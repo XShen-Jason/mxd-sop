@@ -1,0 +1,31 @@
+# Dependencies and build output
+node_modules/
+.gitnexus/
+dist/
+build/
+coverage/
+
+# Local configuration and persistence
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Generated catalog/import output
+data/item-catalog/generated/
+data/generated/
+frontend/.screenshots/
+frontend/.chrome-debug/
+frontend/.shot-profile/
+frontend/.shot-profile-mobile/
+frontend/.shot-debug/
+frontend/.shot-final/
+frontend/.e2e-debug/
+frontend/.e2e-debug2/
+
+# Local development artifacts
+*-dev.log
+*.backup

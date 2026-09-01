@@ -1,0 +1,10 @@
+/* Role accents, login memory, and icon-only expansion controls. */
+.role-theme-manager .topbar { border-bottom-color: #d5e2ee; background: #f7fbff; }
+.role-theme-super_admin .topbar { border-bottom-color: #e4d8c0; background: #fffcf4; }
+.role-theme-manager .avatar { background: #e3edf8; color: #3f6f9f; }
+.role-theme-super_admin .avatar { background: #f6ead0; color: #9a6b1c; }
+.input-with-icon input { outline: 0; box-shadow: none; }
+.remember-login { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+.remember-login input { width: 15px; min-height: 15px; accent-color: var(--teal); }
+.record-action-button.disabled { display: none; }
+.record-expand-button { min-width: 28px; padding-inline: 5px; }
