@@ -34,6 +34,11 @@ semantics, and whether an operation is synchronous or asynchronous.
 
 Review the backend impact whenever a change adds a request, enlarges a payload,
 changes a query, adds polling, or introduces a synchronous external call.
+
+Operation-group records use bounded keyset pagination in the persistence adapter.
+Review, archive, and own-record filters are applied before payload projection;
+the frontend requests only the active workspace page and guards continuation
+requests against duplicate clicks.
 ## Current deployment baseline
 
 For up to 10 internal users, SQLite in WAL mode is the selected persistence

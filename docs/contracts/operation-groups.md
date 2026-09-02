@@ -110,9 +110,13 @@ unauthorized（401）、forbidden（403）、invalid-input（400）、unknown-se
 
 正常：item quantity=2888 被保存为一个 operation（数量不在此处拆分），响应含 itemName=金币 且无 commands。失败：itemCode 不存在时整个 group 不创建。
 
+### Equipment level normalization
+
+Item operations may include `itemLevel` for equipment. The service defaults it to 1 and bounds it to 1-10. Level 1 keeps the base `itemCode`; higher levels use a `_N` suffix (for example `01012190_2`). The persisted operation and manager commands always use this final code. Duplicate checks use the final code, so different equipment levels may coexist. Legacy requests that already contain a suffixed equipment code remain readable.
+
 ### Item image snapshots
 
-Item operations may include the optional `itemImage` URL resolved from `item-catalog` at normalization time. It is a display-only snapshot; clients still submit only `itemCode` and `quantity`. Older records without this field are enriched from the current catalog when projected.
+Item operations may include the optional `itemImage` URL resolved from `item-catalog` at normalization time. It is a display-only snapshot; clients submit `itemCode`, `quantity`, and (for equipment) `itemLevel`. Older records without this field are enriched from the current catalog when projected.
 
 ## operation-groups.list-own
 
@@ -143,6 +147,8 @@ unauthorized（401）、forbidden（403）、invalid-cursor（400）。
 ### Examples
 
 客服看到自己刚提交的 itemName、quantity 和 pending 状态，但 JSON 中不存在 commands、command、herwarp、drop、cashid、ban 字段。
+
+`list-own` also accepts optional `status` (repeatable or comma-separated) and `kind=issuance|regular`; these filters are applied before pagination.
 
 ## operation-groups.cancel-group
 
@@ -201,6 +207,24 @@ unauthorized（401）、forbidden（403）、invalid-cursor（400）、unknown-s
 新增服务器是兼容变更；排序键和 commands 字段语义不可静默改变。
 
 ### Examples
+
+## operation-groups.list-reviews
+
+Owner: operation-groups
+Version: v1
+Consumers: frontend 绠＄悊/瓒呯骇绠＄悊
+
+### Request/event
+
+GET `/api/v1/manager/operation-groups/reviews?cursor={opaque-cursor}&serverId={optional}&limit={n}`。
+
+### Response/handling
+
+返回所有状态的审核记录（包括 pending、approved、rejected、issued、completed、cancelled），按服务器配置顺序及提交时间升序稳定分页。仅 pending 记录允许执行 approve/reject；该读取契约对 manager 与 super_admin 一致开放。
+
+### Limits and side effects
+
+只读；limit 最大 100；游标为不透明 keyset 游标，服务端不会一次性加载全部记录。
 
 正常：蘑菇组先显示最早 submittedAt 的 pending group；同一 group 的 2888 物品对应三条 drop 指令。客服 token 调用同一路径必须得到 forbidden。
 
@@ -263,6 +287,8 @@ unauthorized（401）、forbidden（403）、invalid-cursor（400）、invalid-s
 ### Examples
 
 正常：默认结果包含全部状态；status=pending 只显示未处理。客服调用返回 forbidden。
+
+`list-archive` accepts optional repeatable/comma-separated `status` values and `kind=issuance|regular`; filtering occurs before keyset pagination.
 
 ## v1 workflow extension
 

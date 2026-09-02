@@ -1,6 +1,13 @@
 import { Ban, Check, Circle, Clock3, Package, XCircle } from 'lucide-react';
 import type { AppOptions, Group } from '../../types';
 import { ItemThumbnail } from '../../components/ItemThumbnail';
+import { isEquipment, normalizeEquipmentLevel, splitEquipmentCode } from '../../shared/item-level';
+
+function itemDisplayName(operation: Extract<Group['operations'][number], { type: 'item' }>) {
+  if (!isEquipment(operation.itemClass)) return operation.itemName || operation.itemCode;
+  const level = normalizeEquipmentLevel(operation.itemLevel ?? splitEquipmentCode(operation.itemCode).level);
+  return `${operation.itemName || operation.itemCode}（${level}级）`;
+}
 
 export function formatRecordTime(value?: string) {
   if (!value) return '--';
@@ -99,7 +106,7 @@ export function IssuanceDetails({ group }: { group: Group }) {
   const operations = group.operations.filter((operation) => operation.type === 'item' || operation.type === 'cash');
   if (!operations.length) return null;
   return <section className="issue-details"><div className="detail-label"><Package size={14} />补发内容</div><div className="issue-target"><span>游戏账号</span><strong>{group.account || '--'}</strong><span>玩家 QQ</span><strong>{group.playerQQ || '--'}</strong></div><div className="issue-detail-list">{operations.map((operation, index) => operation.type === 'item'
-    ? <div className="issue-detail-row" key={`${operation.itemCode}-${index}`}><ItemThumbnail src={operation.itemImage} alt={operation.itemName || operation.itemCode} size="medium" /><span className="issue-detail-kind">道具</span><strong>{operation.itemName || operation.itemCode}</strong><code>{operation.itemCode}</code><em>× {operation.quantity}</em></div>
+    ? <div className="issue-detail-row" key={`${operation.itemCode}-${index}`}><ItemThumbnail src={operation.itemImage} alt={operation.itemName || operation.itemCode} size="medium" /><span className="issue-detail-kind">道具</span><strong>{itemDisplayName(operation)}</strong><code>{operation.itemCode}</code><em>× {operation.quantity}</em></div>
     : <div className="issue-detail-row" key={`cash-${index}`}><ItemThumbnail src={undefined} alt="" size="medium" /><span className="issue-detail-kind cash">点券</span><strong>点券</strong><code>cash</code><em>× {operation.quantity}</em></div>)}</div></section>;
 }
 
@@ -116,7 +123,7 @@ export function IssuanceItemsDisplay({ group }: { group: Group }) {
         {operation.type === 'item' ? (
           <>
             <ItemThumbnail src={operation.itemImage} alt={operation.itemName || operation.itemCode} size="medium" />
-            <div className="item-card-name">{operation.itemName || operation.itemCode}</div>
+            <div className="item-card-name">{itemDisplayName(operation)}</div>
             <div className="item-card-quantity">× {operation.quantity}</div>
           </>
         ) : (

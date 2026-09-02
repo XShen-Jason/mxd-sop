@@ -1,5 +1,7 @@
 # operation-groups
 
+Equipment operations normalize an optional `itemLevel` (default 1, maximum 10) into the final item code. Level 1 has no suffix; level N uses `_N`. The normalized code is retained in snapshots and command generation.
+
 本版本将客服工作台命名为“申请道具发放”。发物品和发点券可在同一 group 中并列提交；拖人（`kick`）和封禁（`ban`）是只需要 serverId、characterId、reason 的独立操作。旧 `warp` 类型仅作为历史数据兼容读取。
 
 `actionReasons.kick` 与 `actionReasons.ban` 是独立于道具发放理由的配置集合；服务端会按纯踢人/封号申请校验对应集合，前端不得把理由列表写死。
@@ -83,6 +85,7 @@ Out of scope:
 | operation-groups.list-own | 客服分页查看自己的 group |
 | operation-groups.cancel-group | 客服取消自己的可操作 group |
 | operation-groups.list-queue | 管理按服务器查看 pending group |
+| operation-groups.list-reviews | 管理及超管查看全部审核状态记录（分页） |
 | operation-groups.complete-group | 管理完成 legacy pending 或常规 approved group |
 | operation-groups.list-archive | 管理查看全部历史（包含仍 pending 的 group） |
 

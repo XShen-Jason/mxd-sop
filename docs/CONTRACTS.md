@@ -30,6 +30,7 @@ Contract ID 使用 module-id.operation-name，版本单独记录。所有 ID 为
 | operation-groups.list-own | operation-groups | v1 | frontend 客服 | contracts/operation-groups.md |
 | operation-groups.cancel-group | operation-groups | v1 | frontend 客服 | contracts/operation-groups.md |
 | operation-groups.list-queue | operation-groups | v1 | frontend 管理 | contracts/operation-groups.md |
+| operation-groups.list-reviews | operation-groups | v1 | frontend manager/super_admin | contracts/operation-groups.md |
 | operation-groups.complete-group | operation-groups | v1 | frontend 管理 | contracts/operation-groups.md |
 | operation-groups.list-archive | operation-groups | v1 | frontend 管理 | contracts/operation-groups.md |
 | item-catalog.search | item-catalog | v1 | frontend 客服/管理 | contracts/item-catalog.md |

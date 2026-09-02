@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ChevronDown, ChevronUp, CirclePlus, Layers3, Package, RefreshCw, Send, ShieldBan, Ticket, UserRound, X } from 'lucide-react';
+import { useRef } from 'react';
 import { ApiClient, ApiError } from '../../api/client';
 import { ConfirmDialog } from '../../components/Dialog';
 import { FloatingNotice } from '../../components/FloatingNotice';
@@ -8,10 +9,12 @@ import { ItemThumbnail } from '../../components/ItemThumbnail';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatRecordTime, isIssuanceGroup, IssuanceItemsDisplay, recordType, RecordTableHeader, reasonLabel } from '../operation-groups/RecordPresentation';
 import type { AppOptions, CatalogItem, Group, Role } from '../../types';
-import { readActivities, type Activity } from '../activities/store';
+import { activityRewardLabel, readActivities, type Activity } from '../activities/store';
+import { expandCompletedStatuses } from '../operation-groups/pagination';
+import { codeForLevel, isEquipment, MAX_EQUIPMENT_LEVEL, normalizeEquipmentLevel, splitEquipmentCode } from '../../shared/item-level';
 
 type Mode = 'issue' | 'kick' | 'ban';
-type ItemDraft = { itemCode: string; itemName: string; itemClass?: string; image?: string; quantity: string; state: 'empty' | 'selected' | 'invalid' };
+type ItemDraft = { itemCode: string; itemName: string; itemClass?: string; image?: string; itemLevel?: number; quantity: string; state: 'empty' | 'selected' | 'invalid' };
 type FormState = { serverId: string; account: string; characterId: string; playerQQ: string; reasonCode: string; reasonText: string };
 type ConfirmState = { title: string; description: string; payload: Record<string, unknown> } | null;
 type Notice = { id: number; kind: 'success' | 'error'; text: string };
@@ -51,15 +54,30 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
   const [cashQuantity, setCashQuantity] = useState('');
   const [activities, setActivities] = useState<Activity[]>(readActivities);
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
+  const loadingRequest = useRef(0);
+  const loadingMore = useRef(false);
   useEffect(() => { const sync = () => setActivities(readActivities()); window.addEventListener('storage', sync); window.addEventListener('activities-updated', sync); return () => { window.removeEventListener('storage', sync); window.removeEventListener('activities-updated', sync); }; }, []);
 
   const load = async (append = false) => {
+    if (append && loadingMore.current) return;
+    const requestId = ++loadingRequest.current;
+    if (append) loadingMore.current = true;
     setLoading(true);
-    try { const result = await client.mine(append ? cursor ?? undefined : undefined); setGroups((current) => append ? [...current, ...result.groups] : result.groups); setCursor(result.nextCursor); }
+    try {
+      const kind = section === 'records' ? (recordTypeFilter === 'issue' ? 'issuance' : 'regular') : undefined;
+      const statuses = section === 'records' ? expandCompletedStatuses(recordStatuses) : undefined;
+      if (section === 'records' && statuses?.length === 0) {
+        setGroups([]); setCursor(null); return;
+      }
+      const result = await client.mine(append ? cursor ?? undefined : undefined, 20, statuses, kind);
+      if (requestId !== loadingRequest.current) return;
+      setGroups((current) => append ? [...current, ...result.groups.filter((group) => !current.some((item) => item.id === group.id))] : result.groups);
+      setCursor(result.nextCursor);
+    }
     catch (error) { pushNotice('error', error instanceof ApiError ? error.message : '暂时无法加载申请记录'); }
-    finally { setLoading(false); }
+    finally { if (requestId === loadingRequest.current) setLoading(false); if (append) loadingMore.current = false; }
   };
-  useEffect(() => { void load(); }, [client]);
+  useEffect(() => { void load(); }, [client, section, recordTypeFilter, recordStatuses.join(',')]);
   useEffect(() => { setExpandedRecordId(null); }, [section]);
   useEffect(() => { localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(recentItems)); }, [recentItems]);
   useEffect(() => { if (!activeNotice && noticeQueue.length) { setActiveNotice(noticeQueue[0]); setNoticeQueue((current) => current.slice(1)); } }, [activeNotice, noticeQueue]);
@@ -81,8 +99,9 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
       }
       if (!reward.itemCode) continue;
       const rewardCode = reward.itemCode;
+      const rewardLevel = isEquipment(reward.itemClass) ? normalizeEquipmentLevel(reward.itemLevel) : undefined;
       setItems((current) => {
-        const existing = current.findIndex((item) => item.itemCode === rewardCode);
+        const existing = current.findIndex((item) => codeForLevel(item.itemCode, item.itemClass, item.itemLevel) === codeForLevel(rewardCode, reward.itemClass, rewardLevel));
         if (existing >= 0) return current.map((item, index) => {
           if (index !== existing) return item;
           const quantity = Number(item.quantity || 0) + (removing ? -reward.quantity : reward.quantity);
@@ -91,7 +110,7 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
         }).filter((item): item is ItemDraft => Boolean(item));
         if (removing) return current;
         const blank = current.findIndex((item) => item.state !== 'selected');
-        const nextItem: ItemDraft = { itemCode: rewardCode, itemName: reward.itemName ?? rewardCode, itemClass: reward.itemClass, image: reward.image, quantity: String(reward.quantity), state: 'selected' };
+        const nextItem: ItemDraft = { itemCode: rewardCode, itemName: reward.itemName ?? rewardCode, itemClass: reward.itemClass, image: reward.image, itemLevel: rewardLevel, quantity: String(reward.quantity), state: 'selected' };
         return blank >= 0 ? current.map((item, index) => index === blank ? nextItem : item) : current.length < 100 ? [...current, nextItem] : current;
       });
     }
@@ -105,7 +124,7 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
     const nextMode: Mode = action?.type === 'ban' ? 'ban' : action ? 'kick' : 'issue';
     setMode(nextMode); setEditingId(group.id);
     setForm({ serverId: group.server.id, account: group.account ?? '', characterId: group.characterId, playerQQ: group.playerQQ ?? '', reasonCode: group.reason.code, reasonText: group.reason.text ?? '' });
-    setItems(firstItem && firstItem.type === 'item' ? group.operations.filter((operation): operation is Extract<Group['operations'][number], { type: 'item' }> => operation.type === 'item').map((operation) => ({ itemCode: operation.itemCode, itemName: operation.itemName, itemClass: operation.itemClass, image: operation.itemImage, quantity: String(operation.quantity), state: 'selected' })) : [emptyItem()]);
+    setItems(firstItem && firstItem.type === 'item' ? group.operations.filter((operation): operation is Extract<Group['operations'][number], { type: 'item' }> => operation.type === 'item').map((operation) => { const parsed = isEquipment(operation.itemClass) ? splitEquipmentCode(operation.itemCode) : { baseCode: operation.itemCode, level: undefined }; return { itemCode: parsed.baseCode, itemName: operation.itemName, itemClass: operation.itemClass, image: operation.itemImage, itemLevel: isEquipment(operation.itemClass) ? normalizeEquipmentLevel(operation.itemLevel ?? parsed.level) : undefined, quantity: String(operation.quantity), state: 'selected' }; }) : [emptyItem()]);
     setCashQuantity(cash && cash.type === 'cash' ? String(cash.quantity) : ''); window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -125,7 +144,8 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
       const hasBlankItem = items.some((item) => item.state !== 'selected');
       if (hasBlankItem && !(items.length === 1 && items[0].state === 'empty' && cashQuantity.trim())) throw new Error('请为每一行选择具体物品');
       const operations: Array<Record<string, unknown>> = [];
-      for (const item of items) { if (!item.itemCode) continue; const quantity = Number(item.quantity); if (!Number.isSafeInteger(quantity) || quantity <= 0) throw new Error('物品数量必须是正整数'); operations.push({ type: 'item', itemCode: item.itemCode, quantity }); }
+      const finalCodes = new Set<string>();
+      for (const item of items) { if (!item.itemCode) continue; const quantity = Number(item.quantity); if (!Number.isSafeInteger(quantity) || quantity <= 0) throw new Error('物品数量必须是正整数'); if (isEquipment(item.itemClass) && item.itemLevel !== undefined && (!Number.isInteger(item.itemLevel) || item.itemLevel < 1 || item.itemLevel > MAX_EQUIPMENT_LEVEL)) throw new Error(`装备等级必须是 1-${MAX_EQUIPMENT_LEVEL} 的整数`); const itemLevel = isEquipment(item.itemClass) ? normalizeEquipmentLevel(item.itemLevel) : undefined; const finalCode = codeForLevel(item.itemCode, item.itemClass, itemLevel); if (finalCodes.has(finalCode)) throw new Error('同一物品和等级不能重复选择'); finalCodes.add(finalCode); operations.push({ type: 'item', itemCode: item.itemCode, ...(isEquipment(item.itemClass) ? { itemLevel } : {}), quantity }); }
       if (cashQuantity.trim()) { const quantity = Number(cashQuantity); if (!Number.isSafeInteger(quantity) || quantity <= 0) throw new Error('点券数量必须是正整数'); operations.push({ type: 'cash', quantity }); }
       if (!operations.length) throw new Error('至少添加一项发放内容');
       payload.account = form.account.trim(); payload.playerQQ = form.playerQQ.trim(); payload.operations = operations;
@@ -149,7 +169,7 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
     finally { setSubmitting(false); }
   };
 
-  const chooseRecent = (item: CatalogItem) => { if (items.some((entry) => entry.itemCode === item.code)) { pushNotice('error', '同一物品不能重复选择'); return; } setItems((current) => { const index = current.findIndex((entry) => entry.state !== 'selected'); if (index >= 0) return current.map((entry, i) => i === index ? { ...entry, itemCode: item.code, itemName: item.name, itemClass: item.itemClass, image: item.image, state: 'selected' } : entry); return current.length < 100 ? [...current, { itemCode: item.code, itemName: item.name, itemClass: item.itemClass, image: item.image, quantity: '1', state: 'selected' }] : current; }); };
+  const chooseRecent = (item: CatalogItem) => { const parsed = isEquipment(item.itemClass) ? splitEquipmentCode(item.code) : { baseCode: item.code, level: undefined }; if (!isEquipment(item.itemClass) && items.some((entry) => entry.itemCode === item.code)) { pushNotice('error', '同一物品不能重复选择'); return; } setItems((current) => { const index = current.findIndex((entry) => entry.state !== 'selected'); const next = { itemCode: parsed.baseCode, itemName: item.name, itemClass: item.itemClass, image: item.image, itemLevel: isEquipment(item.itemClass) ? normalizeEquipmentLevel(parsed.level) : undefined, quantity: '1', state: 'selected' as const }; if (index >= 0) return current.map((entry, i) => i === index ? { ...entry, ...next } : entry); return current.length < 100 ? [...current, next] : current; }); };
   const rememberItem = (item: CatalogItem) => setRecentItems((current) => [item, ...current.filter((entry) => entry.code !== item.code)].slice(0, 6));
   const requestCancel = (id: string) => setCancelTarget(id);
   const cancel = async () => {
@@ -162,10 +182,10 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
   const reasons = mode === 'issue' ? options.reasons : options.actionReasons?.[mode] ?? options.reasons;
   const baseComplete = Boolean(form.serverId && /^[0-9]+$/.test(form.characterId) && form.reasonCode && (mode !== 'issue' || (form.account.trim() && form.playerQQ.trim())) && (form.reasonCode !== 'other' || form.reasonText.trim()));
   const showRecords = section === 'records';
-  const visibleGroups = groups.filter((group) => (recordTypeFilter === 'issue' ? isIssuanceGroup(group) : !isIssuanceGroup(group)) && recordStatuses.some((status) => status === 'completed' ? group.status === 'issued' || group.status === 'completed' : group.status === status));
+  const visibleGroups = groups;
   const toggleRecordStatus = (status: RecordFilterStatus) => setRecordStatuses((current) => current.includes(status) ? current.filter((item) => item !== status) : [...current, status]);
   const selectAllRecordStatuses = () => setRecordStatuses(Object.keys(recordStatusName) as RecordFilterStatus[]);
-  const resetRecordFilters = () => { setRecordTypeFilter('issue'); setRecordStatuses(defaultRecordStatuses); void load(); };
+  const resetRecordFilters = () => { setRecordTypeFilter('issue'); setRecordStatuses(defaultRecordStatuses); };
 
   return <section className="workspace customer-workspace">
     <div className={`page-heading ${showRecords ? 'records-heading' : 'manager-heading'}`}><div><p className="eyebrow">客服工作台</p><h1>{showRecords ? '\u6211\u7684\u7533\u8bf7' : editingId ? '\u4fee\u6539\u7533\u8bf7' : '\u7533\u8bf7\u64cd\u4f5c'}</h1></div>{!showRecords && (editingId ? <button type="button" className="secondary-button" onClick={() => { reset(mode); onNavigate?.('records'); }}>返回我的申请</button> : <div className="heading-stat"><span>待审核</span><strong>{groups.filter((group) => group.status === 'pending').length}</strong></div>)}</div>
@@ -194,15 +214,15 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
 function targetLabel(form: FormState, options: AppOptions) { return `${options.servers.find((server) => server.id === form.serverId)?.displayName ?? '未选择'} · ${form.characterId || '角色 ID'}`; }
 
 function ActivityChooser({ activities, selected, enabled, onToggle }: { activities: Activity[]; selected: string[]; enabled: boolean; onToggle: (activity: Activity) => void }) {
-  return <section className={`panel-surface activity-chooser ${enabled ? '' : 'is-disabled'}`}><div className="section-title"><span className="step-index">活动</span><div><h2>活动快捷填充</h2></div></div>{activities.length ? <div className="activity-chooser-list">{activities.map((activity) => <button type="button" key={activity.id} aria-pressed={selected.includes(activity.id)} className={`activity-choice ${selected.includes(activity.id) ? 'selected' : ''}`} disabled={!enabled} onClick={() => onToggle(activity)}><span className="activity-choice-main"><strong>{activity.name}</strong>{activity.description && <small>{activity.description}</small>}</span><span className="activity-choice-rewards">{activity.rewards.map((reward, index) => <em key={`${reward.itemCode ?? reward.kind}-${index}`}>{reward.kind === 'cash' ? `点券×${reward.quantity}` : `${reward.itemName ?? reward.itemCode}×${reward.quantity}`}</em>)}</span>{selected.includes(activity.id) && <span className="activity-selected-mark">已选</span>}</button>)}</div> : <div className="activity-chooser-empty">暂无活动</div>}</section>;
+  return <section className={`panel-surface activity-chooser ${enabled ? '' : 'is-disabled'}`}><div className="section-title"><span className="step-index">活动</span><div><h2>活动快捷填充</h2></div></div>{activities.length ? <div className="activity-chooser-list">{activities.map((activity) => <button type="button" key={activity.id} aria-pressed={selected.includes(activity.id)} className={`activity-choice ${selected.includes(activity.id) ? 'selected' : ''}`} disabled={!enabled} onClick={() => onToggle(activity)}><span className="activity-choice-main"><strong>{activity.name}</strong></span><span className="activity-choice-rewards">{activity.rewards.map((reward, index) => <em key={`${reward.itemCode ?? reward.kind}-${index}`}>{activityRewardLabel(reward)}</em>)}</span>{selected.includes(activity.id) && <span className="activity-selected-mark">已选</span>}</button>)}</div> : <div className="activity-chooser-empty">暂无活动</div>}</section>;
 }
 
 function IssueOperations({ items, setItems, cashQuantity, setCashQuantity, token, recentItems, onRecentSelect, onItemSelected, onDuplicateItem }: { items: ItemDraft[]; setItems: (value: ItemDraft[] | ((current: ItemDraft[]) => ItemDraft[])) => void; cashQuantity: string; setCashQuantity: (value: string) => void; token?: string; recentItems: CatalogItem[]; onRecentSelect: (item: CatalogItem) => void; onItemSelected: (item: CatalogItem) => void; onDuplicateItem: () => void }) {
-  const selectItem = (index: number, next: CatalogItem) => { if (items.some((entry, i) => i !== index && entry.itemCode === next.code)) { onDuplicateItem(); return false; } onItemSelected(next); setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: next.code, itemName: next.name, itemClass: next.itemClass, image: next.image, state: 'selected' } : entry)); return true; };
-  const clearItem = (index: number) => setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: '', itemClass: undefined, image: undefined, quantity: '', state: 'empty' } : entry));
-  const removeItem = (index: number) => setItems((current) => current.length > 1 ? current.filter((_, i) => i !== index) : current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: '', itemClass: undefined, image: undefined, quantity: '', state: 'empty' } : entry));
-  const markInput = (index: number, state: 'empty' | 'invalid') => setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: state === 'empty' ? '' : entry.itemName, itemClass: undefined, image: undefined, state } : entry));
-  return <section className="panel-surface form-panel operations-panel"><div className="section-title"><span className="step-index">02</span><div><h2>具体操作内容</h2></div></div><div className="recent-items-panel"><div><strong>最近选择</strong><span>常用物品快捷入口</span></div><div className="recent-items-list">{recentItems.length ? recentItems.map((item) => <button type="button" key={item.code} className="recent-item-button" onClick={() => onRecentSelect(item)}><span className="recent-item-content"><ItemThumbnail src={item.image} alt="" size="small" /><span>{item.name}</span></span></button>) : <span className="recent-empty">选择物品后会出现在这里</span>}</div></div><div className="operation-split"><div className="operation-block"><div className="operation-block-title"><Package size={17} /><strong>发物品</strong><span>{items.filter((item) => item.itemCode).length}/100</span></div>{items.map((item, index) => <div className="item-line" key={index}><ItemPicker token={token} value={item.itemCode} name={item.itemName} image={item.image} onChange={(next: CatalogItem) => selectItem(index, next)} onClear={() => clearItem(index)} onInputState={(state) => markInput(index, state)} /><input className="item-quantity" inputMode="numeric" aria-label={`第 ${index + 1} 种物品数量`} value={item.quantity} onChange={(event) => setItems((current) => current.map((entry, i) => i === index ? { ...entry, quantity: event.target.value.replace(/[^0-9]/g, '') } : entry))} /><button type="button" className="icon-button danger-button clear-item-button" title={items.length > 1 ? '删除整条物品' : '清空物品和数量'} aria-label={items.length > 1 ? '删除整条物品' : '清空物品和数量'} onClick={() => removeItem(index)}><X size={16} /></button></div>)}<button type="button" className="add-operation" disabled={items.length >= 100 || items.some((item) => item.state !== 'selected')} onClick={() => setItems((current) => [...current, emptyItem()])}><CirclePlus size={16} />添加物品</button></div><div className="operation-block cash-block"><div className="operation-block-title"><Ticket size={17} /><strong>发点券</strong><span>单次数量</span></div><label><span>点券数量</span><input inputMode="numeric" value={cashQuantity} placeholder="可选" onChange={(event) => setCashQuantity(event.target.value.replace(/[^0-9]/g, ''))} /></label><div className="cash-hint">留空表示本次不发点券</div></div></div></section>;
+  const selectItem = (index: number, next: CatalogItem) => { const parsed = isEquipment(next.itemClass) ? splitEquipmentCode(next.code) : { baseCode: next.code, level: undefined }; if (!isEquipment(next.itemClass) && items.some((entry, i) => i !== index && entry.itemCode === next.code)) { onDuplicateItem(); return false; } onItemSelected(next); setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: parsed.baseCode, itemName: next.name, itemClass: next.itemClass, image: next.image, itemLevel: isEquipment(next.itemClass) ? normalizeEquipmentLevel(parsed.level) : undefined, state: 'selected' } : entry)); return true; };
+  const clearItem = (index: number) => setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: '', itemClass: undefined, image: undefined, itemLevel: undefined, quantity: '', state: 'empty' } : entry));
+  const removeItem = (index: number) => setItems((current) => current.length > 1 ? current.filter((_, i) => i !== index) : current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: '', itemClass: undefined, image: undefined, itemLevel: undefined, quantity: '', state: 'empty' } : entry));
+  const markInput = (index: number, state: 'empty' | 'invalid') => setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: state === 'empty' ? '' : entry.itemName, itemClass: undefined, image: undefined, itemLevel: undefined, state } : entry));
+  return <section className="panel-surface form-panel operations-panel"><div className="section-title"><span className="step-index">02</span><div><h2>具体操作内容</h2></div></div><div className="recent-items-panel"><div><strong>最近选择</strong><span>常用物品快捷入口</span></div><div className="recent-items-list">{recentItems.length ? recentItems.map((item) => <button type="button" key={item.code} className="recent-item-button" onClick={() => onRecentSelect(item)}><span className="recent-item-content"><ItemThumbnail src={item.image} alt="" size="small" /><span>{item.name}</span></span></button>) : <span className="recent-empty">选择物品后会出现在这里</span>}</div></div><div className="operation-split"><div className="operation-block"><div className="operation-block-title"><Package size={17} /><strong>发物品</strong><span>{items.filter((item) => item.itemCode).length}/100</span></div>{items.map((item, index) => <div className="item-line" key={index}><ItemPicker token={token} value={item.itemCode} name={item.itemName} image={item.image} onChange={(next: CatalogItem) => selectItem(index, next)} onClear={() => clearItem(index)} onInputState={(state) => markInput(index, state)} />{isEquipment(item.itemClass) && <label className="item-level-control"><span>等级</span><input className="item-level-input" type="text" inputMode="numeric" pattern="[0-9]*" aria-label={`第 ${index + 1} 个装备等级`} value={item.itemLevel ?? 1} onChange={(event) => { const value = event.target.value.replace(/[^0-9]/g, ''); setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemLevel: value ? Number(value) : undefined } : entry)); }} onBlur={(event) => { if (!event.currentTarget.value) setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemLevel: 1 } : entry)); }} /></label>}<label className="item-quantity-control"><span>数量</span><input className="item-quantity" inputMode="numeric" aria-label={`第 ${index + 1} 种物品数量`} value={item.quantity} onChange={(event) => setItems((current) => current.map((entry, i) => i === index ? { ...entry, quantity: event.target.value.replace(/[^0-9]/g, '') } : entry))} /></label><button type="button" className="icon-button danger-button clear-item-button" title={items.length > 1 ? '删除整条物品' : '清空物品和数量'} aria-label={items.length > 1 ? '删除整条物品' : '清空物品和数量'} onClick={() => removeItem(index)}><X size={16} /></button></div>)}<button type="button" className="add-operation" disabled={items.length >= 100 || items.some((item) => item.state !== 'selected')} onClick={() => setItems((current) => [...current, emptyItem()])}><CirclePlus size={16} />添加物品</button></div><div className="operation-block cash-block"><div className="operation-block-title"><Ticket size={17} /><strong>发点券</strong><span>单次数量</span></div><label><span>点券数量</span><input inputMode="numeric" value={cashQuantity} placeholder="可选" onChange={(event) => setCashQuantity(event.target.value.replace(/[^0-9]/g, ''))} /></label><div className="cash-hint">留空表示本次不发点券</div></div></div></section>;
 }
 
 function OwnRecordCard({ index, group, options, expanded, onToggle, onEdit, onCancel }: { index: number; group: Group; options: AppOptions; expanded: boolean; onToggle: () => void; onEdit: (group: Group) => void; onCancel: (id: string) => void }) {

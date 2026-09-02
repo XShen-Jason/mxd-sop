@@ -61,8 +61,11 @@
   .reason-note { margin-top: 14px; }
   .operation-split { grid-template-columns: 1fr; gap: 12px; }
   .operation-block { padding: 13px; }
-  .item-line { grid-template-columns: minmax(0, 1fr) 72px 40px; gap: 6px; }
+  .item-line { grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; }
   .item-quantity { width: 72px; height: 44px; }
+  .item-line .item-level-input, .item-line .item-quantity { width: 72px; height: 44px; min-height: 44px; }
+  .item-level-control { gap: 3px; font-size: 10px; }
+  .item-line .item-level-control, .item-line .item-quantity-control { height: 44px; }
   .item-line .search-field { height: 44px; }
   .clear-item-button { width: 40px; height: 44px; }
   .picker-menu { max-height: min(300px, 48dvh); }
@@ -155,8 +158,8 @@
   .workspace { padding-inline: 10px; }
   .topbar { padding-inline: 8px; }
   .form-panel { padding-inline: 11px; }
-  .item-line { grid-template-columns: minmax(0, 1fr) 64px 40px; }
-  .item-quantity { width: 64px; }
+  .item-line { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .item-line .item-level-input, .item-line .item-quantity { width: 64px; height: 44px; min-height: 44px; }
   .record-table-row, .record-table-row.record-table-reissue, .record-table-row.record-table-without-actor, .record-table-row.record-table-with-reviewer { padding: 10px; gap: 8px 9px; }
   .record-action-button { padding-inline: 7px; }
   .issuance-items-display { grid-template-columns: 1fr; }

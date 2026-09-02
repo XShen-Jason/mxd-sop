@@ -46,6 +46,8 @@ export interface AppOptions {
 export interface ItemOperation {
   type: 'item';
   itemCode: string;
+  /** Equipment level after normalization. Level 1 is represented without a code suffix. */
+  itemLevel?: number;
   itemName: string;
   itemClass?: string;
   itemImage?: string;

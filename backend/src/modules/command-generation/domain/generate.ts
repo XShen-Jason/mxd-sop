@@ -58,7 +58,7 @@ export function generateCommands(inputOrCharacterId: CommandGenerationInput | st
     }
     switch (operation.type) {
       case 'item': {
-        assertNoExtraKeys(operation as unknown as Record<string, unknown>, ['type', 'itemCode', 'itemName', 'itemClass', 'itemImage', 'quantity']);
+        assertNoExtraKeys(operation as unknown as Record<string, unknown>, ['type', 'itemCode', 'itemLevel', 'itemName', 'itemClass', 'itemImage', 'quantity']);
         assertSafeField(operation.itemCode);
         assertQuantity(operation.quantity);
         if (Math.ceil(operation.quantity / 1000) > MAX_ITEM_CHUNKS) throw new CommandGenerationError('invalid-quantity');

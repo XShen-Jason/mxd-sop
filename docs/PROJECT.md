@@ -30,12 +30,12 @@ Authentication uses three roles: `customer` (普通客服), `manager` (管理), 
 
 The `auth` capability is implemented in `backend/src/modules/auth` and `frontend/src/App.tsx`.
 
-The operation-groups workflow contracts now include update-group, approve-group, reject-group, issue-group, and list-overview; see the canonical contract for the pending/approved/rejected/issued state machine.
+The operation-groups workflow contracts now include update-group, approve-group, reject-group, issue-group, list-reviews, and list-overview; see the canonical contract for the pending/approved/rejected/issued state machine.
 
 | Module ID | Capability | Implementation location(s) | Owner application(s) | Public contracts | Dependencies |
 | --- | --- | --- | --- | --- | --- |
 | auth | 登录会话、三层角色和受控账号目录 | backend/src/modules/auth; frontend/src/App.tsx; docs/modules/auth.md | backend + frontend | auth.login, auth.logout, auth.me, auth.list-users, auth.create-user, auth.update-user, auth.delete-user | user persistence/session adapter |
-| operation-groups | 工单组提交、分组、角色视图、取消、完成和归档状态 | backend/src/modules/operation-groups; frontend/src/modules/operation-groups, frontend/src/modules/customer, frontend/src/modules/manager; manifest docs/modules/operation-groups.md | backend + frontend | operation-groups.list-options, operation-groups.submit-group, operation-groups.list-own, operation-groups.cancel-group, operation-groups.list-queue, operation-groups.complete-group, operation-groups.list-archive | item-catalog（提交时校验/快照）；身份适配器；持久化适配器 |
+| operation-groups | 工单组提交、分组、角色视图、取消、完成和归档状态 | backend/src/modules/operation-groups; frontend/src/modules/operation-groups, frontend/src/modules/customer, frontend/src/modules/manager; manifest docs/modules/operation-groups.md | backend + frontend | operation-groups.list-options, operation-groups.submit-group, operation-groups.list-own, operation-groups.cancel-group, operation-groups.list-queue, operation-groups.list-reviews, operation-groups.complete-group, operation-groups.list-archive | item-catalog（提交时校验/快照）；身份适配器；持久化适配器 |
 | item-catalog | 物品表导入、代码/名称映射、模糊搜索和分类读取 | backend/src/modules/item-catalog; manifest docs/modules/item-catalog.md; data/item-catalog/source | backend + frontend consumer | item-catalog.search, item-catalog.by-class | Excel 导入适配器；持久化适配器 |
 | activities | 客服活动与奖励配置、申请表单快捷填充 | frontend/src/modules/activities; manifest docs/modules/activities.md | frontend | local activity storage | item-catalog.search/by-class；operation-groups form |
 | command-generation | 根据已校验操作生成可执行指令并按上限拆分 | backend/src/modules/command-generation; manifest docs/modules/command-generation.md | backend | command-generation.generate | 无外部业务依赖；接收 operation-groups 的不可变快照 |
@@ -67,6 +67,7 @@ Auth contracts are defined in `docs/contracts/auth.md`: `auth.login`, `auth.logo
 | operation-groups.list-own | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend 客服 |
 | operation-groups.cancel-group | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend 客服 |
 | operation-groups.list-queue | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend 管理 |
+| operation-groups.list-reviews | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend manager/super_admin |
 | operation-groups.complete-group | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend 管理 |
 | operation-groups.list-archive | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend 管理 |
 | item-catalog.search | HTTP API | docs/contracts/item-catalog.md | item-catalog | v1 | frontend 客服/管理 |

@@ -29,6 +29,16 @@ function canonicalize(value: unknown): unknown {
   return value;
 }
 
+export type PageCursor = { submittedAt: string; id: string; serverId?: string };
+export function encodePageCursor(cursor: PageCursor) { return Buffer.from(JSON.stringify({ ...cursor, version: 2 }), 'utf8').toString('base64url'); }
+export function decodePageCursor(cursor?: string): PageCursor | undefined {
+  if (!cursor) return undefined;
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { submittedAt?: unknown; id?: unknown; serverId?: unknown; version?: unknown };
+    if (parsed.version !== 2 || typeof parsed.submittedAt !== 'string' || typeof parsed.id !== 'string' || (parsed.serverId !== undefined && typeof parsed.serverId !== 'string')) throw new Error();
+    return { submittedAt: parsed.submittedAt, id: parsed.id, serverId: parsed.serverId };
+  } catch { throw new GroupError('invalid-cursor'); }
+}
 export function encodeCursor(offset: number) { return Buffer.from(JSON.stringify({ offset, version: 1 }), 'utf8').toString('base64url'); }
 export function decodeCursor(cursor?: string) {
   if (!cursor) return 0;

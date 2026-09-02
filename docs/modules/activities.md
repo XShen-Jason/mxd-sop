@@ -1,5 +1,7 @@
 # activities
 
+Equipment rewards include an optional `itemLevel` (default 1, maximum 10). Level 1 uses the catalog base code; higher levels append `_N` when the reward is applied to a request.
+
 ## Purpose
 
 管理客服常用活动及其道具、点券奖励，并在发物资申请中提供一键填充。该工作区仅管理及以上角色可见。

@@ -86,7 +86,14 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
     } catch (error) { return sendError(reply, error); }
   });
   app.get('/api/v1/operation-groups/mine', async (request, reply) => {
-    try { const query = request.query as Query; return reply.send(service.listOwn(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined)); } catch (error) { return sendError(reply, error); }
+    try {
+      const query = request.query as Query;
+      const statuses = query.status === undefined ? undefined : (Array.isArray(query.status) ? query.status.map(String) : String(query.status).split(',')).filter(Boolean) as GroupStatus[];
+      const kind = query.kind === undefined ? undefined : String(query.kind) as 'issuance' | 'regular';
+      if (kind !== undefined && kind !== 'issuance' && kind !== 'regular') throw new GroupError('invalid-input', 'invalid kind');
+      const normalizedStatus = statuses?.length ? (statuses.length === 1 ? statuses[0] : statuses) : undefined;
+      return reply.send(service.listOwn(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, normalizedStatus, kind));
+    } catch (error) { return sendError(reply, error); }
   });
   app.post('/api/v1/operation-groups/:groupId/cancel', async (request, reply) => {
     try { return reply.send(service.cancel(identity(request), (request.params as { groupId: string }).groupId)); } catch (error) { return sendError(reply, error); }
@@ -102,6 +109,9 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
   });
   app.get('/api/v1/manager/operation-groups/queue', async (request, reply) => {
     try { const query = request.query as Query; return reply.send(service.listQueue(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, query.serverId ? String(query.serverId) : undefined)); } catch (error) { return sendError(reply, error); }
+  });
+  app.get('/api/v1/manager/operation-groups/reviews', async (request, reply) => {
+    try { const query = request.query as Query; return reply.send(service.listReview(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, query.serverId ? String(query.serverId) : undefined)); } catch (error) { return sendError(reply, error); }
   });
   app.get('/api/v1/manager/operation-groups/overview', async (request, reply) => {
     try { const query = request.query as Query; return reply.send(service.listOverview(identity(request), limitOf(query, 100), query.cursor ? String(query.cursor) : undefined)); } catch (error) { return sendError(reply, error); }
@@ -129,6 +139,13 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
     try { const body = bodyObject(request); if (Object.keys(body).some((key) => key !== 'executionNote')) throw new GroupError('invalid-input'); if (body.executionNote !== undefined && typeof body.executionNote !== 'string') throw new GroupError('invalid-input'); return reply.send(service.complete(identity(request), (request.params as { groupId: string }).groupId, body.executionNote as string | undefined)); } catch (error) { return sendError(reply, error); }
   });
   app.get('/api/v1/manager/operation-groups/archive', async (request, reply) => {
-    try { const query = request.query as Query; const status = query.status === undefined ? undefined : String(query.status) as GroupStatus; return reply.send(service.listArchive(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, status, query.serverId ? String(query.serverId) : undefined)); } catch (error) { return sendError(reply, error); }
+    try {
+      const query = request.query as Query;
+      const status = query.status === undefined ? undefined : (Array.isArray(query.status) ? query.status.map(String) : String(query.status).split(',')).filter(Boolean) as GroupStatus[];
+      const kind = query.kind === undefined ? undefined : String(query.kind) as 'issuance' | 'regular';
+      if (kind !== undefined && kind !== 'issuance' && kind !== 'regular') throw new GroupError('invalid-input', 'invalid kind');
+      const normalizedStatus = status?.length ? (status.length === 1 ? status[0] : status) : undefined;
+      return reply.send(service.listArchive(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, normalizedStatus, query.serverId ? String(query.serverId) : undefined, kind));
+    } catch (error) { return sendError(reply, error); }
   });
 }

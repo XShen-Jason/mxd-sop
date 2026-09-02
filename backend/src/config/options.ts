@@ -30,7 +30,7 @@ export const appOptions: AppOptions = {
     ]
   },
   operations: [
-    { type: 'item', displayName: '发物品', fields: ['itemCode', 'quantity'], allowMultiple: true },
+    { type: 'item', displayName: '发物品', fields: ['itemCode', 'itemLevel', 'quantity'], allowMultiple: true },
     { type: 'cash', displayName: '发点券', fields: ['quantity'], allowMultiple: true },
     { type: 'kick', displayName: '拖人', fields: [], allowMultiple: true },
     { type: 'ban', displayName: '封禁', fields: [], allowMultiple: true }

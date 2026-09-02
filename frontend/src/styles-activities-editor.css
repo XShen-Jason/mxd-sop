@@ -28,7 +28,7 @@
 
 .activity-fixed-reward {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 78px 30px;
+  grid-template-columns: minmax(0, 1fr) 112px 30px;
   gap: 8px;
   align-items: center;
   margin-top: 8px;
@@ -40,6 +40,8 @@
   font-size: 11px;
 }
 
+.item-reward-row.has-item-level { grid-template-columns: minmax(0, 1fr) 112px 112px 30px; }
+
 .activity-fixed-reward.cash-reward-row {
   grid-template-columns: auto minmax(0, 1fr) 78px 30px;
 }
@@ -49,6 +51,7 @@
 }
 
 .activity-fixed-reward input {
+  height: 34px;
   min-height: 34px;
   padding: 6px 8px;
 }
@@ -58,6 +61,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.item-level-input { width: 78px; height: 34px; min-height: 34px; padding: 6px 8px; }
+.item-level-control, .item-quantity-control { display: flex; align-items: center; justify-content: flex-end; gap: 4px; height: 34px; color: var(--muted); font-size: 10px; line-height: 1; white-space: nowrap; }
+.item-level-control > span, .item-quantity-control > span { display: inline; margin: 0; }
+.item-quantity-input { width: 78px; height: 34px; min-height: 34px; }
+.item-level-input, .item-quantity-input { box-sizing: border-box; }
 
 .item-reward-heading {
   display: flex;
@@ -77,14 +86,56 @@
 
 @media (max-width: 680px) {
   .activity-editor {
-    padding: 18px 15px;
+    padding: 16px 13px;
+    border-radius: 9px;
+  }
+
+  .activity-editor .section-title {
+    margin-bottom: 17px;
+  }
+
+  .activity-reward-title {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+
+  .activity-reward-title .text-button {
+    min-height: 40px;
   }
 
   .activity-fixed-reward {
-    grid-template-columns: minmax(0, 1fr) 66px 26px;
+    grid-template-columns: minmax(0, 1fr) 94px 40px;
+    min-height: 52px;
+    padding: 6px 8px;
   }
 
   .activity-fixed-reward.cash-reward-row {
-    grid-template-columns: auto minmax(0, 1fr) 66px 26px;
+    grid-template-columns: auto minmax(0, 1fr) 66px 40px;
+  }
+
+  .item-reward-row.has-item-level { grid-template-columns: minmax(0, 1fr) 94px 94px 40px; }
+  .item-level-input, .item-quantity-input { width: 66px; height: 34px; min-height: 34px; }
+  .item-level-control, .item-quantity-control { height: 34px; }
+
+  .activity-fixed-reward .icon-button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+
+  .activity-item-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+  }
+
+  .activity-editor-footer {
+    gap: 8px;
+  }
+
+  .activity-editor-footer > .primary-button,
+  .activity-editor-footer > .secondary-button {
+    min-height: 44px;
   }
 }

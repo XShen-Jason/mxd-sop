@@ -39,6 +39,8 @@ export function openDatabase(filePath: string) {
     CREATE INDEX IF NOT EXISTS groups_status_submitted ON operation_groups(status, submitted_at DESC);
     CREATE INDEX IF NOT EXISTS groups_submitter_submitted ON operation_groups(submitted_by_id, submitted_at DESC);
     CREATE INDEX IF NOT EXISTS groups_server_status ON operation_groups(server_id, status, submitted_at DESC);
+    CREATE INDEX IF NOT EXISTS groups_submitter_idempotency ON operation_groups(submitted_by_id, idempotency_key);
+    CREATE INDEX IF NOT EXISTS groups_submitted_id ON operation_groups(submitted_at DESC, id DESC);
   `);
   return db;
 }

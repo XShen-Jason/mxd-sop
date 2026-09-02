@@ -251,16 +251,82 @@
 }
 
 @media (max-width: 680px) {
+  .activity-workspace {
+    padding-top: 20px;
+  }
+
   .activity-layout {
     gap: 14px;
   }
 
+  .activity-list-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .activity-list-heading > div {
+    min-width: 0;
+    flex: 1 1 180px;
+  }
+
+  .activity-list-heading h2 {
+    font-size: 18px;
+  }
+
+  .activity-list-heading > .primary-button {
+    width: 100%;
+    min-height: 44px;
+  }
+
   .activity-item-board {
-    padding: 16px 12px;
+    padding: 15px 12px 13px;
+    border-radius: 9px;
   }
 
   .activity-cards {
     grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .activity-card {
+    padding: 13px;
+    border-radius: 8px;
+  }
+
+  .activity-card-header {
+    gap: 8px;
+  }
+
+  .activity-card-header h3 {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .activity-card-header p {
+    line-height: 1.45;
+  }
+
+  .activity-card-actions {
+    flex: 0 0 auto;
+    gap: 3px;
+  }
+
+  .activity-card-actions .icon-button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+
+  .activity-reward-list {
+    gap: 5px;
+    margin-top: 11px;
+  }
+
+  .activity-reward-pill {
+    padding: 6px 8px;
+    line-height: 1.2;
   }
 
   .activity-type-filters {
@@ -275,7 +341,67 @@
 
   .activity-type-filters button {
     flex: 0 0 auto;
+    min-height: 40px;
     padding-inline: 8px;
+  }
+
+  .activity-item-board > .activity-list-heading {
+    align-items: center;
+  }
+
+  .activity-item-board > .activity-list-heading > span {
+    flex: 0 0 auto;
+  }
+
+  .activity-board-toolbar {
+    gap: 9px;
+    margin-top: 12px;
+  }
+
+  .activity-search input {
+    min-height: 44px;
+  }
+
+  .activity-item-grid {
+    gap: 7px;
+    margin-top: 12px;
+  }
+
+  .activity-item-tile {
+    min-height: 64px;
+    padding: 9px 10px;
+    border-radius: 7px;
+  }
+
+  .activity-item-tile .item-thumbnail {
+    width: 42px;
+    height: 42px;
+  }
+
+  .activity-item-tile strong {
+    font-size: 12px;
+  }
+
+  .activity-board-empty {
+    min-height: 150px;
+    padding: 35px 10px;
+  }
+
+  .activity-catalog-pager {
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .activity-catalog-total {
+    width: 100%;
+    margin-right: 0;
+    text-align: center;
+  }
+
+  .activity-catalog-pager .icon-button {
+    width: 40px;
+    height: 40px;
   }
 
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy, Filter, Layers3, LoaderCircle, PackageCheck, RefreshCw, X } from 'lucide-react';
 import { ApiClient, ApiError } from '../../api/client';
 import { CopyButton } from '../../components/CopyButton';
@@ -8,6 +8,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { formatRecordTime, isIssuanceGroup, IssuanceDetails, IssuanceItemsDisplay, reasonLabel, recordType, RecordTableHeader, WorkflowTimeline } from '../operation-groups/RecordPresentation';
 import { UserAdminView } from './UserAdminView';
 import type { AppOptions, GeneratedCommand, ManagerGroup, Role } from '../../types';
+import { appendUniqueById, expandCompletedStatuses } from '../operation-groups/pagination';
 
 type Panel = 'queue' | 'ready' | 'archive' | 'reissue' | 'users';
 type FilterStatus = 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled';
@@ -48,28 +49,34 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
   const copiedStorageKey = useMemo(() => copiedCommandsStorageKey(role, actorId), [role, actorId]);
   const [copiedCommands, setCopiedCommands] = useState<Set<string>>(() => readCopiedCommands(copiedStorageKey));
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const loadingMore = useRef(false);
 
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const [queueResult, archiveResult, readyResult, reissueResult] = await Promise.all([
-        client.queue(),
-        client.archive(),
-        role === 'super_admin' ? client.archive('approved') : Promise.resolve({ groups: [], nextCursor: null }),
-        client.archive()
-      ]);
-      setQueue(queueResult.groups);
-      setArchive(archiveResult.groups.filter(g => !isIssuanceGroup(g)));
-      setReissue(reissueResult.groups.filter(g => isIssuanceGroup(g)));
-      setReady(readyResult.groups.filter((group) => isIssuanceGroup(group)));
-      setQueueCursor(queueResult.nextCursor);
-      setReadyCursor(readyResult.nextCursor);
-      setArchiveCursor(archiveResult.nextCursor);
-      setReissueCursor(reissueResult.nextCursor);
+      if (panel === 'users') return;
+      if (panel === 'queue') {
+        const result = await client.queue(serverFilter || undefined);
+        setQueue(result.groups); setQueueCursor(result.nextCursor);
+      } else if (panel === 'ready') {
+        const result = await client.archive('approved', serverFilter || undefined, undefined, 20, 'issuance');
+        setReady(result.groups); setReadyCursor(result.nextCursor);
+      } else {
+        const kind = panel === 'reissue' ? 'issuance' : 'regular';
+        const statuses = expandCompletedStatuses(statusFilter);
+        if (!statuses.length) {
+          if (panel === 'reissue') { setReissue([]); setReissueCursor(null); }
+          else { setArchive([]); setArchiveCursor(null); }
+          return;
+        }
+        const result = await client.archive(statuses, serverFilter || undefined, undefined, 20, kind);
+        if (panel === 'reissue') { setReissue(result.groups); setReissueCursor(result.nextCursor); }
+        else { setArchive(result.groups); setArchiveCursor(result.nextCursor); }
+      }
     } catch (err) { setError(err instanceof ApiError ? err.message : '暂时无法加载管理数据'); }
     finally { setLoading(false); }
   };
-  useEffect(() => { void load(); }, [client]);
+  useEffect(() => { void load(); }, [client, panel, serverFilter, statusFilter.join(',')]);
   useEffect(() => { window.dispatchEvent(new Event('workspace-counts-refresh')); }, [queue.length, ready.length]);
   useEffect(() => { setNotice(null); }, [panel]);
   useEffect(() => {
@@ -102,29 +109,30 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
   };
   const reject = async (reason: string) => { if (!rejectTarget) return; setRejectSaving(true); try { await client.reject(rejectTarget.id, reason || undefined); setRejectTarget(null); await load(); } catch (err) { setError(err instanceof ApiError ? err.message : '驳回失败'); } finally { setRejectSaving(false); } };
   const loadMore = async () => {
-    const cursor = panel === 'queue' ? queueCursor : panel === 'ready' ? readyCursor : panel === 'reissue' ? reissueCursor : archiveCursor; if (!cursor) return; setLoading(true);
+    if (loadingMore.current) return;
+    const cursor = panel === 'queue' ? queueCursor : panel === 'ready' ? readyCursor : panel === 'reissue' ? reissueCursor : archiveCursor; if (!cursor) return; loadingMore.current = true; setLoading(true);
     try {
       if (panel === 'queue') {
-        const result = await client.queue(undefined, cursor);
-        setQueue((current) => [...current, ...result.groups]);
+        const result = await client.queue(serverFilter || undefined, cursor);
+        setQueue((current) => appendUniqueById(current, result.groups));
         setQueueCursor(result.nextCursor);
       } else if (panel === 'ready') {
-        const result = await client.archive('approved', undefined, cursor);
-        setReady((current) => [...current, ...result.groups.filter((group) => isIssuanceGroup(group))]);
+        const result = await client.archive('approved', serverFilter || undefined, cursor, 20, 'issuance');
+        setReady((current) => appendUniqueById(current, result.groups));
         setReadyCursor(result.nextCursor);
       } else if (panel === 'reissue') {
-        const result = await client.archive(undefined, undefined, cursor);
-        setReissue((current) => [...current, ...result.groups.filter(g => isIssuanceGroup(g))]);
+        const result = await client.archive(expandCompletedStatuses(statusFilter), serverFilter || undefined, cursor, 20, 'issuance');
+        setReissue((current) => appendUniqueById(current, result.groups));
         setReissueCursor(result.nextCursor);
       } else {
-        const result = await client.archive(undefined, undefined, cursor);
-        setArchive((current) => [...current, ...result.groups.filter(g => !isIssuanceGroup(g))]);
+        const result = await client.archive(expandCompletedStatuses(statusFilter), serverFilter || undefined, cursor, 20, 'regular');
+        setArchive((current) => appendUniqueById(current, result.groups));
         setArchiveCursor(result.nextCursor);
       }
-    } catch (err) { setError(err instanceof ApiError ? err.message : '加载更多失败'); } finally { setLoading(false); }
+    } catch (err) { setError(err instanceof ApiError ? err.message : '加载更多失败'); } finally { setLoading(false); loadingMore.current = false; }
   };
 
-  const pendingCount = queue.length; const approvedCount = role === 'super_admin' ? ready.length : archive.filter((group) => group.status === 'approved').length; const issuedCount = archive.filter((group) => group.status === 'issued' || group.status === 'completed').length;
+  const pendingCount = queue.filter((group) => group.status === 'pending').length; const approvedCount = role === 'super_admin' ? ready.length : archive.filter((group) => group.status === 'approved').length; const issuedCount = archive.filter((group) => group.status === 'issued' || group.status === 'completed').length;
   const serverMatches = (group: ManagerGroup) => !serverFilter || group.server.id === serverFilter;
   const visibleQueue = queue.filter(serverMatches);
   const visibleReady = ready.filter(serverMatches);
@@ -153,7 +161,7 @@ function StatusFilters({ value, onChange }: { value: FilterStatus[]; onChange: (
 function RequestList({ panel, groups, options, role, onAction, copiedCommands, onCommandCopied, onCopyNotice }: { panel: 'queue' | 'ready' | 'archive' | 'reissue'; groups: ManagerGroup[]; options: AppOptions; role: Role; onAction: (action: 'approve' | 'reject' | 'issue' | 'complete', group: ManagerGroup) => void; copiedCommands: Set<string>; onCommandCopied: (groupId: string, command: GeneratedCommand) => void; onCopyNotice: () => void }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   useEffect(() => setExpandedId(null), [panel]);
-  if (!groups.length) return <div className="empty-state"><div className="empty-icon"><Check size={22} /></div><h3>{panel === 'queue' ? '审核队列已清空' : panel === 'ready' ? '暂无待完成申请' : panel === 'reissue' ? '暂无物资发放记录' : '暂无常规操作记录'}</h3><p>{panel === 'queue' ? '新的客服申请会出现在这里' : panel === 'ready' ? '管理通过后，申请会出现在这里' : '可调整筛选条件查看历史'}</p></div>;
+  if (!groups.length) return <div className="empty-state"><div className="empty-icon"><Check size={22} /></div><h3>{panel === 'queue' ? '审核队列已清空' : panel === 'ready' ? '暂无待完成申请' : panel === 'reissue' ? '暂无物资发放记录' : '暂无常规操作记录'}</h3><p>{panel === 'queue' ? '新的待审核申请会出现在这里' : panel === 'ready' ? '管理通过后，申请会出现在这里' : '可调整筛选条件查看历史'}</p></div>;
   const map = new Map([['all', groups]]);
   let sequence = 0;
   const commandMode = panel === 'ready' && role === 'super_admin';

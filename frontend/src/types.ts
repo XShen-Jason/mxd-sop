@@ -8,7 +8,7 @@ export interface OperationOption { type: OperationType; displayName: string; fie
 export interface AppOptions { servers: ServerOption[]; reasons: ReasonOption[]; actionReasons?: { kick: ReasonOption[]; ban: ReasonOption[] }; operations: OperationOption[]; commandRuleVersion: string }
 export interface CatalogItem { code: string; name: string; itemClass?: string; image?: string }
 
-export interface ItemOperation { type: 'item'; itemCode: string; itemName: string; itemClass?: string; itemImage?: string; quantity: number }
+export interface ItemOperation { type: 'item'; itemCode: string; itemLevel?: number; itemName: string; itemClass?: string; itemImage?: string; quantity: number }
 export interface CashOperation { type: 'cash'; quantity: number }
 export interface WarpOperation { type: 'warp' }
 export interface KickOperation { type: 'kick' }

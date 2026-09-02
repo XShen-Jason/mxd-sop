@@ -4,6 +4,28 @@ import type { AppOptions, GroupReason, Operation, OperationType, SubmitGroupInpu
 import { GroupError } from './errors.js';
 import { quantity, safeText, strictText } from './helpers.js';
 
+export const MAX_EQUIPMENT_LEVEL = 10;
+
+function parseEquipmentSuffix(code: string) {
+  const match = /^([^_]+)_([0-9]+)$/u.exec(code);
+  if (!match) return undefined;
+  const level = Number(match[2]);
+  if (!Number.isSafeInteger(level)) throw new GroupError('invalid-input', 'invalid item level');
+  return { baseCode: match[1], level };
+}
+
+function normalizeEquipmentLevel(value: unknown) {
+  if (value === undefined) return 1;
+  if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > MAX_EQUIPMENT_LEVEL) {
+    throw new GroupError('invalid-input', 'invalid item level');
+  }
+  return value as number;
+}
+
+function equipmentCode(baseCode: string, level: number) {
+  return level === 1 ? baseCode : `${baseCode}_${level}`;
+}
+
 export function normalizeReason(value: unknown, options: AppOptions, actionType?: 'kick' | 'ban'): GroupReason {
   if (!value || typeof value !== 'object') throw new GroupError('invalid-input', 'reason is required');
   const reason = value as Record<string, unknown>;
@@ -23,14 +45,26 @@ export function normalizeOperation(value: unknown, options: AppOptions, catalog:
   const type = operation.type as OperationType;
   switch (type) {
     case 'item': {
-      if (Object.keys(operation).some((key) => !['type', 'itemCode', 'quantity'].includes(key))) throw new GroupError('invalid-input');
-      const itemCode = strictText(operation.itemCode, 'itemCode', 64);
-      if (/[\s@]/u.test(itemCode)) throw new GroupError('invalid-input', 'unsafe item code');
-      const item = catalog.lookup(itemCode);
+      if (Object.keys(operation).some((key) => !['type', 'itemCode', 'itemLevel', 'quantity'].includes(key))) throw new GroupError('invalid-input');
+      const requestedCode = strictText(operation.itemCode, 'itemCode', 64);
+      if (/[\s@]/u.test(requestedCode)) throw new GroupError('invalid-input', 'unsafe item code');
+      const suffix = parseEquipmentSuffix(requestedCode);
+      if (operation.itemLevel !== undefined && suffix) throw new GroupError('invalid-input', 'itemCode must be a base code when itemLevel is provided');
+      const exactItem = catalog.lookup(requestedCode);
+      const baseItem = suffix ? catalog.lookup(suffix.baseCode) : undefined;
+      const item = exactItem ?? baseItem;
       if (!item) throw new GroupError('unknown-item');
+      const isEquipment = item.itemClass === 'equip';
+      const itemLevel = isEquipment ? normalizeEquipmentLevel(operation.itemLevel ?? suffix?.level) : undefined;
+      if (!isEquipment && (operation.itemLevel !== undefined || (!exactItem && suffix))) {
+        throw new GroupError('invalid-input', 'item level is only supported for equipment');
+      }
+      const normalizedCode = isEquipment
+        ? (exactItem && suffix ? requestedCode : equipmentCode(item.code, itemLevel ?? 1))
+        : item.code;
       const itemQuantity = quantity(operation.quantity);
       if (Math.ceil(itemQuantity / 1000) > MAX_ITEM_CHUNKS) throw new GroupError('invalid-quantity');
-      return { type: 'item', itemCode: item.code, itemName: item.name, itemClass: item.itemClass, ...(item.image ? { itemImage: item.image } : {}), quantity: itemQuantity };
+      return { type: 'item', itemCode: normalizedCode, ...(isEquipment ? { itemLevel: itemLevel ?? 1 } : {}), itemName: item.name, itemClass: item.itemClass, ...(item.image ? { itemImage: item.image } : {}), quantity: itemQuantity };
     }
     case 'cash':
       if (Object.keys(operation).some((key) => !['type', 'quantity'].includes(key))) throw new GroupError('invalid-input');

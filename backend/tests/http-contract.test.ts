@@ -45,6 +45,9 @@ describe('HTTP role projections', () => {
     expect(queue.json().groups[0].commands.map((command: { text: string }) => command.text)).toEqual([
       'drop@123@02000000@1000', 'drop@123@02000000@1000', 'drop@123@02000000@888'
     ]);
+    const reviews = await app.inject({ method: 'GET', url: '/api/v1/manager/operation-groups/reviews?limit=10', headers: managerHeaders });
+    expect(reviews.statusCode).toBe(200);
+    expect(reviews.json().groups.some((group: { id: string }) => group.id === created.json().id)).toBe(true);
   });
 
   it('returns category-filtered catalog items for authenticated users', async () => {

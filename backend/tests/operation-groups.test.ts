@@ -15,7 +15,11 @@ class MemoryRepository implements GroupRepository {
 
 const customer: Identity = { id: 'customer-a', role: 'customer', displayName: '客服 A' };
 const manager: Identity = { id: 'manager-b', role: 'manager', displayName: '管理 B' };
-const catalog = new ItemCatalog([{ code: '00000001', name: '金币', itemClass: '道具' }]);
+const superAdmin: Identity = { id: 'admin-c', role: 'super_admin', displayName: '超级管理' };
+const catalog = new ItemCatalog([
+  { code: '00000001', name: '金币', itemClass: '道具' },
+  { code: '01012190', name: '扎昆面巾', itemClass: 'equip', image: '/item-images/01012190.png' }
+]);
 
 function service() {
   let id = 0;
@@ -42,6 +46,39 @@ describe('operation-groups lifecycle and projections', () => {
     expect('commands' in group).toBe(false);
     const managerPage = instance.listQueue(manager);
     expect(managerPage.groups[0].commands.map((command) => command.text)).toEqual(['drop@123@00000001@2']);
+  });
+
+  it('normalizes equipment levels into command item codes', () => {
+    const instance = service();
+    const levelOne = instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '123', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '01012190', quantity: 1 }] });
+    const levelTwo = instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '124', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '01012190', itemLevel: 2, quantity: 1 }] });
+    const levelThree = instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '125', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '01012190', itemLevel: 3, quantity: 1 }] });
+    expect(levelOne.operations[0]).toMatchObject({ itemCode: '01012190', itemLevel: 1 });
+    expect(levelTwo.operations[0]).toMatchObject({ itemCode: '01012190_2', itemLevel: 2 });
+    expect(levelThree.operations[0]).toMatchObject({ itemCode: '01012190_3', itemLevel: 3 });
+    expect(instance.listQueue(manager, 20).groups.map((group) => group.commands[0].text)).toEqual(expect.arrayContaining(['drop@124@01012190_2@1', 'drop@125@01012190_3@1']));
+  });
+
+  it('accepts legacy suffixed equipment codes and rejects invalid levels', () => {
+    const instance = service();
+    const legacy = instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '126', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '01012190_2', quantity: 1 }] });
+    expect(legacy.operations[0]).toMatchObject({ itemCode: '01012190_2', itemLevel: 2 });
+    for (const itemLevel of [0, 1.5, 11, '2']) {
+      expect(() => instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '127', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '01012190', itemLevel, quantity: 1 }] })).toThrowError(expect.objectContaining({ code: 'invalid-input' }));
+    }
+    expect(() => instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '128', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '00000001', itemLevel: 2, quantity: 1 }] })).toThrowError(expect.objectContaining({ code: 'invalid-input' }));
+  });
+
+  it('allows different equipment levels but still rejects duplicate final codes', () => {
+    const instance = service();
+    expect(() => instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '129', playerQQ: '456', reason: { code: 'compensation' }, operations: [
+      { type: 'item', itemCode: '01012190', itemLevel: 2, quantity: 1 },
+      { type: 'item', itemCode: '01012190', itemLevel: 3, quantity: 1 }
+    ] })).not.toThrow();
+    expect(() => instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '130', playerQQ: '456', reason: { code: 'compensation' }, operations: [
+      { type: 'item', itemCode: '01012190', itemLevel: 2, quantity: 1 },
+      { type: 'item', itemCode: '01012190_2', quantity: 1 }
+    ] })).toThrowError(expect.objectContaining({ code: 'invalid-input' }));
   });
 
   it('rejects duplicate item operations while allowing cash-only requests', () => {
@@ -108,5 +145,15 @@ describe('operation-groups lifecycle and projections', () => {
     const second = instance.listQueue(manager, 1, first.nextCursor ?? undefined);
     expect(second.groups).toHaveLength(1);
     expect(second.groups[0].id).not.toBe(first.groups[0].id);
+  });
+
+  it('lets both manager roles inspect every review state while own stays isolated', () => {
+    const instance = service();
+    const own = instance.submit(customer, { serverId: 'mushroom', account: 'one', characterId: '1', playerQQ: '1', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '00000001', quantity: 1 }] });
+    const other = instance.submit({ ...customer, id: 'customer-b' }, { serverId: 'yeti', account: 'two', characterId: '2', playerQQ: '2', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '00000001', quantity: 1 }] });
+    instance.approve(manager, own.id);
+    expect(instance.listReview(manager, 20).groups.map((group) => group.id)).toEqual(expect.arrayContaining([own.id, other.id]));
+    expect(instance.listReview(superAdmin, 20).groups.map((group) => group.id)).toEqual(expect.arrayContaining([own.id, other.id]));
+    expect(instance.listOwn(customer, 20).groups.map((group) => group.id)).toEqual([own.id]);
   });
 });

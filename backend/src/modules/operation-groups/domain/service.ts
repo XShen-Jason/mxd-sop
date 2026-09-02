@@ -13,9 +13,10 @@ import type {
   SubmitGroupInput
 } from '../../../shared/types.js';
 import type { GroupRepository } from '../infrastructure/json-store.js';
-import { compareAsc, compareDesc, compareText, decodeCursor, encodeCursor, fingerprint, safeText } from './helpers.js';
+import { compareDesc, compareText, decodeCursor, encodeCursor, fingerprint, safeText } from './helpers.js';
 import { GroupError } from './errors.js';
 import { normalizeSubmission } from './normalization.js';
+import { readGroupPage } from './pagination.js';
 
 export { GroupError } from './errors.js';
 export type { GroupErrorCode } from './errors.js';
@@ -50,7 +51,8 @@ export class OperationGroupsService {
     this.requireAuthenticated(identity);
     if (idempotencyKey && (idempotencyKey.length > 128 || /[\s\u0000-\u001f\u007f]/u.test(idempotencyKey))) throw new GroupError('invalid-input');
     if (idempotencyKey) {
-      const existing = this.deps.repository.all().find((group) => group.idempotencyKey === idempotencyKey && group.submittedBy.id === identity.id);
+      const existing = this.deps.repository.findByIdempotency?.(identity.id, idempotencyKey)
+        ?? this.deps.repository.all().find((group) => group.idempotencyKey === idempotencyKey && group.submittedBy.id === identity.id);
       if (existing) {
         if (existing.requestFingerprint !== fingerprint(input)) throw new GroupError('idempotency-conflict');
         return this.customerProjection(existing);
@@ -72,10 +74,12 @@ export class OperationGroupsService {
     return this.customerProjection(group);
   }
 
-  listOwn(identity: Identity, limit = 20, cursor?: string) {
+  listOwn(identity: Identity, limit = 20, cursor?: string, status?: GroupStatus | GroupStatus[], kind?: 'issuance' | 'regular') {
     this.requireAuthenticated(identity);
-    const groups = this.deps.repository.all().filter((group) => group.submittedBy.id === identity.id).sort(compareDesc);
-    const page = this.page(groups, limit, cursor);
+    const statuses = status ? (Array.isArray(status) ? status : [status]) : [];
+    if (statuses.some((value) => !['pending', 'approved', 'rejected', 'issued', 'completed', 'cancelled'].includes(value))) throw new GroupError('invalid-status');
+    if (kind !== undefined && kind !== 'issuance' && kind !== 'regular') throw new GroupError('invalid-input', 'invalid kind');
+    const page = readGroupPage(this.deps.repository, { ownerId: identity.id, status, kind, limit, order: 'desc' }, cursor);
     return { groups: page.groups.map((group) => this.customerProjection(group)), nextCursor: page.nextCursor };
   }
 
@@ -175,10 +179,14 @@ export class OperationGroupsService {
   listQueue(identity: Identity, limit = 20, cursor?: string, serverId?: string) {
     this.requireManager(identity);
     if (serverId && !this.options.servers.some((server) => server.id === serverId)) throw new GroupError('unknown-server');
-    const order = new Map(this.options.servers.map((server, index) => [server.id, index]));
-    const groups = this.deps.repository.all().filter((group) => group.status === 'pending' && (!serverId || group.server.id === serverId));
-    groups.sort((a, b) => (order.get(a.server.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.server.id) ?? Number.MAX_SAFE_INTEGER) || compareAsc(a, b));
-    const page = this.page(groups, limit, cursor);
+    const page = readGroupPage(this.deps.repository, { status: 'pending', serverId, limit, order: 'asc', serverOrder: this.options.servers.map((server) => server.id) }, cursor);
+    return { groups: page.groups.map((group) => this.managerProjection(group)), nextCursor: page.nextCursor };
+  }
+
+  listReview(identity: Identity, limit = 20, cursor?: string, serverId?: string) {
+    this.requireManager(identity);
+    if (serverId && !this.options.servers.some((server) => server.id === serverId)) throw new GroupError('unknown-server');
+    const page = readGroupPage(this.deps.repository, { serverId, limit, order: 'asc', serverOrder: this.options.servers.map((server) => server.id) }, cursor);
     return { groups: page.groups.map((group) => this.managerProjection(group)), nextCursor: page.nextCursor };
   }
 
@@ -199,12 +207,13 @@ export class OperationGroupsService {
     return this.managerProjection(group);
   }
 
-  listArchive(identity: Identity, limit = 20, cursor?: string, status?: GroupStatus, serverId?: string) {
+  listArchive(identity: Identity, limit = 20, cursor?: string, status?: GroupStatus | GroupStatus[], serverId?: string, kind?: 'issuance' | 'regular') {
     this.requireManager(identity);
     if (serverId && !this.options.servers.some((server) => server.id === serverId)) throw new GroupError('unknown-server');
-    if (status && !['pending', 'approved', 'rejected', 'issued', 'completed', 'cancelled'].includes(status)) throw new GroupError('invalid-status');
-    const groups = this.deps.repository.all().filter((group) => (!status || group.status === status) && (!serverId || group.server.id === serverId)).sort(compareDesc);
-    const page = this.page(groups, limit, cursor);
+    const statuses = status ? (Array.isArray(status) ? status : [status]) : [];
+    if (statuses.some((value) => !['pending', 'approved', 'rejected', 'issued', 'completed', 'cancelled'].includes(value))) throw new GroupError('invalid-status');
+    if (kind !== undefined && kind !== 'issuance' && kind !== 'regular') throw new GroupError('invalid-input', 'invalid kind');
+    const page = readGroupPage(this.deps.repository, { status, serverId, kind, limit, order: 'desc' }, cursor);
     return { groups: page.groups.map((group) => this.managerProjection(group)), nextCursor: page.nextCursor };
   }
 
@@ -250,7 +259,8 @@ export class OperationGroupsService {
     const projection = structuredClone(group);
     projection.operations = projection.operations.map((operation) => {
       if (operation.type !== 'item' || operation.itemImage) return operation;
-      const image = this.deps.catalog.lookup(operation.itemCode)?.image;
+      const baseCode = operation.itemCode.replace(/_[0-9]+$/u, '');
+      const image = this.deps.catalog.lookup(operation.itemCode)?.image ?? this.deps.catalog.lookup(baseCode)?.image;
       return image ? { ...operation, itemImage: image } : operation;
     });
     for (const field of actorFields) {
