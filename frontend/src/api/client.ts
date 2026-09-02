@@ -57,7 +57,16 @@ export class ApiClient {
   deleteUser(id: string) { return this.request<User>(`/api/v1/auth/users/${encodeURIComponent(id)}/delete`, { method: 'POST' }); }
 
   options() { return this.request<AppOptions>('/api/v1/operation-groups/options'); }
-  searchItems(query: string, signal?: AbortSignal) { return this.request<{ items: CatalogItem[]; nextCursor: string | null }>(`/api/v1/item-catalog/search?q=${encodeURIComponent(query)}&limit=12`, { signal }); }
+  searchItems(query: string, signal?: AbortSignal, cursor?: string, limit = 12) {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    if (cursor) params.set('cursor', cursor);
+    return this.request<{ items: CatalogItem[]; nextCursor: string | null; totalCount: number }>(`/api/v1/item-catalog/search?${params}`, { signal });
+  }
+  listItemsByClass(itemClass: string, signal?: AbortSignal, cursor?: string, limit = 8) {
+    const params = new URLSearchParams({ class: itemClass, limit: String(limit) });
+    if (cursor) params.set('cursor', cursor);
+    return this.request<{ items: CatalogItem[]; nextCursor: string | null; totalCount: number }>(`/api/v1/item-catalog/by-class?${params}`, { signal });
+  }
   submit(input: unknown) {
     const key = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return this.request<Group>('/api/v1/operation-groups', { method: 'POST', headers: { 'idempotency-key': key }, body: JSON.stringify(input) });

@@ -46,4 +46,10 @@ describe('HTTP role projections', () => {
       'drop@123@02000000@1000', 'drop@123@02000000@1000', 'drop@123@02000000@888'
     ]);
   });
+
+  it('returns category-filtered catalog items for authenticated users', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/v1/item-catalog/by-class?class=consume&limit=2', headers: customerHeaders });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().items.every((item: { itemClass?: string }) => item.itemClass === 'consume')).toBe(true);
+  });
 });

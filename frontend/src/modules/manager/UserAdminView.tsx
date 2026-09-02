@@ -5,7 +5,7 @@ import { ConfirmDialog } from '../../components/Dialog';
 import { FloatingNotice } from '../../components/FloatingNotice';
 import type { Role, User } from '../../types';
 
-const roleName: Record<Role, string> = { customer: '普通客服', manager: '管理', super_admin: '超级管理' };
+const roleName: Record<Role, string> = { customer: '客服', manager: '管理', super_admin: '超级管理' };
 type AccountForm = { role: Role; displayName: string; username: string; password: string };
 const emptyForm = (): AccountForm => ({ role: 'customer', displayName: '', username: '', password: '' });
 
@@ -54,7 +54,8 @@ export function UserAdminView({ token, actorRole, actorId, onRequireRelogin }: {
   const remove = (user: User) => setDeleteTarget(user);
   const confirmRemove = async () => { if (!deleteTarget) return; setDeleteSaving(true); try { await client.deleteUser(deleteTarget.id); setUsers((current) => current.filter((item) => item.id !== deleteTarget.id)); setDeleteTarget(null); setNotice({ kind: 'success', text: '账号已删除，历史申请记录仍会保留' }); } catch (error) { setNotice({ kind: 'error', text: error instanceof ApiError ? error.message : '删除失败' }); } finally { setDeleteSaving(false); } };
   const canManage = (user: User) => actorRole === 'super_admin' || user.role !== 'super_admin';
-  const groupedUsers = (['super_admin', 'manager', 'customer'] as Role[]).map((role) => ({ role, users: users.filter((user) => user.role === role) })).filter((group) => group.users.length > 0);
+  const visibleRoles: Role[] = actorRole === 'super_admin' ? ['super_admin', 'manager', 'customer'] : ['manager', 'customer'];
+  const groupedUsers = visibleRoles.map((role) => ({ role, users: users.filter((user) => user.role === role) })).filter((group) => group.users.length > 0);
 
   return <section className="users-panel"><div className="users-toolbar"><div><p className="eyebrow">账号权限</p><p className="heading-copy">可添加管理和客服，密码在编辑账号时修改</p></div><div className="toolbar-actions"><button type="button" className="primary-button" onClick={openCreate}><Plus size={17} />添加账号</button></div></div>
     {notice && <FloatingNotice kind={notice.kind} text={notice.text} onDismiss={() => setNotice(null)} />}

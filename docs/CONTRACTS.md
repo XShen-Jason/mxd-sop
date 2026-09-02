@@ -33,6 +33,7 @@ Contract ID 使用 module-id.operation-name，版本单独记录。所有 ID 为
 | operation-groups.complete-group | operation-groups | v1 | frontend 管理 | contracts/operation-groups.md |
 | operation-groups.list-archive | operation-groups | v1 | frontend 管理 | contracts/operation-groups.md |
 | item-catalog.search | item-catalog | v1 | frontend 客服/管理 | contracts/item-catalog.md |
+| item-catalog.by-class | item-catalog | v1 | frontend 管理活动配置 | contracts/item-catalog.md |
 | command-generation.generate | command-generation | v1 | backend manager projection | contracts/command-generation.md |
 
 ## Portable data semantics

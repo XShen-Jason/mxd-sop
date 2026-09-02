@@ -70,6 +70,7 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, [client]);
+  useEffect(() => { window.dispatchEvent(new Event('workspace-counts-refresh')); }, [queue.length, ready.length]);
   useEffect(() => { setNotice(null); }, [panel]);
   useEffect(() => {
     try { localStorage.setItem(copiedStorageKey, JSON.stringify([...copiedCommands])); } catch { /* Storage may be unavailable in private browsing. */ }

@@ -1,0 +1,90 @@
+.activity-editor {
+  min-width: 0;
+}
+
+.activity-editor > label {
+  display: block;
+  margin-top: 15px;
+}
+
+.activity-editor > label:first-of-type {
+  margin-top: 0;
+}
+
+.activity-description {
+  display: block;
+}
+
+.activity-reward-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.activity-fixed-reward {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px 30px;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 8px 9px;
+  border: 1px solid #dce9e3;
+  border-radius: 5px;
+  background: #fbfdfc;
+  color: #536b62;
+  font-size: 11px;
+}
+
+.activity-fixed-reward.cash-reward-row {
+  grid-template-columns: auto minmax(0, 1fr) 78px 30px;
+}
+
+.activity-fixed-reward > svg {
+  color: var(--amber);
+}
+
+.activity-fixed-reward input {
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.activity-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-reward-heading {
+  display: flex;
+  justify-content: space-between;
+  background: transparent;
+  border-style: dashed;
+}
+
+.activity-no-items {
+  margin-top: 8px;
+  padding: 11px;
+  border: 1px dashed #cbdad3;
+  color: var(--muted);
+  text-align: center;
+  font-size: 11px;
+}
+
+@media (max-width: 680px) {
+  .activity-editor {
+    padding: 18px 15px;
+  }
+
+  .activity-fixed-reward {
+    grid-template-columns: minmax(0, 1fr) 66px 26px;
+  }
+
+  .activity-fixed-reward.cash-reward-row {
+    grid-template-columns: auto minmax(0, 1fr) 66px 26px;
+  }
+}

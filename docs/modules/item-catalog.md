@@ -42,6 +42,7 @@ Out of scope:
 | Contract | 用途 |
 | --- | --- |
 | item-catalog.search | 登录用户按关键词查询物品 |
+| item-catalog.by-class | 登录用户按固定分类读取物品 |
 
 提交校验使用模块的内部公开 lookup 能力，具体传输形状由 operation-groups 的后端适配器定义，不让前端直接访问内部存储。
 

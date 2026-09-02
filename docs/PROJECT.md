@@ -36,7 +36,8 @@ The operation-groups workflow contracts now include update-group, approve-group,
 | --- | --- | --- | --- | --- | --- |
 | auth | 登录会话、三层角色和受控账号目录 | backend/src/modules/auth; frontend/src/App.tsx; docs/modules/auth.md | backend + frontend | auth.login, auth.logout, auth.me, auth.list-users, auth.create-user, auth.update-user, auth.delete-user | user persistence/session adapter |
 | operation-groups | 工单组提交、分组、角色视图、取消、完成和归档状态 | backend/src/modules/operation-groups; frontend/src/modules/operation-groups, frontend/src/modules/customer, frontend/src/modules/manager; manifest docs/modules/operation-groups.md | backend + frontend | operation-groups.list-options, operation-groups.submit-group, operation-groups.list-own, operation-groups.cancel-group, operation-groups.list-queue, operation-groups.complete-group, operation-groups.list-archive | item-catalog（提交时校验/快照）；身份适配器；持久化适配器 |
-| item-catalog | 物品表导入、代码/名称映射、模糊搜索 | backend/src/modules/item-catalog; manifest docs/modules/item-catalog.md; data/item-catalog/source | backend + frontend consumer | item-catalog.search | Excel 导入适配器；持久化适配器 |
+| item-catalog | 物品表导入、代码/名称映射、模糊搜索和分类读取 | backend/src/modules/item-catalog; manifest docs/modules/item-catalog.md; data/item-catalog/source | backend + frontend consumer | item-catalog.search, item-catalog.by-class | Excel 导入适配器；持久化适配器 |
+| activities | 客服活动与奖励配置、申请表单快捷填充 | frontend/src/modules/activities; manifest docs/modules/activities.md | frontend | local activity storage | item-catalog.search/by-class；operation-groups form |
 | command-generation | 根据已校验操作生成可执行指令并按上限拆分 | backend/src/modules/command-generation; manifest docs/modules/command-generation.md | backend | command-generation.generate | 无外部业务依赖；接收 operation-groups 的不可变快照 |
 
 模块说明的完整内容见 docs/modules/；前端只消费契约，不导入后端内部文件。
@@ -112,3 +113,6 @@ File-size/quality check: `Get-ChildItem backend/src,frontend/src -Recurse -File 
 Production persistence is SQLite for both `auth` and `operation-groups`; JSON
 repositories remain test-only adapters. Sessions use the SQLite session table,
 and the production identity path does not accept demo headers.
+
+The frontend `activities` capability provides a local activity/reward workspace
+and shortcut selection in customer issuance requests; see `docs/modules/activities.md`.

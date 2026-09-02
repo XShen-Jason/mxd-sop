@@ -6,12 +6,13 @@ import { CatalogError, ItemCatalog, loadCatalogFromExcel, loadCatalogFromJson } 
 describe('item-catalog.search', () => {
   const catalog = new ItemCatalog([
     { code: '02000000', name: '红色药水', itemClass: 'consume' },
+    { code: '02000001', name: '红色药水 II', itemClass: 'consume' },
     { code: '00000001', name: '金币' },
     { code: 'A-2', name: '蓝色药水' }
   ]);
 
   it('matches code or name case-insensitively with stable relevance order', () => {
-    expect(catalog.search('药水', 10).items.map((item) => item.code)).toEqual(['02000000', 'A-2']);
+    expect(catalog.search('药水', 10).items.map((item) => item.code)).toEqual(['02000000', '02000001', 'A-2']);
     expect(catalog.search('0000', 10).items[0].code).toBe('00000001');
   });
 
@@ -19,6 +20,16 @@ describe('item-catalog.search', () => {
     expect(() => catalog.search('')).toThrowError(CatalogError);
     expect(() => catalog.search('x', 51)).toThrowError(CatalogError);
     expect(() => catalog.search('x', 20, 'bad-cursor')).toThrowError(CatalogError);
+  });
+
+  it('lists a complete category with stable cursor pagination', () => {
+    const firstPage = catalog.listByClass('consume', 1);
+    expect(firstPage).toMatchObject({ items: [{ code: '02000000' }] });
+    expect(firstPage.nextCursor).toEqual(expect.any(String));
+    expect(catalog.listByClass('consume', 1, firstPage.nextCursor ?? undefined)).toEqual({ items: [{ code: '02000001', name: '红色药水 II', itemClass: 'consume' }], nextCursor: null, totalCount: 2 });
+    expect(catalog.listByClass('missing', 10)).toEqual({ items: [], nextCursor: null, totalCount: 0 });
+    expect(() => catalog.listByClass('')).toThrowError(CatalogError);
+    expect(() => catalog.listByClass('consume', 0)).toThrowError(CatalogError);
   });
 
   it('loads the supplied workbook while retaining text codes', () => {

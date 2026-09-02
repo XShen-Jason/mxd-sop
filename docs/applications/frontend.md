@@ -8,12 +8,25 @@
 
 ## Boundary rules
 
+工作区使用独立路径 `/request`、`/records`、`/activities`、`/queue`、`/ready`、`/reissue`、`/archive`、`/accounts`；活动与道具工作区 `/activities` 仅管理及以上角色可见，由前端活动模块维护。
+
 工作区导航按能力拆分：申请操作、我的申请、待审核/待完成、物资发放记录、常规操作记录和账号管理分别作为左侧入口；高权限角色同时继承低权限工作区。表单校验错误使用固定 toast，不改变页面布局。
 
 - 不在前端拼接、拆分或持久化指令；只渲染管理契约返回的 commands。
 - 客服路由只调用客服契约，不能通过隐藏字段或缓存读取管理投影。
 - 搜索请求应 debounce、取消过期请求并使用契约的 limit/cursor。
 - 页面需表现 loading、empty、error、disabled 和权限拒绝状态，但这些不改变后端规则。
+
+## Activity catalog
+
+The activities workspace uses cursor pagination for both category browsing and
+text search. Each request is limited to eight rows; category changes load
+immediately, while text input is debounced and obsolete requests are aborted.
+Search and category selection are independent modes, so changing one resets the
+other. Catalog feedback is presented through the shared floating notice.
+
+On a role's default entry route, customer opens `/request`, manager opens
+`/queue`, and super administrator opens `/ready`.
 
 ## Stack
 

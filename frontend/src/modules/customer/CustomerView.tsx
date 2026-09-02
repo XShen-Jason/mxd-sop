@@ -8,6 +8,7 @@ import { ItemThumbnail } from '../../components/ItemThumbnail';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatRecordTime, isIssuanceGroup, IssuanceItemsDisplay, recordType, RecordTableHeader, reasonLabel } from '../operation-groups/RecordPresentation';
 import type { AppOptions, CatalogItem, Group, Role } from '../../types';
+import { readActivities, type Activity } from '../activities/store';
 
 type Mode = 'issue' | 'kick' | 'ban';
 type ItemDraft = { itemCode: string; itemName: string; itemClass?: string; image?: string; quantity: string; state: 'empty' | 'selected' | 'invalid' };
@@ -48,6 +49,9 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
   const [form, setForm] = useState<FormState>({ serverId: options.servers[0]?.id ?? '', account: '', characterId: '', playerQQ: '', reasonCode: options.reasons[0]?.code ?? 'bug-recovery', reasonText: '' });
   const [items, setItems] = useState<ItemDraft[]>([emptyItem()]);
   const [cashQuantity, setCashQuantity] = useState('');
+  const [activities, setActivities] = useState<Activity[]>(readActivities);
+  const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
+  useEffect(() => { const sync = () => setActivities(readActivities()); window.addEventListener('storage', sync); window.addEventListener('activities-updated', sync); return () => { window.removeEventListener('storage', sync); window.removeEventListener('activities-updated', sync); }; }, []);
 
   const load = async (append = false) => {
     setLoading(true);
@@ -64,6 +68,33 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
     setMode(nextMode); setEditingId(null); setConfirm(null);
     setForm((current) => ({ ...current, account: '', characterId: '', playerQQ: '', reasonCode: nextMode === 'issue' ? options.reasons[0]?.code ?? 'bug-recovery' : (options.actionReasons?.[nextMode]?.[0]?.code ?? options.reasons[0]?.code ?? 'bug-recovery'), reasonText: '' }));
     setItems([emptyItem()]); setCashQuantity('');
+    setSelectedActivities([]);
+  };
+
+  const toggleActivity = (activity: Activity) => {
+    const removing = selectedActivities.includes(activity.id);
+    setSelectedActivities((current) => removing ? current.filter((id) => id !== activity.id) : [...current, activity.id]);
+    for (const reward of activity.rewards) {
+      if (reward.kind === 'cash') {
+        setCashQuantity((current) => { const next = Math.max(0, Number(current || 0) + (removing ? -reward.quantity : reward.quantity)); return next ? String(next) : ''; });
+        continue;
+      }
+      if (!reward.itemCode) continue;
+      const rewardCode = reward.itemCode;
+      setItems((current) => {
+        const existing = current.findIndex((item) => item.itemCode === rewardCode);
+        if (existing >= 0) return current.map((item, index) => {
+          if (index !== existing) return item;
+          const quantity = Number(item.quantity || 0) + (removing ? -reward.quantity : reward.quantity);
+          if (quantity > 0) return { ...item, quantity: String(quantity) };
+          return current.length > 1 ? null : emptyItem();
+        }).filter((item): item is ItemDraft => Boolean(item));
+        if (removing) return current;
+        const blank = current.findIndex((item) => item.state !== 'selected');
+        const nextItem: ItemDraft = { itemCode: rewardCode, itemName: reward.itemName ?? rewardCode, itemClass: reward.itemClass, image: reward.image, quantity: String(reward.quantity), state: 'selected' };
+        return blank >= 0 ? current.map((item, index) => index === blank ? nextItem : item) : current.length < 100 ? [...current, nextItem] : current;
+      });
+    }
   };
 
   const edit = (group: Group) => {
@@ -141,11 +172,11 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
     {!showRecords && !editingId && <div className="action-tabs" role="tablist">{(['issue', 'kick', 'ban'] as Mode[]).map((item) => <button type="button" key={item} className={mode === item ? 'action-tab active' : 'action-tab'} onClick={() => reset(item)} role="tab" aria-selected={mode === item}>{item === 'issue' ? <Package size={16} /> : item === 'kick' ? <UserRound size={16} /> : <ShieldBan size={16} />}{actionLabel[item]}</button>)}</div>}
     {activeNotice && <FloatingNotice kind={activeNotice.kind} text={activeNotice.text} onDismiss={() => setActiveNotice(null)} />}
     {!showRecords && <form className="request-form" onSubmit={submit}>
-      <section className="panel-surface form-panel player-panel"><div className="section-title"><span className="step-index">01</span><div><h2>玩家信息</h2><p>{mode === 'issue' ? '发物资需要完整玩家资料' : `${actionLabel[mode]}只需填写服务器、角色 ID 和理由`}</p></div></div>
+      <div className={mode === 'issue' ? 'request-top-grid' : ''}><section className="panel-surface form-panel player-panel"><div className="section-title"><span className="step-index">01</span><div><h2>玩家信息</h2><p>{mode === 'issue' ? '发物资需要完整玩家资料' : `${actionLabel[mode]}只需填写服务器、角色 ID 和理由`}</p></div></div>
         <div className="server-picker" aria-label="选择服务器">{options.servers.map((server) => <button type="button" key={server.id} aria-pressed={form.serverId === server.id} className={form.serverId === server.id ? 'server-choice selected' : 'server-choice'} onClick={() => setForm({ ...form, serverId: server.id })}>{server.displayName}</button>)}</div>
         <div className={`field-grid ${mode !== 'issue' ? 'compact-grid' : ''}`}>{mode === 'issue' && <><label><span>游戏账号</span><input value={form.account} placeholder="输入账号" onChange={(event) => setForm({ ...form, account: event.target.value })} /></label><label><span>玩家 QQ</span><input inputMode="numeric" value={form.playerQQ} placeholder="输入 QQ" onChange={(event) => setForm({ ...form, playerQQ: event.target.value })} /></label></>}<label><span>角色 ID</span><input inputMode="numeric" value={form.characterId} placeholder="仅数字" onChange={(event) => setForm({ ...form, characterId: event.target.value.replace(/[^0-9]/g, '') })} /></label><label className="reason-select-field"><span>申请理由</span><select value={form.reasonCode} onChange={(event) => setForm({ ...form, reasonCode: event.target.value })}>{reasons.map((reason) => <option key={reason.code} value={reason.code}>{reason.displayName}</option>)}</select></label></div>
         <label className="reason-note"><span>补充说明 <em>{form.reasonCode === 'other' ? '必填' : '可选'}</em></span><textarea value={form.reasonText} rows={2} placeholder={mode === 'ban' ? '填写违规事实或证据摘要' : mode === 'kick' ? '填写踢人原因' : '补充必要背景'} onChange={(event) => setForm({ ...form, reasonText: event.target.value })} /></label>
-      </section>
+      </section>{mode === 'issue' && <ActivityChooser activities={activities} selected={selectedActivities} enabled={baseComplete} onToggle={toggleActivity} />}</div>
       {mode === 'issue' && baseComplete && <IssueOperations items={items} setItems={setItems} cashQuantity={cashQuantity} setCashQuantity={setCashQuantity} token={token} recentItems={recentItems} onRecentSelect={chooseRecent} onItemSelected={rememberItem} onDuplicateItem={() => pushNotice('error', '同一物品不能重复选择')} />}
       {mode !== 'issue' && baseComplete && <section className="panel-surface mini-action-panel compact-action"><div className="mini-action-icon">{mode === 'kick' ? <UserRound size={20} /> : <ShieldBan size={20} />}</div><strong>{actionLabel[mode]}申请</strong><span>目标：{targetLabel(form, options)}</span></section>}
       <div className="form-footer request-footer"><span className="muted-note">{editingId ? '保存后重新进入审核队列' : mode === 'issue' && !baseComplete ? '填写完整玩家信息后自动展开操作内容' : '提交后可在申请记录中查看进度'}</span><div className="footer-actions">{editingId && <button type="button" className="secondary-button" onClick={() => reset(mode)}>取消编辑</button>}<button className="primary-button submit-button" disabled={submitting} type="submit">{submitting ? '处理中…' : editingId ? '保存修改' : '提交申请'}<Send size={17} /></button></div></div>
@@ -162,12 +193,16 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
 
 function targetLabel(form: FormState, options: AppOptions) { return `${options.servers.find((server) => server.id === form.serverId)?.displayName ?? '未选择'} · ${form.characterId || '角色 ID'}`; }
 
+function ActivityChooser({ activities, selected, enabled, onToggle }: { activities: Activity[]; selected: string[]; enabled: boolean; onToggle: (activity: Activity) => void }) {
+  return <section className={`panel-surface activity-chooser ${enabled ? '' : 'is-disabled'}`}><div className="section-title"><span className="step-index">活动</span><div><h2>活动快捷填充</h2></div></div>{activities.length ? <div className="activity-chooser-list">{activities.map((activity) => <button type="button" key={activity.id} aria-pressed={selected.includes(activity.id)} className={`activity-choice ${selected.includes(activity.id) ? 'selected' : ''}`} disabled={!enabled} onClick={() => onToggle(activity)}><span className="activity-choice-main"><strong>{activity.name}</strong>{activity.description && <small>{activity.description}</small>}</span><span className="activity-choice-rewards">{activity.rewards.map((reward, index) => <em key={`${reward.itemCode ?? reward.kind}-${index}`}>{reward.kind === 'cash' ? `点券×${reward.quantity}` : `${reward.itemName ?? reward.itemCode}×${reward.quantity}`}</em>)}</span>{selected.includes(activity.id) && <span className="activity-selected-mark">已选</span>}</button>)}</div> : <div className="activity-chooser-empty">暂无活动</div>}</section>;
+}
+
 function IssueOperations({ items, setItems, cashQuantity, setCashQuantity, token, recentItems, onRecentSelect, onItemSelected, onDuplicateItem }: { items: ItemDraft[]; setItems: (value: ItemDraft[] | ((current: ItemDraft[]) => ItemDraft[])) => void; cashQuantity: string; setCashQuantity: (value: string) => void; token?: string; recentItems: CatalogItem[]; onRecentSelect: (item: CatalogItem) => void; onItemSelected: (item: CatalogItem) => void; onDuplicateItem: () => void }) {
   const selectItem = (index: number, next: CatalogItem) => { if (items.some((entry, i) => i !== index && entry.itemCode === next.code)) { onDuplicateItem(); return false; } onItemSelected(next); setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: next.code, itemName: next.name, itemClass: next.itemClass, image: next.image, state: 'selected' } : entry)); return true; };
   const clearItem = (index: number) => setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: '', itemClass: undefined, image: undefined, quantity: '', state: 'empty' } : entry));
   const removeItem = (index: number) => setItems((current) => current.length > 1 ? current.filter((_, i) => i !== index) : current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: '', itemClass: undefined, image: undefined, quantity: '', state: 'empty' } : entry));
   const markInput = (index: number, state: 'empty' | 'invalid') => setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: state === 'empty' ? '' : entry.itemName, itemClass: undefined, image: undefined, state } : entry));
-  return <section className="panel-surface form-panel operations-panel"><div className="section-title"><span className="step-index">02</span><div><h2>具体操作内容</h2><p>选择物品和数量，点券可选</p></div></div><div className="recent-items-panel"><div><strong>最近选择</strong><span>常用物品快捷入口</span></div><div className="recent-items-list">{recentItems.length ? recentItems.map((item) => <button type="button" key={item.code} className="recent-item-button" onClick={() => onRecentSelect(item)}><span className="recent-item-content"><ItemThumbnail src={item.image} alt="" size="small" /><span>{item.name}</span></span></button>) : <span className="recent-empty">选择物品后会出现在这里</span>}</div></div><div className="operation-split"><div className="operation-block"><div className="operation-block-title"><Package size={17} /><strong>发物品</strong><span>{items.filter((item) => item.itemCode).length}/100</span></div>{items.map((item, index) => <div className="item-line" key={index}><ItemPicker token={token} value={item.itemCode} name={item.itemName} image={item.image} onChange={(next: CatalogItem) => selectItem(index, next)} onClear={() => clearItem(index)} onInputState={(state) => markInput(index, state)} /><input className="item-quantity" inputMode="numeric" aria-label={`第 ${index + 1} 种物品数量`} value={item.quantity} onChange={(event) => setItems((current) => current.map((entry, i) => i === index ? { ...entry, quantity: event.target.value.replace(/[^0-9]/g, '') } : entry))} /><button type="button" className="icon-button danger-button clear-item-button" title={items.length > 1 ? '删除整条物品' : '清空物品和数量'} aria-label={items.length > 1 ? '删除整条物品' : '清空物品和数量'} onClick={() => removeItem(index)}><X size={16} /></button></div>)}<button type="button" className="add-operation" disabled={items.length >= 100 || items.some((item) => item.state !== 'selected')} onClick={() => setItems((current) => [...current, emptyItem()])}><CirclePlus size={16} />添加物品</button></div><div className="operation-block cash-block"><div className="operation-block-title"><Ticket size={17} /><strong>发点券</strong><span>单次数量</span></div><label><span>点券数量</span><input inputMode="numeric" value={cashQuantity} placeholder="可选" onChange={(event) => setCashQuantity(event.target.value.replace(/[^0-9]/g, ''))} /></label><div className="cash-hint">留空表示本次不发点券</div></div></div></section>;
+  return <section className="panel-surface form-panel operations-panel"><div className="section-title"><span className="step-index">02</span><div><h2>具体操作内容</h2></div></div><div className="recent-items-panel"><div><strong>最近选择</strong><span>常用物品快捷入口</span></div><div className="recent-items-list">{recentItems.length ? recentItems.map((item) => <button type="button" key={item.code} className="recent-item-button" onClick={() => onRecentSelect(item)}><span className="recent-item-content"><ItemThumbnail src={item.image} alt="" size="small" /><span>{item.name}</span></span></button>) : <span className="recent-empty">选择物品后会出现在这里</span>}</div></div><div className="operation-split"><div className="operation-block"><div className="operation-block-title"><Package size={17} /><strong>发物品</strong><span>{items.filter((item) => item.itemCode).length}/100</span></div>{items.map((item, index) => <div className="item-line" key={index}><ItemPicker token={token} value={item.itemCode} name={item.itemName} image={item.image} onChange={(next: CatalogItem) => selectItem(index, next)} onClear={() => clearItem(index)} onInputState={(state) => markInput(index, state)} /><input className="item-quantity" inputMode="numeric" aria-label={`第 ${index + 1} 种物品数量`} value={item.quantity} onChange={(event) => setItems((current) => current.map((entry, i) => i === index ? { ...entry, quantity: event.target.value.replace(/[^0-9]/g, '') } : entry))} /><button type="button" className="icon-button danger-button clear-item-button" title={items.length > 1 ? '删除整条物品' : '清空物品和数量'} aria-label={items.length > 1 ? '删除整条物品' : '清空物品和数量'} onClick={() => removeItem(index)}><X size={16} /></button></div>)}<button type="button" className="add-operation" disabled={items.length >= 100 || items.some((item) => item.state !== 'selected')} onClick={() => setItems((current) => [...current, emptyItem()])}><CirclePlus size={16} />添加物品</button></div><div className="operation-block cash-block"><div className="operation-block-title"><Ticket size={17} /><strong>发点券</strong><span>单次数量</span></div><label><span>点券数量</span><input inputMode="numeric" value={cashQuantity} placeholder="可选" onChange={(event) => setCashQuantity(event.target.value.replace(/[^0-9]/g, ''))} /></label><div className="cash-hint">留空表示本次不发点券</div></div></div></section>;
 }
 
 function OwnRecordCard({ index, group, options, expanded, onToggle, onEdit, onCancel }: { index: number; group: Group; options: AppOptions; expanded: boolean; onToggle: () => void; onEdit: (group: Group) => void; onCancel: (id: string) => void }) {

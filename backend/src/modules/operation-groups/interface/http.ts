@@ -69,6 +69,15 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
   app.get('/api/v1/item-catalog/search', async (request, reply) => {
     try { identity(request); const query = request.query as Query; return reply.send(catalog.search(String(query.q ?? ''), limitOf(query), query.cursor ? String(query.cursor) : undefined)); } catch (error) { return sendError(reply, error); }
   });
+  app.get('/api/v1/item-catalog/by-class', async (request, reply) => {
+    try {
+      identity(request);
+      const query = request.query as Query;
+      const itemClass = String(query.class ?? '').trim();
+      const limit = limitOf(query);
+      return reply.send(catalog.listByClass(itemClass, limit, query.cursor ? String(query.cursor) : undefined));
+    } catch (error) { return sendError(reply, error); }
+  });
   app.post('/api/v1/operation-groups', async (request, reply) => {
     try {
       const idempotencyKey = headerValue(request, 'idempotency-key');

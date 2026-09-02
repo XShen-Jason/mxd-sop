@@ -1,4 +1,4 @@
-# item-catalog.search
+# item-catalog
 
 Owner: item-catalog  
 Version: v1  
@@ -12,18 +12,27 @@ GET /api/v1/item-catalog/search?q={query}&cursor={opaque-cursor}&limit={n}
 - limit 默认 20，最大 50；cursor 不透明且与排序版本绑定。
 - 认证用户可以搜索，权限不影响目录内容。
 
+GET /api/v1/item-catalog/by-class?class={class}&cursor={opaque-cursor}&limit={n}
+
+- class 为固定目录分类字符串；该接口按 code 升序返回该分类的全部物品。
+- limit 默认 20，最大 50；cursor 保持与搜索接口相同的不透明分页语义。
+- 认证用户可以读取，权限不影响目录内容。
+
 ## Response/handling
 
 ~~~json
 {
   "items": [
-    {"code": "02000000", "name": "金币", "class": "-"}
+    {"code": "02000000", "name": "金币", "itemClass": "-"}
   ],
-  "nextCursor": null
+  "nextCursor": null,
+  "totalCount": 1
 }
 ~~~
 
-结果按匹配相关性排序，相关性相同按 code 升序；排序必须稳定。返回的 code 是字符串，不能丢失前导零。该接口不返回命令模板。
+`totalCount` 为当前搜索或分类结果的总条数，用于计算分页总页数；不会改变每次响应的 `limit` 上限。
+
+搜索结果按匹配相关性排序，相关性相同按 code 升序；分类结果按 code 升序；两种排序都必须稳定。返回的 code 是字符串，不能丢失前导零。该接口不返回命令模板。
 
 ## Errors
 
@@ -39,7 +48,7 @@ unauthorized（401）、invalid-query（400）、invalid-cursor（400）、catal
 
 ## Image extension
 
-Search results may include an optional `image` field containing a static URL such as `/item-images/02000000.png`. Rows without a matching asset omit the field. Existing `code`, `name`, and `class` fields remain unchanged.
+Search results may include an optional `image` field containing a static URL such as `/item-images/02000000.png`. Rows without a matching asset omit the field. Existing `code`, `name`, and `itemClass` fields remain unchanged.
 
 ## Examples
 

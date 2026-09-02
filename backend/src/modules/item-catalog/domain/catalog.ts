@@ -15,7 +15,10 @@ export class CatalogError extends Error {
 export interface CatalogSearchResult {
   items: CatalogItem[];
   nextCursor: string | null;
+  totalCount: number;
 }
+
+export const MAX_CLASS_PAGE_SIZE = 50;
 
 function encodeCursor(offset: number) {
   return Buffer.from(JSON.stringify({ offset, version: 1 }), 'utf8').toString('base64url');
@@ -38,6 +41,7 @@ function compareCode(a: string, b: string) {
 
 export class ItemCatalog {
   private readonly byCode: Map<string, CatalogItem>;
+  private readonly byClass: Map<string, CatalogItem[]>;
   private readonly items: CatalogItem[];
 
   constructor(items: CatalogItem[]) {
@@ -53,6 +57,13 @@ export class ItemCatalog {
     }
     this.byCode = deduped;
     this.items = [...deduped.values()].sort((a, b) => compareCode(a.code, b.code));
+    this.byClass = new Map<string, CatalogItem[]>();
+    for (const item of this.items) {
+      const itemClass = item.itemClass ?? '-';
+      const entries = this.byClass.get(itemClass) ?? [];
+      entries.push(item);
+      this.byClass.set(itemClass, entries);
+    }
   }
 
   lookup(code: string) {
@@ -76,10 +87,20 @@ export class ItemCatalog {
       });
     const offset = decodeCursor(cursor);
     const page = matches.slice(offset, offset + limit);
-    return { items: page.map((item) => ({ ...item })), nextCursor: offset + page.length < matches.length ? encodeCursor(offset + page.length) : null };
+    return { items: page.map((item) => ({ ...item })), nextCursor: offset + page.length < matches.length ? encodeCursor(offset + page.length) : null, totalCount: matches.length };
   }
 
   searchItems(query: string, limit = 20, cursor?: string) {
     return this.search(query, limit, cursor);
+  }
+
+  listByClass(itemClass: string, limit = 20, cursor?: string): CatalogSearchResult {
+    if (typeof itemClass !== 'string' || !itemClass.trim() || itemClass.length > 32 || /[\s\u0000-\u001f\u007f]/u.test(itemClass)) throw new CatalogError('invalid-query');
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_CLASS_PAGE_SIZE) throw new CatalogError('invalid-query');
+    const normalized = itemClass.trim();
+    const matches = this.byClass.get(normalized) ?? [];
+    const offset = decodeCursor(cursor);
+    const page = matches.slice(offset, offset + limit);
+    return { items: page.map((item) => ({ ...item })), nextCursor: offset + page.length < matches.length ? encodeCursor(offset + page.length) : null, totalCount: matches.length };
   }
 }
