@@ -18,7 +18,7 @@ function workspaceItems(role: Session['user']['role']): NavItem[] {
   if (role === 'customer') return items;
   items.push({ id: 'queue', label: '待审核', icon: Headphones });
   if (role === 'super_admin') items.push({ id: 'ready', label: '待完成', icon: PackageCheck });
-  items.push({ id: 'reissue', label: '物资发放记录', icon: Archive }, { id: 'archive', label: '常规记录', icon: Archive }, { id: 'accounts', label: '账号管理', icon: ShieldCheck });
+  items.push({ id: 'reissue', label: '物资发放记录', icon: Archive }, { id: 'archive', label: '常规操作记录', icon: Archive }, { id: 'accounts', label: '账号管理', icon: ShieldCheck });
   return items;
 }
 

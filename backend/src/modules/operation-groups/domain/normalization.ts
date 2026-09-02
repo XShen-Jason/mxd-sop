@@ -65,7 +65,7 @@ export function normalizeSubmission(input: SubmitGroupInput, options: AppOptions
   const action = operations.length > 0 && operations.every((operation) => operation.type === 'kick' || operation.type === 'ban' || operation.type === 'warp')
     ? operations[0]
     : undefined;
-  const actionType = action?.type === 'ban' ? 'ban' : action?.type === 'kick' ? 'kick' : undefined;
+  const actionType = action?.type === 'ban' ? 'ban' : action?.type === 'kick' || action?.type === 'warp' ? 'kick' : undefined;
   const reason = normalizeReason(input.reason, options, actionType);
   const usesPlayerAccount = operations.some((operation) => operation.type === 'item' || operation.type === 'cash');
   if (usesPlayerAccount && (!account || !playerQQ)) throw new GroupError('invalid-input', 'account and playerQQ are required for item/cash operations');

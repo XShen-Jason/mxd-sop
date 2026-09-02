@@ -26,7 +26,7 @@
 
 itemName 是服务端解析后的快照；客户端提交时只选择 itemCode。同一 group 中的 item operation 不得重复 itemCode；如果只发 cash，可以不提交 item operation。v1 的 characterId 默认是仅含 0-9 的字符串，即使看起来是数字也不能改成 JSON number；服务器例外必须显式配置并版本化。submittedBy 在客服投影中可省略或只显示当前用户，不能用于客户端授权。
 
-状态值为 pending、approved、rejected、issued、completed、cancelled；前端展示为待审核、待发放、已驳回、已完成、已取消。终态字段按对应状态出现。group 应记录 command rule version，或引用不可变的规则版本，以便归档重现历史指令。
+状态值为 pending、approved、rejected、issued、completed、cancelled；前端展示为待审核、待完成、已驳回、已完成、已取消。终态字段按对应状态出现。group 应记录 command rule version，或引用不可变的规则版本，以便归档重现历史指令。
 
 ## operation-groups.list-options
 
@@ -46,7 +46,7 @@ GET /api/v1/operation-groups/options
 
 响应可包含 `actionReasons.kick` 和 `actionReasons.ban`，分别供拖人/封禁小功能使用；它们与道具发放的 `reasons` 分开维护。
 
-初始理由预设建议为 player-request、compensation、bug-recovery、event-reward、other；other 要求填写 reason.text。该列表是配置数据，不是客户端硬编码。
+发物资初始理由预设为 bug-recovery（BUG补发）、event-reward（活动奖励）、compensation（补偿）、internal（自己人）、other（其他）；拖人初始理由预设为 corpse（尸体）、abnormal-behavior（抢吸）、player-request（玩家反馈）、other（其他）；封禁理由保留 cheating（外挂/作弊）、player-request（玩家举报）、abuse（违规行为）、other（其他），默认分别取各列表第一项。other 要求填写 reason.text。该列表是配置数据，不是客户端硬编码。
 
 ### Errors
 
@@ -266,7 +266,7 @@ unauthorized（401）、forbidden（403）、invalid-cursor（400）、invalid-s
 
 ## v1 workflow extension
 
-The original `completed` state remains readable for MVP records. 物资记录使用 `pending -> approved -> issued`，常规 `kick`/`ban` 记录跳过审核并进入 `approved`（待完成）；物资记录可在 `pending` 状态修改或取消，常规记录可在 `approved` 完成前修改或取消。`approve` 可由 `manager` 或 `super_admin` 执行；`issue` 只能由 `super_admin` 执行；常规记录由管理角色调用完成接口结束。管理归档和客服投影会保留 approved、rejected、issued 的审计字段，客服投影仍绝不包含 commands。
+The original `completed` state remains readable for MVP records. 物资记录使用 `pending -> approved -> issued`，常规 `kick`/`ban` 记录跳过审核并进入 `approved`（待完成）；物资记录可在 `pending` 状态修改或取消，常规操作记录可在 `approved` 完成前修改或取消。`approve` 可由 `manager` 或 `super_admin` 执行；`issue` 只能由 `super_admin` 执行；常规操作记录由管理角色调用完成接口结束。管理归档和客服投影会保留 approved、rejected、issued 的审计字段，客服投影仍绝不包含 commands。
 
 角色层级向下兼容：manager 和 super_admin 也可调用客服的 submit/list-own/update/cancel 能力，但每次仍只作用于认证 userId 自己的 group。
 

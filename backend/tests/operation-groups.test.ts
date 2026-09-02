@@ -23,6 +23,18 @@ function service() {
 }
 
 describe('operation-groups lifecycle and projections', () => {
+  it('publishes the configured reason presets in default order', () => {
+    const options = service().getOptions();
+    expect(options.reasons.map((reason) => reason.displayName)).toEqual(['BUG补发', '活动奖励', '补偿', '自己人', '其他']);
+    expect(options.actionReasons?.kick.map((reason) => reason.displayName)).toEqual(['尸体', '抢吸', '玩家反馈', '其他']);
+    expect(options.actionReasons?.ban[0]).toMatchObject({ code: 'cheating', displayName: '外挂/作弊' });
+  });
+
+  it('rejects removed item reason codes', () => {
+    const instance = service();
+    expect(() => instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '123', playerQQ: '456', reason: { code: 'player-request' }, operations: [{ type: 'item', itemCode: '00000001', quantity: 1 }] })).toThrowError(expect.objectContaining({ code: 'invalid-input' }));
+  });
+
   it('stores item name snapshots and never exposes commands to customer', () => {
     const instance = service();
     const group = instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '123', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '00000001', quantity: 2 }] }, 'key-1');

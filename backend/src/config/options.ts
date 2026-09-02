@@ -9,21 +9,22 @@ export const appOptions: AppOptions = {
     { id: 'piaopiao-pig', displayName: '漂漂猪' }
   ],
   reasons: [
-    { code: 'player-request', displayName: '玩家申请' },
-    { code: 'compensation', displayName: '补偿' },
-    { code: 'bug-recovery', displayName: '异常恢复' },
+    { code: 'bug-recovery', displayName: 'BUG补发' },
     { code: 'event-reward', displayName: '活动奖励' },
+    { code: 'compensation', displayName: '补偿' },
+    { code: 'internal', displayName: '自己人' },
     { code: 'other', displayName: '其他' }
   ],
   actionReasons: {
     kick: [
-      { code: 'player-request', displayName: '玩家要求踢出' },
-      { code: 'abnormal-behavior', displayName: '异常行为' },
+      { code: 'corpse', displayName: '尸体' },
+      { code: 'abnormal-behavior', displayName: '抢吸' },
+      { code: 'player-request', displayName: '玩家反馈' },
       { code: 'other', displayName: '其他' }
     ],
     ban: [
-      { code: 'player-request', displayName: '玩家举报' },
       { code: 'cheating', displayName: '外挂/作弊' },
+      { code: 'player-request', displayName: '玩家举报' },
       { code: 'abuse', displayName: '违规行为' },
       { code: 'other', displayName: '其他' }
     ]

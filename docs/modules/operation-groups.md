@@ -49,15 +49,17 @@ Out of scope:
 
 服务器、reason preset 和 operation type 必须可配置扩展；客户端应通过 list-options 契约取得展示选项，不能把这些列表写成后端规则的第二份。
 
-建议的初始 reason preset（业务确认后仍可调整）：
+初始 reason preset（业务确认后仍可调整）：
 
 | code | displayName | 备注 |
 | --- | --- | --- |
-| player-request | 玩家申请 | 常规玩家诉求 |
-| compensation | 补偿 | 活动或服务补偿 |
-| bug-recovery | 异常恢复 | BUG/误操作恢复 |
+| bug-recovery | BUG补发 | BUG/误操作恢复 |
 | event-reward | 活动奖励 | 活动发放 |
+| compensation | 补偿 | 活动或服务补偿 |
+| internal | 自己人 | 内部处理 |
 | other | 其他 | 需要填写 reason.text |
+
+拖人使用 corpse（尸体）、abnormal-behavior（抢吸）、player-request（玩家反馈）、other（其他）；封禁使用 cheating（外挂/作弊）、player-request（玩家举报）、abuse（违规行为）、other（其他）。各列表第一项为默认理由。
 
 预设 code 负责统计和筛选；reason.text 用于补充说明，不能被解释为指令参数。
 
@@ -66,7 +68,7 @@ Out of scope:
 - 一个 group 只能有一个 serverId、account、characterId、playerQQ 和 reason，且至少有一个 operation；v1 默认要求 characterId 是仅含 0-9 的数字字符串，服务器例外必须显式配置。
 - operation 是有序数组；每个 item operation 单独保存数量，不能因 UI 合并而丢失原始顺序；同一 group 中不得重复 itemCode，纯 cash 申请可以没有 item operation。
 - item 和 cash 的 quantity 都是十进制正整数；warp/ban 不接受额外参数。
-- 状态使用 pending、approved、rejected、issued、completed、cancelled（前端分别显示待审核、待发放、已驳回、已完成、已取消）；道具/点券申请按 pending -> approved -> issued 流转，纯拖人（kick）和封禁申请跳过审核并进入 approved 待完成状态。
+- 状态使用 pending、approved、rejected、issued、completed、cancelled（前端分别显示待审核、待完成、已驳回、已完成、已取消）；道具/点券申请按 pending -> approved -> issued 流转，纯拖人（kick）和封禁申请跳过审核并进入 approved 待完成状态。
 - 只有提交者可以取消自己的 pending 物资 group 或 approved 常规 group；管理可审核 pending，管理可完成 approved 常规 group，超级管理可将 approved 物资确认发放。竞争请求以先成功的状态转换为准，另一方得到稳定冲突错误。
 - submittedAt、completedAt、cancelledAt 使用 UTC RFC 3339；历史 group 的物品代码和名称是提交时快照。
 - group 记录所用的 command rule version，或保证指令映射版本不可变，确保归档可重现历史指令。
@@ -103,4 +105,4 @@ Out of scope:
 
 模块 ID 和 group/operation 字段语义必须保持稳定。更换数据库或 API 框架时只替换适配器和接口层；若增加 processing 等状态，先升级契约并记录迁移。
 
-工作流扩展使用 `pending`、`approved`、`rejected`、`issued` 和 `cancelled`；旧 `completed` 记录继续可读。客服可编辑/取消 pending 物资或 approved 常规记录，管理或超级管理可审核物资，管理角色可完成常规记录，只有超级管理可确认发放物资。
+工作流扩展使用 `pending`、`approved`、`rejected`、`issued` 和 `cancelled`；旧 `completed` 记录继续可读。客服可编辑/取消 pending 物资或 approved 常规操作记录，管理或超级管理可审核物资，管理角色可完成常规操作记录，只有超级管理可确认发放物资。

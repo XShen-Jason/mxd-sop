@@ -136,7 +136,7 @@ textarea { resize: vertical; min-height: 62px; }
 .server-label { color: var(--teal); font-size: 12px; font-weight: 700; margin-right: 10px; }
 time { color: #8a9892; font-size: 10px; }
 .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
-.status-pending { color: #986312; background: #fff4db; }.status-approved { color: #246c5a; background: #e1f3ec; }.status-rejected { color: #a54136; background: #fff0ed; }.status-issued, .status-completed { color: #1d775f; background: #e2f4ed; }.status-cancelled { color: #8b5952; background: #f6e9e6; }
+.status-pending { color: #986312; background: #fff4db; }.status-approved { color: #2f5f9f; background: #e9f1ff; }.status-rejected { color: #a54136; background: #fff0ed; }.status-issued, .status-completed { color: #0d6b82; background: #e4f4fa; }.status-cancelled { color: #6f6570; background: #f1edf3; }
 .group-summary { justify-content: flex-start; margin-top: 14px; font-size: 12px; }.group-summary strong { font-size: 14px; overflow-wrap: anywhere; }.group-summary span { color: var(--muted); }
 .reason-line { color: #62716c; font-size: 11px; margin-top: 10px; overflow-wrap: anywhere; }
 .operation-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }.operation-chips span { color: #49645c; background: #edf4f0; border-radius: 4px; padding: 5px 7px; font-size: 10px; overflow-wrap: anywhere; }
@@ -246,11 +246,18 @@ button.primary-button, button.secondary-button, button.complete-button, .server-
 .manager-card-title { flex: 1 1 320px; }
 .manager-card-preview { flex: 0 1 300px; }
 .manager-card-content { padding: 12px 14px 14px; }
-.status-card-pending { border-color: #e7dfc4; }.status-card-approved { border-color: #c5ddd4; }.status-card-rejected { border-color: #e6cbc6; }.status-card-issued, .status-card-completed { border-color: #d2e2da; }.status-card-cancelled { border-color: #dfd6d3; }
+.status-card-pending { border-color: #e7dfc4; }.status-card-approved { border-color: #bfd4f5; }.status-card-rejected { border-color: #e6cbc6; }.status-card-issued, .status-card-completed { border-color: #b8dfea; }.status-card-cancelled { border-color: #d9cedc; }
 .record-card-header { width: 100%; min-height: 58px; border: 0; background: #fff; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink); text-align: left; }.record-card-header:hover { background: #fbfdfc; }.record-card-main { min-width: 0; flex: 1 1 auto; }.record-card-main strong, .record-card-main span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.record-card-main strong { font-size: 12px; }.record-card-main span { color: var(--muted); font-size: 10px; margin-top: 3px; }.record-card-meta { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }.record-chevron { color: var(--muted); font-size: 10px; }.record-card-content { border-top: 1px solid #e6ede9; padding: 12px 14px 14px; }.record-card .operation-chips { margin-top: 10px; }.customer-audit { margin-top: 12px; }
 .user-role-groups { display: grid; gap: 18px; margin-top: 18px; }.user-role-group { display: grid; gap: 7px; }.user-role-heading { display: flex; align-items: baseline; gap: 9px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }.user-role-heading h3 { font-size: 14px; }.user-role-heading span { color: var(--muted); font-size: 10px; }.user-role-group .user-list { margin-top: 0; }
 .user-actions .icon-button { width: 32px; height: 32px; padding: 0; }
 @media (max-width: 680px) { .manager-card-preview { display: none; }.manager-card-header, .record-card-header { min-height: 56px; padding: 8px 10px; }.manager-card-meta time, .record-card-meta time { display: none; }.record-card-meta { gap: 6px; }.record-chevron { display: none; }.user-role-groups { gap: 14px; } }
+
+/* Status filters mirror the badge palette so key workflow nodes are easy to scan. */
+.status-filter-choice.status-filter-pending.selected { color: #986312; background: #fff4db; border-color: #efd7a1; }
+.status-filter-choice.status-filter-approved.selected { color: #2f5f9f; background: #e9f1ff; border-color: #bfd4f5; }
+.status-filter-choice.status-filter-completed.selected { color: #0d6b82; background: #e4f4fa; border-color: #b8dfea; }
+.status-filter-choice.status-filter-rejected.selected { color: #a54136; background: #fff0ed; border-color: #efc7c0; }
+.status-filter-choice.status-filter-cancelled.selected { color: #6f6570; background: #f1edf3; border-color: #d9cedc; }
 
 /* Dense record tables and compact workflow detail. */
 .record-table-shell { margin-top: 18px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); overflow-x: auto; box-shadow: var(--shadow); }
@@ -336,6 +343,7 @@ button.primary-button, button.secondary-button, button.complete-button, .server-
 .command-row code { flex: 1; min-width: 0; overflow: auto; color: #4c645b; font: 12px/1.3 "SFMono-Regular", Consolas, monospace; white-space: nowrap; }
 .command-copy-icon { color: #7a968b; flex: 0 0 auto; }
 .command-row.is-copied .command-copy-icon { color: #4e8f7c; }
+.record-command-check { color: #2f8069; flex: 0 0 auto; }
 @media (max-width: 680px) { .command-row { min-width: 160px; max-width: none; flex-basis: 100%; } }
 
 /* Keep record actions on one stable row and align the customer heading with the workbench. */
