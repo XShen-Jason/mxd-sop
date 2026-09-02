@@ -301,6 +301,23 @@ hook，自动 reload Nginx。
 
 ## 12. 后续升级
 
+### 12.1 本地提交并推送更新
+
+在开发机的项目根目录执行。`git add -u` 只会加入已跟踪文件的修改，
+不会把本地数据库、操作记录或 `docs/data/` 下的资料带入提交；不要使用
+`git add .`。
+
+```bash
+git add -u
+# 如果本次新增了部署所需文件，再单独添加明确的路径：
+git add <新增文件路径>
+git diff --cached --name-only
+git commit -m "描述本次更新"
+git push origin main
+```
+
+### 12.2 服务器拉取并发布
+
 ```bash
 sudo env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \
   /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
