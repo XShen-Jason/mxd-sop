@@ -111,6 +111,15 @@ describe('operation-groups lifecycle and projections', () => {
     expect(instance.cancel(customer, cancellable.id).status).toBe('cancelled');
   });
 
+  it('returns both issuance and regular approved groups for the ready queue', () => {
+    const instance = service();
+    const issuance = instance.submit(customer, { serverId: 'mushroom', account: 'item-player', characterId: '123', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '00000001', quantity: 1 }] });
+    const regular = instance.submit(customer, { serverId: 'mushroom', characterId: '789', reason: { code: 'player-request' }, operations: [{ type: 'kick' }] });
+    instance.approve(manager, issuance.id);
+    const ready = instance.listArchive(superAdmin, 20, undefined, 'approved');
+    expect(ready.groups.map((group) => group.id)).toEqual(expect.arrayContaining([issuance.id, regular.id]));
+  });
+
   it('supports idempotent retries and conflicts', () => {
     const instance = service();
     const input = { serverId: 'mushroom', account: 'acc', characterId: '123', playerQQ: '456', reason: { code: 'player-request' }, operations: [{ type: 'ban' as const }] };

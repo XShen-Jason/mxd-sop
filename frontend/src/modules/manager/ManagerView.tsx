@@ -59,7 +59,9 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
         const result = await client.queue(serverFilter || undefined);
         setQueue(result.groups); setQueueCursor(result.nextCursor);
       } else if (panel === 'ready') {
-        const result = await client.archive('approved', serverFilter || undefined, undefined, 20, 'issuance');
+        // The ready queue contains every approved group: issuance groups wait
+        // for super-admin issuance and regular groups wait for execution.
+        const result = await client.archive('approved', serverFilter || undefined, undefined, 20);
         setReady(result.groups); setReadyCursor(result.nextCursor);
       } else {
         const kind = panel === 'reissue' ? 'issuance' : 'regular';
@@ -117,7 +119,7 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
         setQueue((current) => appendUniqueById(current, result.groups));
         setQueueCursor(result.nextCursor);
       } else if (panel === 'ready') {
-        const result = await client.archive('approved', serverFilter || undefined, cursor, 20, 'issuance');
+        const result = await client.archive('approved', serverFilter || undefined, cursor, 20);
         setReady((current) => appendUniqueById(current, result.groups));
         setReadyCursor(result.nextCursor);
       } else if (panel === 'reissue') {
@@ -180,8 +182,8 @@ function RequestCard({ index, panel, group, options, role, expanded, onToggle, o
   const issuance = isIssuanceGroup(group);
   const expandable = issuance || panel === 'archive' || panel === 'reissue';
   const canReview = panel === 'queue' && group.status === 'pending';
-  const canIssue = panel === 'ready' && group.status === 'approved' && role === 'super_admin';
-  const canComplete = panel === 'archive' && group.status === 'approved' && !issuance;
+  const canIssue = panel === 'ready' && group.status === 'approved' && role === 'super_admin' && issuance;
+  const canComplete = (panel === 'ready' || panel === 'archive') && group.status === 'approved' && !issuance;
   const isReissuePanel = panel === 'reissue' || panel === 'queue';
   return <article className={`manager-card record-card manager-record status-card-${group.status} ${expanded ? 'is-expanded' : ''}`}>
       <div className={`record-table-row ${isReissuePanel ? 'record-table-reissue' : panel === 'ready' ? 'record-table-with-reviewer' : 'record-table-without-actor'} ${expandable ? 'is-expandable' : ''}`} role="row" tabIndex={expandable ? 0 : undefined} aria-expanded={expandable ? expanded : undefined} onClick={expandable ? onToggle : undefined} onKeyDown={expandable ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onToggle(); } } : undefined}>
