@@ -39,6 +39,17 @@ Operation-group records use bounded keyset pagination in the persistence adapter
 Review, archive, and own-record filters are applied before payload projection;
 the frontend requests only the active workspace page and guards continuation
 requests against duplicate clicks.
+
+Operation-group collaboration uses one authenticated SSE connection per active
+browser session. Events contain no record payload and are emitted only after a
+write; clients coalesce bursts within 50 ms before refreshing the active
+workspace and compact aggregate count query, with no interval polling. Reminder
+lists are filtered and paginated in SQLite.
+
+Frontend GET requests use a short-lived in-memory cache keyed by role and full
+request URL, and concurrent reads for the same key share one promise. Mutations
+and SSE changes invalidate the cache; login/logout also closes the shared SSE
+connection so credentials are never reused across sessions.
 ## Current deployment baseline
 
 For up to 10 internal users, SQLite in WAL mode is the selected persistence

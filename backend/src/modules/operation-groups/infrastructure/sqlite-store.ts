@@ -16,6 +16,7 @@ export class SqliteGroupRepository implements GroupRepository {
     const clauses: string[] = [];
     const values: unknown[] = [];
     if (query.ownerId) { clauses.push('submitted_by_id = ?'); values.push(query.ownerId); }
+    if (query.reminded) clauses.push('reminder_count > 0');
     if (query.status) {
       const statuses = Array.isArray(query.status) ? query.status : [query.status];
       clauses.push(`status IN (${statuses.map(() => '?').join(',')})`);
@@ -47,6 +48,17 @@ export class SqliteGroupRepository implements GroupRepository {
     values.push(query.limit + 1);
     return (this.db.prepare(sql).all(...values) as Array<{ payload_json: string }>).map((row) => JSON.parse(row.payload_json) as OperationGroup);
   }
-  insert(group: OperationGroup) { this.db.prepare('INSERT INTO operation_groups (id, submitted_by_id, status, server_id, submitted_at, idempotency_key, request_fingerprint, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(group.id, group.submittedBy.id, group.status, group.server.id, group.submittedAt, group.idempotencyKey ?? null, group.requestFingerprint ?? null, JSON.stringify(group)); }
-  replace(group: OperationGroup) { this.db.prepare('UPDATE operation_groups SET submitted_by_id = ?, status = ?, server_id = ?, submitted_at = ?, idempotency_key = ?, request_fingerprint = ?, payload_json = ? WHERE id = ?').run(group.submittedBy.id, group.status, group.server.id, group.submittedAt, group.idempotencyKey ?? null, group.requestFingerprint ?? null, JSON.stringify(group), group.id); }
+  insert(group: OperationGroup) { this.db.prepare('INSERT INTO operation_groups (id, submitted_by_id, status, server_id, submitted_at, idempotency_key, request_fingerprint, reminder_count, last_reminded_at, last_reminded_by_json, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(group.id, group.submittedBy.id, group.status, group.server.id, group.submittedAt, group.idempotencyKey ?? null, group.requestFingerprint ?? null, group.reminderCount ?? 0, group.lastRemindedAt ?? null, group.lastRemindedBy ? JSON.stringify(group.lastRemindedBy) : null, JSON.stringify(group)); }
+  replace(group: OperationGroup) { this.db.prepare('UPDATE operation_groups SET submitted_by_id = ?, status = ?, server_id = ?, submitted_at = ?, idempotency_key = ?, request_fingerprint = ?, reminder_count = ?, last_reminded_at = ?, last_reminded_by_json = ?, payload_json = ? WHERE id = ?').run(group.submittedBy.id, group.status, group.server.id, group.submittedAt, group.idempotencyKey ?? null, group.requestFingerprint ?? null, group.reminderCount ?? 0, group.lastRemindedAt ?? null, group.lastRemindedBy ? JSON.stringify(group.lastRemindedBy) : null, JSON.stringify(group), group.id); }
+  workspaceCounts(ownerId: string) {
+    return this.db.prepare(`SELECT
+      COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) AS pending,
+      COALESCE(SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END), 0) AS approved,
+      COALESCE(SUM(CASE WHEN submitted_by_id = ? AND (payload_json LIKE '%\"type\":\"item\"%' OR payload_json LIKE '%\"type\":\"cash\"%') THEN 1 ELSE 0 END), 0) AS ownIssuance,
+      COALESCE(SUM(CASE WHEN submitted_by_id = ? AND payload_json NOT LIKE '%\"type\":\"item\"%' AND payload_json NOT LIKE '%\"type\":\"cash\"%' THEN 1 ELSE 0 END), 0) AS ownRegular,
+      COALESCE(SUM(CASE WHEN submitted_by_id = ? AND status = 'approved' AND reminder_count > 0 THEN 1 ELSE 0 END), 0) AS reminders,
+      COALESCE(SUM(CASE WHEN submitted_by_id = ? AND status = 'approved' AND reminder_count > 0 AND (payload_json LIKE '%\"type\":\"item\"%' OR payload_json LIKE '%\"type\":\"cash\"%') THEN 1 ELSE 0 END), 0) AS reminderIssuance,
+      COALESCE(SUM(CASE WHEN submitted_by_id = ? AND status = 'approved' AND reminder_count > 0 AND payload_json NOT LIKE '%\"type\":\"item\"%' AND payload_json NOT LIKE '%\"type\":\"cash\"%' THEN 1 ELSE 0 END), 0) AS reminderRegular
+      FROM operation_groups`).get(ownerId, ownerId, ownerId, ownerId, ownerId) as { pending: number; approved: number; ownIssuance: number; ownRegular: number; reminders: number; reminderIssuance: number; reminderRegular: number };
+  }
 }

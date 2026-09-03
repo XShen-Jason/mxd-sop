@@ -104,11 +104,22 @@ describe('operation-groups lifecycle and projections', () => {
     expect(regular.status).toBe('approved');
 
     const updated = instance.update(customer, regular.id, { serverId: 'yeti', characterId: '456', reason: { code: 'player-request' }, operations: [{ type: 'ban' }] });
-    expect(updated.status).toBe('approved');
+    expect(updated.status).toBe('pending');
     expect(updated.characterId).toBe('456');
 
     const cancellable = instance.submit(customer, { serverId: 'mushroom', characterId: '789', reason: { code: 'player-request' }, operations: [{ type: 'kick' }] });
     expect(instance.cancel(customer, cancellable.id).status).toBe('cancelled');
+  });
+
+  it('publishes one change notification for every successful write', () => {
+    let changes = 0;
+    const instance = new OperationGroupsService({ repository: new MemoryRepository(), catalog, onChange: () => { changes += 1; } });
+    const group = instance.submit(customer, { serverId: 'mushroom', characterId: '123', reason: { code: 'player-request' }, operations: [{ type: 'kick' }] });
+    expect(changes).toBe(1);
+    instance.update(customer, group.id, { serverId: 'yeti', characterId: '456', reason: { code: 'player-request' }, operations: [{ type: 'ban' }] });
+    expect(changes).toBe(2);
+    instance.cancel(customer, group.id);
+    expect(changes).toBe(3);
   });
 
   it('returns both issuance and regular approved groups for the ready queue', () => {

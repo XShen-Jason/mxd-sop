@@ -32,7 +32,7 @@ function readRecentItems() {
   try { const value = JSON.parse(localStorage.getItem(RECENT_ITEMS_KEY) ?? '[]') as CatalogItem[]; return Array.isArray(value) ? value.slice(0, 6) : []; } catch { return []; }
 }
 
-export function CustomerView({ options, token, role = 'customer', section = 'operations', onNavigate }: { options: AppOptions; token?: string; role?: Role; section?: 'operations' | 'records'; onNavigate?: (section: 'operations' | 'records') => void }) {
+export function CustomerView({ options, token, role = 'customer', section = 'operations', onNavigate, reminderCounts, recordCounts }: { options: AppOptions; token?: string; role?: Role; section?: 'operations' | 'records' | 'reminders'; onNavigate?: (section: 'operations' | 'records' | 'reminders') => void; reminderCounts?: { issuance?: number; regular?: number }; recordCounts?: { issuance?: number; regular?: number } }) {
   const client = useMemo(() => new ApiClient(role, token), [role, token]);
   const [mode, setMode] = useState<Mode>('issue');
   const [groups, setGroups] = useState<Group[]>([]);
@@ -62,9 +62,24 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
     if (append && loadingMore.current) return;
     const requestId = ++loadingRequest.current;
     if (append) loadingMore.current = true;
+    if (section === 'operations') {
+      setGroups([]);
+      setCursor(null);
+      setLoading(false);
+      loadingMore.current = false;
+      return;
+    }
     setLoading(true);
     try {
-      const kind = section === 'records' ? (recordTypeFilter === 'issue' ? 'issuance' : 'regular') : undefined;
+      if (section === 'reminders') {
+        const kind = recordTypeFilter === 'issue' ? 'issuance' : 'regular';
+        const result = await client.reminders(append ? cursor ?? undefined : undefined, 20, kind);
+        if (requestId !== loadingRequest.current) return;
+        setGroups((current) => append ? [...current, ...result.groups.filter((group) => !current.some((item) => item.id === group.id))] : result.groups);
+        setCursor(result.nextCursor);
+        return;
+      }
+       const kind = section === 'records' ? (recordTypeFilter === 'issue' ? 'issuance' : 'regular') : undefined;
       const statuses = section === 'records' ? expandCompletedStatuses(recordStatuses) : undefined;
       if (section === 'records' && statuses?.length === 0) {
         setGroups([]); setCursor(null); return;
@@ -74,10 +89,11 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
       setGroups((current) => append ? [...current, ...result.groups.filter((group) => !current.some((item) => item.id === group.id))] : result.groups);
       setCursor(result.nextCursor);
     }
-    catch (error) { pushNotice('error', error instanceof ApiError ? error.message : '暂时无法加载申请记录'); }
+    catch (error) { if (requestId === loadingRequest.current) pushNotice('error', error instanceof ApiError ? error.message : '暂时无法加载申请记录'); }
     finally { if (requestId === loadingRequest.current) setLoading(false); if (append) loadingMore.current = false; }
   };
   useEffect(() => { void load(); }, [client, section, recordTypeFilter, recordStatuses.join(',')]);
+  useEffect(() => { let refreshTimer: number | undefined; const refresh = () => { if (section === 'operations') return; if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); refreshTimer = window.setTimeout(() => { refreshTimer = undefined; void load(); }, 50); }; window.addEventListener('operation-groups-changed', refresh); return () => { window.removeEventListener('operation-groups-changed', refresh); if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); }; }, [client, section, recordTypeFilter, recordStatuses.join(',')]);
   useEffect(() => { setExpandedRecordId(null); }, [section]);
   useEffect(() => { localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(recentItems)); }, [recentItems]);
   useEffect(() => { if (!activeNotice && noticeQueue.length) { setActiveNotice(noticeQueue[0]); setNoticeQueue((current) => current.slice(1)); } }, [activeNotice, noticeQueue]);
@@ -164,7 +180,11 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
 
   const confirmSubmit = async () => {
     if (!confirm) return; setSubmitting(true);
-    try { if (editingId) await client.updateGroup(editingId, confirm.payload); else await client.submit(confirm.payload); setConfirm(null); pushNotice('success', editingId ? '申请已更新' : mode === 'issue' ? '申请已提交，等待管理审核' : '申请已提交，等待完成'); reset(mode); await load(); }
+    try {
+      const saved = editingId ? await client.updateGroup(editingId, confirm.payload) : await client.submit(confirm.payload);
+      setGroups((current) => editingId ? current.map((group) => group.id === saved.id ? saved : group) : [saved, ...current].slice(0, 20));
+      setConfirm(null); pushNotice('success', editingId ? '申请已更新' : mode === 'issue' ? '申请已提交，等待管理审核' : '申请已提交，等待完成'); reset(mode);
+    }
     catch (error) { pushNotice('error', error instanceof ApiError || error instanceof Error ? error.message : '提交失败'); }
     finally { setSubmitting(false); }
   };
@@ -175,20 +195,22 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
   const cancel = async () => {
     if (!cancelTarget) return;
     setCanceling(true);
-    try { await client.cancel(cancelTarget); setGroups((current) => current.map((group) => group.id === cancelTarget ? { ...group, status: 'cancelled' } : group)); setCancelTarget(null); pushNotice('success', '申请已取消'); }
+    try { await client.cancel(cancelTarget); setCancelTarget(null); pushNotice('success', '申请已取消'); }
     catch (error) { pushNotice('error', error instanceof ApiError ? error.message : '取消失败'); }
     finally { setCanceling(false); }
   };
   const reasons = mode === 'issue' ? options.reasons : options.actionReasons?.[mode] ?? options.reasons;
   const baseComplete = Boolean(form.serverId && /^[0-9]+$/.test(form.characterId) && form.reasonCode && (mode !== 'issue' || (form.account.trim() && form.playerQQ.trim())) && (form.reasonCode !== 'other' || form.reasonText.trim()));
-  const showRecords = section === 'records';
+  const showRecords = section === 'records' || section === 'reminders';
   const visibleGroups = groups;
+  const reminderCountFor = (type: RecordFilterType) => type === 'issue' ? (reminderCounts?.issuance ?? 0) : (reminderCounts?.regular ?? 0);
+  const recordCountFor = (type: RecordFilterType) => type === 'issue' ? (recordCounts?.issuance ?? 0) : (recordCounts?.regular ?? 0);
   const toggleRecordStatus = (status: RecordFilterStatus) => setRecordStatuses((current) => current.includes(status) ? current.filter((item) => item !== status) : [...current, status]);
   const selectAllRecordStatuses = () => setRecordStatuses(Object.keys(recordStatusName) as RecordFilterStatus[]);
   const resetRecordFilters = () => { setRecordTypeFilter('issue'); setRecordStatuses(defaultRecordStatuses); };
 
   return <section className="workspace customer-workspace">
-    <div className={`page-heading ${showRecords ? 'records-heading' : 'manager-heading'}`}><div><p className="eyebrow">客服工作台</p><h1>{showRecords ? '\u6211\u7684\u7533\u8bf7' : editingId ? '\u4fee\u6539\u7533\u8bf7' : '\u7533\u8bf7\u64cd\u4f5c'}</h1></div>{!showRecords && (editingId ? <button type="button" className="secondary-button" onClick={() => { reset(mode); onNavigate?.('records'); }}>返回我的申请</button> : <div className="heading-stat"><span>待审核</span><strong>{groups.filter((group) => group.status === 'pending').length}</strong></div>)}</div>
+    <div className={`page-heading ${showRecords ? 'records-heading' : 'manager-heading'}`}><div><p className="eyebrow">客服工作台</p><h1>{section === 'reminders' ? '待提醒' : showRecords ? '\u6211\u7684\u7533\u8bf7' : editingId ? '\u4fee\u6539\u7533\u8bf7' : '\u7533\u8bf7\u64cd\u4f5c'}</h1></div>{!showRecords && (editingId ? <button type="button" className="secondary-button" onClick={() => { reset(mode); onNavigate?.('records'); }}>返回我的申请</button> : <div className="heading-stat"><span>待审核</span><strong>{groups.filter((group) => group.status === 'pending').length}</strong></div>)}</div>
     {!showRecords && !editingId && <div className="action-tabs" role="tablist">{(['issue', 'kick', 'ban'] as Mode[]).map((item) => <button type="button" key={item} className={mode === item ? 'action-tab active' : 'action-tab'} onClick={() => reset(item)} role="tab" aria-selected={mode === item}>{item === 'issue' ? <Package size={16} /> : item === 'kick' ? <UserRound size={16} /> : <ShieldBan size={16} />}{actionLabel[item]}</button>)}</div>}
     {activeNotice && <FloatingNotice kind={activeNotice.kind} text={activeNotice.text} onDismiss={() => setActiveNotice(null)} />}
     {!showRecords && <form className="request-form" onSubmit={submit}>
@@ -201,7 +223,7 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
       {mode !== 'issue' && baseComplete && <section className="panel-surface mini-action-panel compact-action"><div className="mini-action-icon">{mode === 'kick' ? <UserRound size={20} /> : <ShieldBan size={20} />}</div><strong>{actionLabel[mode]}申请</strong><span>目标：{targetLabel(form, options)}</span></section>}
       <div className="form-footer request-footer"><span className="muted-note">{editingId ? '保存后重新进入审核队列' : mode === 'issue' && !baseComplete ? '填写完整玩家信息后自动展开操作内容' : '提交后可在申请记录中查看进度'}</span><div className="footer-actions">{editingId && <button type="button" className="secondary-button" onClick={() => reset(mode)}>取消编辑</button>}<button className="primary-button submit-button" disabled={submitting} type="submit">{submitting ? '处理中…' : editingId ? '保存修改' : '提交申请'}<Send size={17} /></button></div></div>
     </form>}
-    {showRecords && <section id="my-requests" className="records-section records-page">{loading ? <div className="empty-state"><LoaderDots /></div> : <><div className="manager-toolbar"><div className="filter-row"><div className="record-type-filter filter-choice-group" role="group" aria-label="筛选申请类型"><span className="filter-choice-label"><Package size={14} />类型</span>{(Object.entries(recordTypeName) as Array<[RecordFilterType, string]>).map(([type, label]) => <button type="button" className={recordTypeFilter === type ? 'filter-choice selected' : 'filter-choice'} key={type} aria-pressed={recordTypeFilter === type} onClick={() => { setRecordTypeFilter(type); setExpandedRecordId(null); }}>{label}</button>)}</div><div className="record-status-filter filter-choice-group" role="group" aria-label="筛选申请状态"><span className="filter-choice-label"><Layers3 size={14} />状态</span><button type="button" className={recordStatuses.length === Object.keys(recordStatusName).length ? 'filter-choice selected' : 'filter-choice'} onClick={selectAllRecordStatuses}>全部</button>{Object.entries(recordStatusName).map(([status, label]) => <button type="button" className={`filter-choice status-filter-choice status-filter-${status} ${recordStatuses.includes(status as RecordFilterStatus) ? 'selected' : ''}`} key={status} onClick={() => toggleRecordStatus(status as RecordFilterStatus)}>{label}</button>)}</div><button type="button" className="icon-button refresh-button" title="刷新" aria-label="刷新申请记录" onClick={resetRecordFilters}><RefreshCw size={17} /></button></div></div>{visibleGroups.length === 0 ? <div className="empty-state"><div className="empty-icon"><Package size={22} /></div><h3>{groups.length ? '没有符合筛选条件的记录' : '还没有申请记录'}</h3><p>{groups.length ? `当前筛选：${recordTypeName[recordTypeFilter]}，请选择其他条件查看申请` : '提交的申请会显示在这里'}</p></div> : <div className="record-table-shell">{recordTypeFilter === 'issue' ? <RecordTableHeader isReissue /> : <RecordTableHeader />}<div className="record-table-body">{visibleGroups.map((group, index) => <OwnRecordCard key={group.id} index={index + 1} group={group} options={options} expanded={expandedRecordId === group.id} onToggle={() => setExpandedRecordId((current) => current === group.id ? null : group.id)} onEdit={edit} onCancel={requestCancel} />)}</div></div>}</>}{cursor && <button type="button" className="load-more" disabled={loading} onClick={() => void load(true)}>加载更多</button>}</section>}
+    {showRecords && <section id="my-requests" className="records-section records-page">{loading ? <div className="empty-state"><LoaderDots /></div> : <><div className="manager-toolbar"><div className="filter-row">{(section === 'records' || section === 'reminders') && <div className="record-type-filter filter-choice-group" role="group" aria-label="筛选申请类型"><span className="filter-choice-label"><Package size={14} />类型</span>{(Object.entries(recordTypeName) as Array<[RecordFilterType, string]>).map(([type, label]) => <button type="button" className={recordTypeFilter === type ? 'filter-choice selected' : 'filter-choice'} key={type} aria-pressed={recordTypeFilter === type} onClick={() => { setRecordTypeFilter(type); setExpandedRecordId(null); }}>{label}{section === 'reminders' ? ` ${reminderCountFor(type)}` : section === 'records' ? ` ${recordCountFor(type)}` : ''}</button>)}</div>}{section === 'records' && <div className="record-status-filter filter-choice-group" role="group" aria-label="筛选申请状态"><span className="filter-choice-label"><Layers3 size={14} />状态</span><button type="button" className={recordStatuses.length === Object.keys(recordStatusName).length ? 'filter-choice selected' : 'filter-choice'} onClick={selectAllRecordStatuses}>全部</button>{Object.entries(recordStatusName).map(([status, label]) => <button type="button" className={`filter-choice status-filter-choice status-filter-${status} ${recordStatuses.includes(status as RecordFilterStatus) ? 'selected' : ''}`} key={status} onClick={() => toggleRecordStatus(status as RecordFilterStatus)}>{label}</button>)}</div>}<button type="button" className="icon-button refresh-button" title="刷新" aria-label="刷新申请记录" onClick={() => void load()}><RefreshCw size={17} /></button></div></div>{visibleGroups.length === 0 ? <div className="empty-state"><div className="empty-icon"><Package size={22} /></div><h3>{groups.length ? '没有符合筛选条件的记录' : section === 'reminders' ? '暂无待提醒记录' : '还没有申请记录'}</h3><p>{groups.length ? `当前筛选：${recordTypeName[recordTypeFilter]}，请选择其他条件查看申请` : '提交的申请会显示在这里'}</p></div> : <div className="record-table-shell">{section === 'reminders' || recordTypeFilter === 'issue' ? <RecordTableHeader isReissue /> : <RecordTableHeader />}<div className="record-table-body">{visibleGroups.map((group, index) => <OwnRecordCard key={group.id} index={index + 1} group={group} options={options} expanded={expandedRecordId === group.id} onToggle={() => setExpandedRecordId((current) => current === group.id ? null : group.id)} onEdit={edit} onCancel={requestCancel} />)}</div></div>}</>}{cursor && <button type="button" className="load-more" disabled={loading} onClick={() => void load(true)}>加载更多</button>}</section>}
     {confirm && <ConfirmDialog title={confirm.title} description={confirm.description} confirmLabel={editingId ? '保存修改' : '确认提交'} busy={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirmSubmit()} />}
     {cancelTarget && <ConfirmDialog title="确认取消申请？" description="取消后将停止处理，且无法恢复。" confirmLabel="确认取消" danger busy={canceling} onCancel={() => setCancelTarget(null)} onConfirm={() => void cancel()} />}
   </section>;
@@ -227,7 +249,7 @@ function IssueOperations({ items, setItems, cashQuantity, setCashQuantity, token
 
 function OwnRecordCard({ index, group, options, expanded, onToggle, onEdit, onCancel }: { index: number; group: Group; options: AppOptions; expanded: boolean; onToggle: () => void; onEdit: (group: Group) => void; onCancel: (id: string) => void }) {
   const kind = recordType(group); const reason = reasonLabel(options, group); const isIssuance = isIssuanceGroup(group); const expandable = isIssuance;
-  const canModify = group.status === 'pending' || (!isIssuance && group.status === 'approved');
+  const canModify = group.status === 'pending' || group.status === 'approved' || group.status === 'rejected';
   return <article className={`group-card record-card status-card-${group.status} ${expanded ? 'is-expanded' : ''}`}><div className={`record-table-row ${isIssuance ? 'record-table-reissue' : 'record-table-without-actor'} ${expandable ? 'is-expandable' : ''}`} role="row" tabIndex={expandable ? 0 : undefined} aria-expanded={expandable ? expanded : undefined} onClick={expandable ? onToggle : undefined} onKeyDown={expandable ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onToggle(); } } : undefined}><span className="record-index" role="cell" aria-label={`第 ${index} 条`}>{String(index).padStart(2, '0')}</span><div className="record-cell record-server" data-label="服务器" role="cell"><strong>{group.server.displayName}</strong></div>{isIssuance && <div className="record-cell record-account" data-label="游戏账号" role="cell"><span>{group.account || '--'}</span></div>}{isIssuance && <div className="record-cell record-qq" data-label="玩家 QQ" role="cell"><span>{group.playerQQ || '--'}</span></div>}<div className="record-cell record-character" data-label="角色 ID" role="cell"><code>{group.characterId}</code></div><div className="record-cell record-type-cell" data-label="类型" role="cell"><span className={`record-type record-type-${kind.key}`}>{kind.label}</span></div><div className="record-cell record-reason" data-label="理由" role="cell" title={reason}>{reason}{group.rejectionReason ? ` · ${group.rejectionReason}` : ''}</div><time className="record-time" data-label="提交时间" role="cell" dateTime={group.submittedAt}>{formatRecordTime(group.submittedAt)}</time><div className="record-status-cell" data-label="状态" role="cell"><StatusBadge status={group.status} /></div><div className="record-operation" data-label="操作" role="cell" onKeyDown={(event) => event.stopPropagation()}>{canModify && <><button type="button" className="record-action-button" onClick={(event) => { event.stopPropagation(); onEdit(group); }}>修改</button><button type="button" className="record-action-button danger" onClick={(event) => { event.stopPropagation(); onCancel(group.id); }}>取消</button></>}{expandable && <button type="button" className="record-action-button record-expand-button" title={expanded ? '收起详情' : '展开详情'} aria-label={expanded ? '收起详情' : '展开详情'} onClick={(event) => { event.stopPropagation(); onToggle(); }}>{expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</button>}</div></div>{expanded && expandable && <div className="record-card-content"><IssuanceItemsDisplay group={group} /></div>}</article>;
 }
 

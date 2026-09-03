@@ -37,6 +37,11 @@ Contract ID 使用 module-id.operation-name，版本单独记录。所有 ID 为
 | item-catalog.by-class | item-catalog | v1 | frontend 管理活动配置 | contracts/item-catalog.md |
 | command-generation.generate | command-generation | v1 | backend manager projection | contracts/command-generation.md |
 
+| operation-groups.remind-customer | operation-groups | v1 | frontend super_admin | contracts/operation-groups.md |
+| operation-groups.list-reminders | operation-groups | v1 | frontend all roles | contracts/operation-groups.md |
+| operation-groups.workspace-counts | operation-groups | v1 | frontend | contracts/operation-groups.md |
+| operation-groups.events | operation-groups | v1 | frontend | contracts/operation-groups.md |
+
 ## Portable data semantics
 
 - null 表示明确无值；省略字段表示该字段不适用于该 operation；空字符串不作为缺省值。

@@ -358,13 +358,17 @@ button.primary-button, button.secondary-button, button.complete-button, .server-
 @media (max-width: 680px) { .command-row { min-width: 160px; max-width: none; flex-basis: 100%; } }
 
 /* Keep record actions on one stable row and align the customer heading with the workbench. */
+.remember-login { display: inline-flex; align-items: center; gap: 8px; color: #60746c; font-size: 12px; cursor: pointer; }
+.remember-login input { min-height: 16px; width: 16px; accent-color: var(--teal); }
 .records-heading { align-items: center; }
 .record-operation { flex-wrap: nowrap; white-space: nowrap; }
 .record-operation > .record-action-button { flex: 0 0 auto; }
 .record-table-head.record-table-reissue, .record-table-row.record-table-reissue { grid-template-columns: 38px minmax(100px, .85fr) minmax(90px, .76fr) minmax(80px, .68fr) minmax(70px, .60fr) minmax(58px, .50fr) minmax(150px, 1.25fr) 82px 78px 150px; min-width: 1150px; }
+.record-table-head.record-table-with-reviewer, .record-table-row.record-table-with-reviewer { grid-template-columns: 38px minmax(126px, 1fr) minmax(76px, .7fr) minmax(64px, .6fr) minmax(210px, 1.5fr) minmax(100px, .8fr) 92px 88px 200px; min-width: 1190px; }
 .record-table-head.record-table-without-actor, .record-table-row.record-table-without-actor { grid-template-columns: 38px minmax(132px, 1.15fr) minmax(76px, .68fr) minmax(64px, .58fr) minmax(170px, 1.45fr) 88px 84px 122px; min-width: 958px; }
 @media (max-width: 680px) {
   .records-heading { align-items: center; margin-bottom: 23px; }
+  .record-table-head.record-table-with-reviewer, .record-table-row.record-table-with-reviewer { grid-template-columns: 32px 116px 70px 58px 170px 96px 84px 84px 190px; min-width: 1060px; }
   .record-table-head.record-table-reissue, .record-table-row.record-table-reissue { grid-template-columns: 32px 116px 76px 62px 145px 90px 78px 78px 150px; min-width: 1055px; }
   .record-table-head.record-table-without-actor, .record-table-row.record-table-without-actor { grid-template-columns: 32px 124px 70px 58px 155px 78px 78px 122px; min-width: 930px; }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Copy, Filter, Layers3, LoaderCircle, PackageCheck, RefreshCw, X } from 'lucide-react';
+import { Bell, Check, ChevronDown, ChevronUp, Copy, Filter, Layers3, LoaderCircle, PackageCheck, RefreshCw, X } from 'lucide-react';
 import { ApiClient, ApiError } from '../../api/client';
 import { CopyButton } from '../../components/CopyButton';
 import { ConfirmDialog, TextPromptDialog } from '../../components/Dialog';
@@ -44,24 +44,28 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
   const [error, setError] = useState('');
   const [rejectTarget, setRejectTarget] = useState<ManagerGroup | null>(null);
   const [rejectSaving, setRejectSaving] = useState(false);
-  const [actionConfirm, setActionConfirm] = useState<{ action: 'approve' | 'issue' | 'complete'; group: ManagerGroup } | null>(null);
+  const [actionConfirm, setActionConfirm] = useState<{ action: 'approve' | 'issue' | 'complete' | 'remind'; group: ManagerGroup } | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
   const copiedStorageKey = useMemo(() => copiedCommandsStorageKey(role, actorId), [role, actorId]);
   const [copiedCommands, setCopiedCommands] = useState<Set<string>>(() => readCopiedCommands(copiedStorageKey));
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const loadingMore = useRef(false);
+  const loadRequest = useRef(0);
 
   const load = async () => {
+    const requestId = ++loadRequest.current;
     setLoading(true); setError('');
     try {
       if (panel === 'users') return;
       if (panel === 'queue') {
         const result = await client.queue(serverFilter || undefined);
+        if (requestId !== loadRequest.current) return;
         setQueue(result.groups); setQueueCursor(result.nextCursor);
       } else if (panel === 'ready') {
         // The ready queue contains every approved group: issuance groups wait
         // for super-admin issuance and regular groups wait for execution.
         const result = await client.archive('approved', serverFilter || undefined, undefined, 20);
+        if (requestId !== loadRequest.current) return;
         setReady(result.groups); setReadyCursor(result.nextCursor);
       } else {
         const kind = panel === 'reissue' ? 'issuance' : 'regular';
@@ -72,14 +76,15 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
           return;
         }
         const result = await client.archive(statuses, serverFilter || undefined, undefined, 20, kind);
+        if (requestId !== loadRequest.current) return;
         if (panel === 'reissue') { setReissue(result.groups); setReissueCursor(result.nextCursor); }
         else { setArchive(result.groups); setArchiveCursor(result.nextCursor); }
       }
-    } catch (err) { setError(err instanceof ApiError ? err.message : '暂时无法加载管理数据'); }
-    finally { setLoading(false); }
+    } catch (err) { if (requestId === loadRequest.current) setError(err instanceof ApiError ? err.message : '暂时无法加载管理数据'); }
+    finally { if (requestId === loadRequest.current) setLoading(false); }
   };
   useEffect(() => { void load(); }, [client, panel, serverFilter, statusFilter.join(',')]);
-  useEffect(() => { window.dispatchEvent(new Event('workspace-counts-refresh')); }, [queue.length, ready.length]);
+  useEffect(() => { let refreshTimer: number | undefined; const refresh = () => { if (panel === 'users') return; if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); refreshTimer = window.setTimeout(() => { refreshTimer = undefined; void load(); }, 50); }; window.addEventListener('operation-groups-changed', refresh); return () => { window.removeEventListener('operation-groups-changed', refresh); if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); }; }, [client, panel, serverFilter, statusFilter.join(',')]);
   useEffect(() => { setNotice(null); }, [panel]);
   useEffect(() => {
     try { localStorage.setItem(copiedStorageKey, JSON.stringify([...copiedCommands])); } catch { /* Storage may be unavailable in private browsing. */ }
@@ -92,9 +97,14 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
   };
   const notifyCommandCopied = () => setNotice({ kind: 'success', text: '指令复制成功' });
 
-  const mutate = async (action: 'approve' | 'reject' | 'issue' | 'complete', group: ManagerGroup) => {
+  const mutate = async (action: 'approve' | 'reject' | 'issue' | 'complete' | 'remind', group: ManagerGroup) => {
     setError('');
     if (action === 'reject') { setRejectTarget(group); return; }
+    if (action === 'remind') {
+      try { await client.remind(group.id); setNotice({ kind: 'success', text: '已提醒客服' }); }
+      catch (err) { setError(err instanceof ApiError ? err.message : '提醒失败'); }
+      return;
+    }
     setActionConfirm({ action, group });
   };
   const confirmAction = async () => {
@@ -103,35 +113,40 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
     try {
       if (actionConfirm.action === 'approve') await client.approve(actionConfirm.group.id);
       else if (actionConfirm.action === 'issue') await client.issue(actionConfirm.group.id);
+      else if (actionConfirm.action === 'remind') await client.remind(actionConfirm.group.id);
       else await client.complete(actionConfirm.group.id);
       setActionConfirm(null);
-      await load();
     } catch (err) { setError(err instanceof ApiError ? err.message : '操作失败'); }
     finally { setActionSaving(false); }
   };
-  const reject = async (reason: string) => { if (!rejectTarget) return; setRejectSaving(true); try { await client.reject(rejectTarget.id, reason || undefined); setRejectTarget(null); await load(); } catch (err) { setError(err instanceof ApiError ? err.message : '驳回失败'); } finally { setRejectSaving(false); } };
+  const reject = async (reason: string) => { if (!rejectTarget) return; setRejectSaving(true); try { await client.reject(rejectTarget.id, reason || undefined); setRejectTarget(null); } catch (err) { setError(err instanceof ApiError ? err.message : '驳回失败'); } finally { setRejectSaving(false); } };
   const loadMore = async () => {
     if (loadingMore.current) return;
     const cursor = panel === 'queue' ? queueCursor : panel === 'ready' ? readyCursor : panel === 'reissue' ? reissueCursor : archiveCursor; if (!cursor) return; loadingMore.current = true; setLoading(true);
+    const requestId = ++loadRequest.current;
     try {
       if (panel === 'queue') {
         const result = await client.queue(serverFilter || undefined, cursor);
+        if (requestId !== loadRequest.current) return;
         setQueue((current) => appendUniqueById(current, result.groups));
         setQueueCursor(result.nextCursor);
       } else if (panel === 'ready') {
         const result = await client.archive('approved', serverFilter || undefined, cursor, 20);
+        if (requestId !== loadRequest.current) return;
         setReady((current) => appendUniqueById(current, result.groups));
         setReadyCursor(result.nextCursor);
       } else if (panel === 'reissue') {
         const result = await client.archive(expandCompletedStatuses(statusFilter), serverFilter || undefined, cursor, 20, 'issuance');
+        if (requestId !== loadRequest.current) return;
         setReissue((current) => appendUniqueById(current, result.groups));
         setReissueCursor(result.nextCursor);
       } else {
         const result = await client.archive(expandCompletedStatuses(statusFilter), serverFilter || undefined, cursor, 20, 'regular');
+        if (requestId !== loadRequest.current) return;
         setArchive((current) => appendUniqueById(current, result.groups));
         setArchiveCursor(result.nextCursor);
       }
-    } catch (err) { setError(err instanceof ApiError ? err.message : '加载更多失败'); } finally { setLoading(false); loadingMore.current = false; }
+    } catch (err) { if (requestId === loadRequest.current) setError(err instanceof ApiError ? err.message : '加载更多失败'); } finally { if (requestId === loadRequest.current) setLoading(false); loadingMore.current = false; }
   };
 
   const pendingCount = queue.filter((group) => group.status === 'pending').length; const approvedCount = role === 'super_admin' ? ready.length : archive.filter((group) => group.status === 'approved').length; const issuedCount = archive.filter((group) => group.status === 'issued' || group.status === 'completed').length;
@@ -160,7 +175,7 @@ function StatusFilters({ value, onChange }: { value: FilterStatus[]; onChange: (
   return <div className="filter-choice-group status-filter-group" role="group" aria-label="筛选状态"><span className="filter-choice-label"><Layers3 size={14} />状态</span><button type="button" className={value.length === statusEntries.length ? 'filter-choice selected' : 'filter-choice'} onClick={() => onChange(statusEntries.map(([status]) => status))}>全部</button>{statusEntries.map(([status, label]) => <button type="button" className={`filter-choice status-filter-choice status-filter-${status} ${value.includes(status) ? 'selected' : ''}`} key={status} onClick={() => toggle(status)}>{label}</button>)}</div>;
 }
 
-function RequestList({ panel, groups, options, role, onAction, copiedCommands, onCommandCopied, onCopyNotice }: { panel: 'queue' | 'ready' | 'archive' | 'reissue'; groups: ManagerGroup[]; options: AppOptions; role: Role; onAction: (action: 'approve' | 'reject' | 'issue' | 'complete', group: ManagerGroup) => void; copiedCommands: Set<string>; onCommandCopied: (groupId: string, command: GeneratedCommand) => void; onCopyNotice: () => void }) {
+function RequestList({ panel, groups, options, role, onAction, copiedCommands, onCommandCopied, onCopyNotice }: { panel: 'queue' | 'ready' | 'archive' | 'reissue'; groups: ManagerGroup[]; options: AppOptions; role: Role; onAction: (action: 'approve' | 'reject' | 'issue' | 'complete' | 'remind', group: ManagerGroup) => void; copiedCommands: Set<string>; onCommandCopied: (groupId: string, command: GeneratedCommand) => void; onCopyNotice: () => void }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   useEffect(() => setExpandedId(null), [panel]);
   if (!groups.length) return <div className="empty-state"><div className="empty-icon"><Check size={22} /></div><h3>{panel === 'queue' ? '审核队列已清空' : panel === 'ready' ? '暂无待完成申请' : panel === 'reissue' ? '暂无物资发放记录' : '暂无常规操作记录'}</h3><p>{panel === 'queue' ? '新的待审核申请会出现在这里' : panel === 'ready' ? '管理通过后，申请会出现在这里' : '可调整筛选条件查看历史'}</p></div>;
@@ -171,7 +186,7 @@ function RequestList({ panel, groups, options, role, onAction, copiedCommands, o
   const isReissueTable = panel === 'reissue' || panel === 'queue';
   return <div className="manager-groups">{[...map.entries()].map(([key, items]) => { const start = sequence; sequence += items.length; return <div className="server-section" key={key}><div className="record-table-shell manager-record-table" role="table" aria-label={panel === 'ready' ? '待完成申请列表' : panel === 'reissue' || panel === 'queue' ? '物资申请列表' : '申请列表'}><RecordTableHeader commandMode={commandMode} actor={actor} isReissue={isReissueTable} /><div className="record-table-body" role="rowgroup">{items.map((group, index) => <RequestCard key={group.id} index={start + index + 1} panel={commandMode ? 'ready' : panel} group={group} options={options} role={role} expanded={expandedId === group.id} onToggle={() => setExpandedId((current) => current === group.id ? null : group.id)} onAction={onAction} copiedCommands={copiedCommands} onCommandCopied={onCommandCopied} onCopyNotice={onCopyNotice} />)}</div></div></div>; })}</div>;
 }
-function RequestCard({ index, panel, group, options, role, expanded, onToggle, onAction, copiedCommands, onCommandCopied, onCopyNotice }: { index: number; panel: 'queue' | 'ready' | 'archive' | 'reissue'; group: ManagerGroup; options: AppOptions; role: Role; expanded: boolean; onToggle: () => void; onAction: (action: 'approve' | 'reject' | 'issue' | 'complete', group: ManagerGroup) => void; copiedCommands: Set<string>; onCommandCopied: (groupId: string, command: GeneratedCommand) => void; onCopyNotice: () => void }) {
+function RequestCard({ index, panel, group, options, role, expanded, onToggle, onAction, copiedCommands, onCommandCopied, onCopyNotice }: { index: number; panel: 'queue' | 'ready' | 'archive' | 'reissue'; group: ManagerGroup; options: AppOptions; role: Role; expanded: boolean; onToggle: () => void; onAction: (action: 'approve' | 'reject' | 'issue' | 'complete' | 'remind', group: ManagerGroup) => void; copiedCommands: Set<string>; onCommandCopied: (groupId: string, command: GeneratedCommand) => void; onCopyNotice: () => void }) {
   const kind = recordType(group);
   const reason = reasonLabel(options, group);
   const commandMode = panel === 'ready' && role === 'super_admin';
@@ -183,6 +198,8 @@ function RequestCard({ index, panel, group, options, role, expanded, onToggle, o
   const expandable = issuance || panel === 'archive' || panel === 'reissue';
   const canReview = panel === 'queue' && group.status === 'pending';
   const canIssue = panel === 'ready' && group.status === 'approved' && role === 'super_admin' && issuance;
+  const canRemind = panel === 'ready' && group.status === 'approved' && role === 'super_admin';
+  const remindButton = canRemind ? <button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('remind', group); }}><Bell size={13} />{group.reminderCount ? '再次提醒' : '提醒上线'}</button> : null;
   const canComplete = (panel === 'ready' || panel === 'archive') && group.status === 'approved' && !issuance;
   const isReissuePanel = panel === 'reissue' || panel === 'queue';
   return <article className={`manager-card record-card manager-record status-card-${group.status} ${expanded ? 'is-expanded' : ''}`}>
@@ -199,7 +216,7 @@ function RequestCard({ index, panel, group, options, role, expanded, onToggle, o
       {panel === 'ready' && <div className="record-cell record-actor" data-label="审核员" role="cell">{group.approvedBy?.displayName || '--'}</div>}
       <time className="record-time" data-label="提交时间" role="cell" dateTime={group.submittedAt}>{formatRecordTime(group.submittedAt)}</time>
       <div className="record-status-cell" data-label="状态" role="cell"><StatusBadge status={group.status} /></div>
-      <div className="record-operation" data-label="操作" role="cell" onKeyDown={(event) => event.stopPropagation()}>{canReview && <><button type="button" className="record-action-button danger" onClick={(event) => { event.stopPropagation(); onAction('reject', group); }}><X size={13} />驳回</button><button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('approve', group); }}><Check size={13} />通过</button></>}{canIssue && <button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('issue', group); }}><PackageCheck size={14} />确认完成</button>}{canComplete && <button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('complete', group); }}><Check size={14} />确认完成</button>}{expandable && <button type="button" className="record-action-button record-expand-button" title={expanded ? '收起详情' : '展开详情'} aria-label={expanded ? '收起详情' : '展开详情'} onClick={(event) => { event.stopPropagation(); onToggle(); }}>{expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</button>}</div>
+      <div className="record-operation" data-label="操作" role="cell" onKeyDown={(event) => event.stopPropagation()}>{canReview && <><button type="button" className="record-action-button danger" onClick={(event) => { event.stopPropagation(); onAction('reject', group); }}><X size={13} />驳回</button><button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('approve', group); }}><Check size={13} />通过</button></>}{remindButton}{canIssue && <button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('issue', group); }}><PackageCheck size={14} />确认完成</button>}{canComplete && <button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('complete', group); }}><Check size={14} />确认完成</button>}{expandable && <button type="button" className="record-action-button record-expand-button" title={expanded ? '收起详情' : '展开详情'} aria-label={expanded ? '收起详情' : '展开详情'} onClick={(event) => { event.stopPropagation(); onToggle(); }}>{expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</button>}</div>
     </div>
     {expanded && <div className="record-card-content">
       {panel === 'archive' ? <WorkflowTimeline group={group} /> : panel === 'reissue' ? <><WorkflowTimeline group={group} /><IssuanceItemsDisplay group={group} /></> : panel === 'queue' ? <IssuanceItemsDisplay group={group} /> : commandMode ? <CommandDetails group={group} commands={displayCommands} copiedCommands={copiedCommands} onCommandCopied={onCommandCopied} /> : <>

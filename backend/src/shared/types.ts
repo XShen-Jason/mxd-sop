@@ -102,6 +102,9 @@ export interface OperationGroup {
   cancelledBy?: { id: string; displayName: string };
   updatedAt?: string;
   updatedBy?: { id: string; displayName: string };
+  reminderCount?: number;
+  lastRemindedAt?: string;
+  lastRemindedBy?: { id: string; displayName: string };
   executionNote?: string;
   commandRuleVersion: string;
   idempotencyKey?: string;
@@ -147,6 +150,9 @@ export interface CustomerGroupProjection {
   cancelledBy?: { id: string; displayName: string };
   updatedAt?: string;
   updatedBy?: { id: string; displayName: string };
+  reminderCount?: number;
+  lastRemindedAt?: string;
+  lastRemindedBy?: { id: string; displayName: string };
   executionNote?: string;
 }
 

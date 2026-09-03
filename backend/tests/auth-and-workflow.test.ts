@@ -131,4 +131,69 @@ describe('authentication and approval workflow', () => {
     const complete = await app.inject({ method: 'POST', url: `/api/v1/manager/operation-groups/${response.json().id}/complete`, headers: { authorization: `Bearer ${managerToken}` }, payload: {} });
     expect(complete.statusCode).toBe(409);
   });
+
+  it('lets only super admins remind customers and reopens edited applications for review', async () => {
+    const headers = { authorization: `Bearer ${customerToken}` };
+    const payload = { serverId: 'mushroom', account: 'remind-player', playerQQ: '12', characterId: '991', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '02000000', quantity: 1 }] };
+    const created = await app.inject({ method: 'POST', url: '/api/v1/operation-groups', headers, payload });
+    const id = created.json().id as string;
+    await app.inject({ method: 'POST', url: `/api/v1/manager/operation-groups/${id}/approve`, headers: { authorization: `Bearer ${managerToken}` } });
+
+    const denied = await app.inject({ method: 'POST', url: `/api/v1/super-admin/operation-groups/${id}/remind`, headers: { authorization: `Bearer ${managerToken}` } });
+    expect(denied.statusCode).toBe(403);
+    const reminded = await app.inject({ method: 'POST', url: `/api/v1/super-admin/operation-groups/${id}/remind`, headers: { authorization: `Bearer ${superToken}` } });
+    expect(reminded.statusCode).toBe(200);
+    expect(reminded.json().reminderCount).toBe(1);
+    const reminders = await app.inject({ method: 'GET', url: '/api/v1/operation-groups/reminders', headers });
+    expect(reminders.json().groups.map((group: { id: string }) => group.id)).toContain(id);
+    expect((await app.inject({ method: 'GET', url: '/api/v1/operation-groups/workspace-counts', headers })).json().reminders).toBeGreaterThan(0);
+    const managerReminders = await app.inject({ method: 'GET', url: '/api/v1/operation-groups/reminders', headers: { authorization: `Bearer ${managerToken}` } });
+    expect(managerReminders.statusCode).toBe(200);
+    expect(managerReminders.json().groups).toEqual([]);
+    const managerSubmitted = await app.inject({ method: 'POST', url: '/api/v1/operation-groups', headers: { authorization: `Bearer ${managerToken}` }, payload: { ...payload, characterId: '994' } });
+    const managerGroupId = managerSubmitted.json().id as string;
+    await app.inject({ method: 'POST', url: `/api/v1/manager/operation-groups/${managerGroupId}/approve`, headers: { authorization: `Bearer ${managerToken}` } });
+    await app.inject({ method: 'POST', url: `/api/v1/super-admin/operation-groups/${managerGroupId}/remind`, headers: { authorization: `Bearer ${superToken}` } });
+    const managerOwnReminder = await app.inject({ method: 'GET', url: '/api/v1/operation-groups/reminders', headers: { authorization: `Bearer ${managerToken}` } });
+    expect(managerOwnReminder.json().groups.map((group: { id: string }) => group.id)).toContain(managerGroupId);
+
+    const regular = await app.inject({ method: 'POST', url: '/api/v1/operation-groups', headers, payload: { serverId: 'uu', characterId: '993', reason: { code: 'cheating' }, operations: [{ type: 'ban' }] } });
+    const regularId = regular.json().id as string;
+    const regularReminder = await app.inject({ method: 'POST', url: `/api/v1/super-admin/operation-groups/${regularId}/remind`, headers: { authorization: `Bearer ${superToken}` } });
+    expect(regularReminder.statusCode).toBe(200);
+    const regularReminders = await app.inject({ method: 'GET', url: '/api/v1/operation-groups/reminders?kind=regular', headers });
+    expect(regularReminders.json().groups.map((group: { id: string }) => group.id)).toContain(regularId);
+    const counts = (await app.inject({ method: 'GET', url: '/api/v1/operation-groups/workspace-counts', headers })).json();
+    expect(counts.reminderIssuance).toBe(1);
+    expect(counts.reminderRegular).toBe(1);
+
+    const edited = await app.inject({ method: 'PUT', url: `/api/v1/operation-groups/${id}`, headers, payload: { ...payload, characterId: '992' } });
+    expect(edited.statusCode).toBe(200);
+    expect(edited.json().status).toBe('pending');
+    expect(edited.json()).not.toHaveProperty('approvedAt');
+    expect(edited.json()).not.toHaveProperty('reminderCount');
+  });
+
+  it('pushes changed events to connected collaborators', async () => {
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const controller = new AbortController();
+    const decoder = new TextDecoder();
+    try {
+      const stream = await fetch(`${address}/api/v1/operation-groups/events`, { headers: { authorization: `Bearer ${customerToken}` }, signal: controller.signal });
+      expect(stream.status).toBe(200);
+      expect(stream.headers.get('content-type')).toContain('text/event-stream');
+      const reader = stream.body?.getReader();
+      expect(reader).toBeDefined();
+      const connected = decoder.decode((await reader!.read()).value);
+      expect(connected).toContain(': connected');
+      const write = app.inject({ method: 'POST', url: '/api/v1/operation-groups', headers: { authorization: `Bearer ${customerToken}` }, payload: { serverId: 'mushroom', characterId: '777', reason: { code: 'player-request' }, operations: [{ type: 'kick' }] } });
+      const changed = decoder.decode((await reader!.read()).value);
+      expect(changed).toContain('event: changed');
+      expect((await write).statusCode).toBe(201);
+      await reader!.cancel();
+    } finally {
+      controller.abort();
+      await app.close();
+    }
+  });
 });

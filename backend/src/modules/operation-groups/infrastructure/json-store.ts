@@ -5,6 +5,7 @@ import { compareAsc, compareDesc } from '../domain/helpers.js';
 
 export type GroupPageQuery = {
   ownerId?: string;
+  reminded?: boolean;
   status?: GroupStatus | GroupStatus[];
   serverId?: string;
   kind?: 'issuance' | 'regular';
@@ -21,6 +22,7 @@ export interface GroupRepository {
   listPage?(query: GroupPageQuery): OperationGroup[];
   insert(group: OperationGroup): void;
   replace(group: OperationGroup): void;
+  workspaceCounts?(ownerId: string): { pending: number; approved: number; reminders: number; reminderIssuance?: number; reminderRegular?: number; ownIssuance?: number; ownRegular?: number };
 }
 
 export class JsonGroupRepository implements GroupRepository {
@@ -48,6 +50,7 @@ export class JsonGroupRepository implements GroupRepository {
     const serverOrder = new Map((query.serverOrder ?? []).map((id, index) => [id, index]));
     const groups = this.groups.filter((group) => {
       if (query.ownerId && group.submittedBy.id !== query.ownerId) return false;
+      if (query.reminded && !(group.reminderCount && group.reminderCount > 0)) return false;
       if (query.status && (Array.isArray(query.status) ? !query.status.includes(group.status) : group.status !== query.status)) return false;
       if (query.serverId && group.server.id !== query.serverId) return false;
       if (query.kind) {
@@ -77,6 +80,24 @@ export class JsonGroupRepository implements GroupRepository {
     if (index < 0) throw new Error('group not found');
     this.groups[index] = structuredClone(group);
     this.persist();
+  }
+
+  workspaceCounts(ownerId: string) {
+    return this.groups.reduce((counts, group) => {
+      if (group.status === 'pending') counts.pending += 1;
+      if (group.status === 'approved') counts.approved += 1;
+      if (group.submittedBy.id === ownerId) {
+        const issuance = group.operations.some((operation) => operation.type === 'item' || operation.type === 'cash');
+        if (issuance) counts.ownIssuance += 1;
+        else counts.ownRegular += 1;
+        if (group.status === 'approved' && group.reminderCount && group.reminderCount > 0) {
+          counts.reminders += 1;
+          if (issuance) counts.reminderIssuance += 1;
+          else counts.reminderRegular += 1;
+        }
+      }
+      return counts;
+    }, { pending: 0, approved: 0, reminders: 0, reminderIssuance: 0, reminderRegular: 0, ownIssuance: 0, ownRegular: 0 });
   }
 
   private read(): OperationGroup[] {

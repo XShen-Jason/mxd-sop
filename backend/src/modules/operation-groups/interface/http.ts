@@ -95,6 +95,30 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
       return reply.send(service.listOwn(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, normalizedStatus, kind));
     } catch (error) { return sendError(reply, error); }
   });
+  app.get('/api/v1/operation-groups/reminders', async (request, reply) => {
+    try {
+      const query = request.query as Query;
+      const kind = query.kind === undefined ? undefined : String(query.kind) as 'issuance' | 'regular';
+      if (kind !== undefined && kind !== 'issuance' && kind !== 'regular') throw new GroupError('invalid-input', 'invalid kind');
+      return reply.send(service.listReminders(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, kind));
+    } catch (error) { return sendError(reply, error); }
+  });
+  app.get('/api/v1/operation-groups/workspace-counts', async (request, reply) => {
+    try { return reply.send(service.workspaceCounts(identity(request))); } catch (error) { return sendError(reply, error); }
+  });
+  app.get('/api/v1/operation-groups/events', async (request, reply) => {
+    try {
+      identity(request);
+      reply.hijack();
+      reply.raw.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache, no-transform', connection: 'keep-alive' });
+      reply.raw.write(': connected\n\n');
+      const writeEvent = (payload: string) => { if (reply.raw.writableEnded || reply.raw.destroyed) return; try { reply.raw.write(payload); } catch { /* The client may disconnect between the guard and write. */ } };
+      const unsubscribe = service.subscribe(() => writeEvent('event: changed\ndata: {}\n\n'));
+      const heartbeat = setInterval(() => writeEvent(': keepalive\n\n'), 25_000);
+      const close = () => { clearInterval(heartbeat); unsubscribe(); };
+      request.raw.once('close', close);
+    } catch (error) { return sendError(reply, error); }
+  });
   app.post('/api/v1/operation-groups/:groupId/cancel', async (request, reply) => {
     try { return reply.send(service.cancel(identity(request), (request.params as { groupId: string }).groupId)); } catch (error) { return sendError(reply, error); }
   });
@@ -130,6 +154,9 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
   });
   app.post('/api/v1/manager/operation-groups/:groupId/issue', async (request, reply) => {
     try { const body = bodyObject(request); if (Object.keys(body).some((key) => key !== 'executionNote')) throw new GroupError('invalid-input'); if (body.executionNote !== undefined && typeof body.executionNote !== 'string') throw new GroupError('invalid-input'); return reply.send(service.issue(identity(request), (request.params as { groupId: string }).groupId, body.executionNote as string | undefined)); } catch (error) { return sendError(reply, error); }
+  });
+  app.post('/api/v1/super-admin/operation-groups/:groupId/remind', async (request, reply) => {
+    try { return reply.send(service.remind(identity(request), (request.params as { groupId: string }).groupId)); } catch (error) { return sendError(reply, error); }
   });
   app.post('/api/v1/manager/operation-groups/:groupId/deliver', async (request, reply) => {
     try { const body = bodyObject(request); if (Object.keys(body).some((key) => key !== 'executionNote')) throw new GroupError('invalid-input'); if (body.executionNote !== undefined && typeof body.executionNote !== 'string') throw new GroupError('invalid-input'); return reply.send(service.issue(identity(request), (request.params as { groupId: string }).groupId, body.executionNote as string | undefined)); } catch (error) { return sendError(reply, error); }

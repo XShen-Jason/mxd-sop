@@ -16,6 +16,7 @@ function fallbackList(repository: GroupRepository, query: GroupPageQuery) {
   const order = new Map((query.serverOrder ?? []).map((id, index) => [id, index]));
   const groups = repository.all().filter((group) => {
     if (query.ownerId && group.submittedBy.id !== query.ownerId) return false;
+    if (query.reminded && !(group.reminderCount && group.reminderCount > 0)) return false;
     if (query.status && (Array.isArray(query.status) ? !query.status.includes(group.status) : group.status !== query.status)) return false;
     if (query.serverId && group.server.id !== query.serverId) return false;
     if (query.kind) {

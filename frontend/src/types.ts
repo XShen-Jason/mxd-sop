@@ -41,6 +41,9 @@ export interface Group {
   updatedAt?: string;
   updatedBy?: { id: string; displayName: string };
   executionNote?: string;
+  reminderCount?: number;
+  lastRemindedAt?: string;
+  lastRemindedBy?: { id: string; displayName: string };
 }
 export interface GeneratedCommand { operationIndex: number; sequence: number; text: string }
 export interface ManagerGroup extends Group { commands: GeneratedCommand[]; commandRuleVersion: string }

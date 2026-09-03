@@ -300,7 +300,15 @@ The original `completed` state remains readable for MVP records. 物资记录使
 
 ### operation-groups.update-group
 
-`PUT /api/v1/operation-groups/{groupId}`，认证角色必须是提交者本人；customer、manager、super_admin 均可继承调用。物资 group 仅 pending 可修改；常规 group 在 approved（待完成）状态也可修改。服务端重新执行完整输入校验并记录 updatedAt/updatedBy；已驳回、发放、完成或取消的 group 返回 `invalid-status-transition`。
+`PUT /api/v1/operation-groups/{groupId}`，认证角色必须是提交者本人；customer、manager、super_admin 均可继承调用。申请在 pending、approved 或 rejected 状态可修改，服务端重新执行完整输入校验、清除旧审核及提醒字段、记录 updatedAt/updatedBy，并统一回到 pending 重新审核；已发放、完成或取消的 group 返回 `invalid-status-transition`。取消契约使用相同的完成前窗口，但取消后不能恢复。
+
+### operation-groups.remind-customer / list-reminders
+
+`POST /api/v1/super-admin/operation-groups/{groupId}/remind` 仅允许 `super_admin` 对 approved 申请调用。调用不改变 status，递增 `reminderCount` 并记录 `lastRemindedAt/lastRemindedBy`；重复调用表示再次提醒，发物资和常规操作均可提醒。
+
+`GET /api/v1/operation-groups/reminders?cursor={opaque-cursor}&limit={n}&kind={issuance|regular}` 允许所有已认证角色调用；只返回当前登录用户提交者本人、仍为 approved、已被提醒的记录。`kind` 可筛选发物资或常规操作，省略时返回两类；使用与 list-own 相同的客服投影和倒序游标分页，绝不返回 commands。
+
+`GET /api/v1/operation-groups/workspace-counts` 返回当前角色可见的小标计数；所有角色均得到自己的 `reminders`，并附带 `reminderIssuance`、`reminderRegular` 分类型计数，以及当前用户全部申请的 `ownIssuance`、`ownRegular` 分类型计数；管理角色额外得到 `pending`，超级管理员额外得到 `ready`。`GET /api/v1/operation-groups/events` 是认证 SSE 变更信号，只发送无业务数据的 changed 事件，客户端据此刷新当前页，不轮询。
 
 ### operation-groups.approve-group / reject-group / issue-group
 

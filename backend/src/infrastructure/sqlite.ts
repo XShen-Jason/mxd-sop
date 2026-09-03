@@ -34,6 +34,9 @@ export function openDatabase(filePath: string) {
       submitted_at TEXT NOT NULL,
       idempotency_key TEXT,
       request_fingerprint TEXT,
+      reminder_count INTEGER NOT NULL DEFAULT 0,
+      last_reminded_at TEXT,
+      last_reminded_by_json TEXT,
       payload_json TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS groups_status_submitted ON operation_groups(status, submitted_at DESC);
@@ -42,6 +45,12 @@ export function openDatabase(filePath: string) {
     CREATE INDEX IF NOT EXISTS groups_submitter_idempotency ON operation_groups(submitted_by_id, idempotency_key);
     CREATE INDEX IF NOT EXISTS groups_submitted_id ON operation_groups(submitted_at DESC, id DESC);
   `);
+  const columns = db.prepare('PRAGMA table_info(operation_groups)').all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has('reminder_count')) db.exec('ALTER TABLE operation_groups ADD COLUMN reminder_count INTEGER NOT NULL DEFAULT 0');
+  if (!existing.has('last_reminded_at')) db.exec('ALTER TABLE operation_groups ADD COLUMN last_reminded_at TEXT');
+  if (!existing.has('last_reminded_by_json')) db.exec('ALTER TABLE operation_groups ADD COLUMN last_reminded_by_json TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS groups_reminders ON operation_groups(submitted_by_id, status, reminder_count, submitted_at DESC, id DESC)');
   return db;
 }
 
