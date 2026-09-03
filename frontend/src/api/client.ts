@@ -35,6 +35,7 @@ const GET_CACHE_TTL_MS = 15_000;
 const responseCache = new Map<string, { expiresAt: number; value: unknown }>();
 const inFlightRequests = new Map<string, Promise<unknown>>();
 const eventConnections = new Map<string, { source: EventSource; users: number; closeTimer?: number }>();
+export const OPERATION_GROUPS_LOCAL_CHANGE_EVENT = 'operation-groups-local-change';
 let cacheEpoch = 0;
 
 /** Drop cached reads after a mutation or an SSE change notification. */
@@ -84,7 +85,12 @@ export class ApiClient {
     }
     const value = response.status === 204 ? undefined as T : await response.json() as T;
     if (cacheable && requestEpoch === cacheEpoch) responseCache.set(cacheKey, { expiresAt: Date.now() + GET_CACHE_TTL_MS, value });
-    if (method !== 'GET') invalidateApiCache();
+    if (method !== 'GET') {
+      invalidateApiCache();
+      if (path.includes('/operation-groups') && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(OPERATION_GROUPS_LOCAL_CHANGE_EVENT));
+      }
+    }
     return value;
   }
 

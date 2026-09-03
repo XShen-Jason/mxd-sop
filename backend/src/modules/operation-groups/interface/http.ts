@@ -110,7 +110,13 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
     try {
       identity(request);
       reply.hijack();
-      reply.raw.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache, no-transform', connection: 'keep-alive' });
+      reply.raw.writeHead(200, {
+        'content-type': 'text/event-stream; charset=utf-8',
+        'cache-control': 'no-cache, no-transform',
+        connection: 'keep-alive',
+        // Tell Nginx and compatible reverse proxies to flush each event.
+        'x-accel-buffering': 'no'
+      });
       reply.raw.write(': connected\n\n');
       const writeEvent = (payload: string) => { if (reply.raw.writableEnded || reply.raw.destroyed) return; try { reply.raw.write(payload); } catch { /* The client may disconnect between the guard and write. */ } };
       const unsubscribe = service.subscribe(() => writeEvent('event: changed\ndata: {}\n\n'));

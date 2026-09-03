@@ -101,8 +101,11 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
     setError('');
     if (action === 'reject') { setRejectTarget(group); return; }
     if (action === 'remind') {
-      try { await client.remind(group.id); setNotice({ kind: 'success', text: '已提醒客服' }); }
-      catch (err) { setError(err instanceof ApiError ? err.message : '提醒失败'); }
+      try {
+        await client.remind(group.id);
+        setNotice({ kind: 'success', text: '已提醒客服' });
+        await load();
+      } catch (err) { setError(err instanceof ApiError ? err.message : '提醒失败'); }
       return;
     }
     setActionConfirm({ action, group });
@@ -116,10 +119,22 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
       else if (actionConfirm.action === 'remind') await client.remind(actionConfirm.group.id);
       else await client.complete(actionConfirm.group.id);
       setActionConfirm(null);
+      // Refresh immediately; SSE remains the cross-browser update path, but
+      // the acting manager must not depend on a proxy-delivered event.
+      await load();
     } catch (err) { setError(err instanceof ApiError ? err.message : '操作失败'); }
     finally { setActionSaving(false); }
   };
-  const reject = async (reason: string) => { if (!rejectTarget) return; setRejectSaving(true); try { await client.reject(rejectTarget.id, reason || undefined); setRejectTarget(null); } catch (err) { setError(err instanceof ApiError ? err.message : '驳回失败'); } finally { setRejectSaving(false); } };
+  const reject = async (reason: string) => {
+    if (!rejectTarget) return;
+    setRejectSaving(true);
+    try {
+      await client.reject(rejectTarget.id, reason || undefined);
+      setRejectTarget(null);
+      await load();
+    } catch (err) { setError(err instanceof ApiError ? err.message : '驳回失败'); }
+    finally { setRejectSaving(false); }
+  };
   const loadMore = async () => {
     if (loadingMore.current) return;
     const cursor = panel === 'queue' ? queueCursor : panel === 'ready' ? readyCursor : panel === 'reissue' ? reissueCursor : archiveCursor; if (!cursor) return; loadingMore.current = true; setLoading(true);

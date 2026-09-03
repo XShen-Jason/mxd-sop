@@ -195,7 +195,7 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
   const cancel = async () => {
     if (!cancelTarget) return;
     setCanceling(true);
-    try { await client.cancel(cancelTarget); setCancelTarget(null); pushNotice('success', '申请已取消'); }
+    try { await client.cancel(cancelTarget); setCancelTarget(null); await load(); pushNotice('success', '申请已取消'); }
     catch (error) { pushNotice('error', error instanceof ApiError ? error.message : '取消失败'); }
     finally { setCanceling(false); }
   };

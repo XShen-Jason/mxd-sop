@@ -182,6 +182,7 @@ describe('authentication and approval workflow', () => {
       const stream = await fetch(`${address}/api/v1/operation-groups/events`, { headers: { authorization: `Bearer ${customerToken}` }, signal: controller.signal });
       expect(stream.status).toBe(200);
       expect(stream.headers.get('content-type')).toContain('text/event-stream');
+      expect(stream.headers.get('x-accel-buffering')).toBe('no');
       const reader = stream.body?.getReader();
       expect(reader).toBeDefined();
       const connected = decoder.decode((await reader!.read()).value);

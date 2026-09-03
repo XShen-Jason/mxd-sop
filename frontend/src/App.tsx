@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Archive, Bell, CalendarDays, ClipboardList, Headphones, KeyRound, LoaderCircle, LogIn, LogOut, Menu, PackageCheck, ShieldCheck, SlidersHorizontal, UserRound, Wrench, X } from 'lucide-react';
-import { ApiClient, ApiError, invalidateApiCache, resetApiClientState } from './api/client';
+import { ApiClient, ApiError, invalidateApiCache, OPERATION_GROUPS_LOCAL_CHANGE_EVENT, resetApiClientState } from './api/client';
 import { FloatingNotice } from './components/FloatingNotice';
 import { CustomerView } from './modules/customer/CustomerView';
 import { ManagerView } from './modules/manager/ManagerView';
@@ -50,7 +50,39 @@ export default function App() {
   useEffect(() => { const onPopState = () => { if (session) setWorkspace(workspaceFromPath(session.user.role)); }; window.addEventListener('popstate', onPopState); return () => window.removeEventListener('popstate', onPopState); }, [session]);
   useEffect(() => { const bootstrap = async () => { try { const user = await new ApiClient().me(); setSession({ user, expiresAt: '' }); } catch { /* no active cookie */ } finally { setChecking(false); } }; void bootstrap(); }, []);
   useEffect(() => { if (!session) { setOptions(null); return; } setError(''); client.options().then(setOptions).catch((err) => { setSession(null); setOptions(null); setError(err instanceof ApiError ? err.message : '会话已失效，请重新登录'); }); }, [session?.user.id]);
-  useEffect(() => { if (!session) { setWorkspaceCounts({}); return; } const refreshTimer = { current: undefined as number | undefined }; let countsRequest = 0; const loadCounts = async () => { const requestId = ++countsRequest; try { const counts = await client.workspaceCounts(); if (requestId !== countsRequest) return; setWorkspaceCounts({ queue: counts.pending, ready: counts.ready, reminders: counts.reminders, reminderIssuance: counts.reminderIssuance, reminderRegular: counts.reminderRegular, ownIssuance: counts.ownIssuance, ownRegular: counts.ownRegular }); } catch { /* panels expose errors */ } }; const changed = () => { invalidateApiCache(); if (refreshTimer.current !== undefined) return; refreshTimer.current = window.setTimeout(() => { refreshTimer.current = undefined; void loadCounts(); window.dispatchEvent(new Event('operation-groups-changed')); }, 50); }; void loadCounts(); const stream = client.events(); stream.addEventListener('changed', changed); return () => { countsRequest += 1; stream.close(); if (refreshTimer.current !== undefined) window.clearTimeout(refreshTimer.current); }; }, [session?.user.id, session?.user.role, client]);
+  useEffect(() => {
+    if (!session) { setWorkspaceCounts({}); return; }
+    let refreshTimer: number | undefined;
+    let countsRequest = 0;
+    const loadCounts = async () => {
+      const requestId = ++countsRequest;
+      try {
+        const counts = await client.workspaceCounts();
+        if (requestId !== countsRequest) return;
+        setWorkspaceCounts({ queue: counts.pending, ready: counts.ready, reminders: counts.reminders, reminderIssuance: counts.reminderIssuance, reminderRegular: counts.reminderRegular, ownIssuance: counts.ownIssuance, ownRegular: counts.ownRegular });
+      } catch { /* panels expose errors */ }
+    };
+    const changed = () => {
+      invalidateApiCache();
+      if (refreshTimer !== undefined) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = undefined;
+        void loadCounts();
+        window.dispatchEvent(new Event('operation-groups-changed'));
+      }, 50);
+    };
+    const localChanged = () => { invalidateApiCache(); void loadCounts(); };
+    void loadCounts();
+    const stream = client.events();
+    stream.addEventListener('changed', changed);
+    window.addEventListener(OPERATION_GROUPS_LOCAL_CHANGE_EVENT, localChanged);
+    return () => {
+      countsRequest += 1;
+      stream.close();
+      window.removeEventListener(OPERATION_GROUPS_LOCAL_CHANGE_EVENT, localChanged);
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
+    };
+  }, [session?.user.id, session?.user.role, client]);
 
   const login = async (username: string, password: string) => { const result = await new ApiClient().login(username, password); resetApiClientState(); setSession({ user: result.user, expiresAt: result.expiresAt }); setOptions(null); };
   const logout = async () => { try { await client.logout(); } catch { /* local session still clears */ } resetApiClientState(); setSession(null); setOptions(null); window.history.pushState({}, '', '/'); };

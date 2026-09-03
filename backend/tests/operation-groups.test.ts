@@ -94,6 +94,7 @@ describe('operation-groups lifecycle and projections', () => {
     expect(() => instance.cancel({ ...customer, id: 'other' }, group.id)).toThrow('forbidden');
     const completed = instance.complete(manager, group.id);
     expect(completed.status).toBe('completed');
+    expect(instance.listQueue(manager).groups).toEqual([]);
     expect(() => instance.complete(manager, group.id)).not.toThrow();
     expect(() => instance.cancel(customer, group.id)).toThrow('invalid-status-transition');
   });
