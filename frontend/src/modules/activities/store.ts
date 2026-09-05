@@ -1,23 +1,7 @@
-import type { CatalogItem } from '../../types';
+import type { Activity, ActivityReward, CatalogItem } from '../../types';
 import { codeForLevel, isEquipment, normalizeEquipmentLevel, splitEquipmentCode } from '../../shared/item-level';
 
-export type ActivityReward = {
-  kind: 'item' | 'cash';
-  quantity: number;
-  itemCode?: string;
-  itemLevel?: number;
-  itemName?: string;
-  itemClass?: string;
-  image?: string;
-};
-
-export type Activity = {
-  id: string;
-  name: string;
-  description: string;
-  rewards: ActivityReward[];
-  updatedAt: string;
-};
+export type { Activity, ActivityReward } from '../../types';
 
 export const ACTIVITIES_KEY = 'game-support-activities';
 

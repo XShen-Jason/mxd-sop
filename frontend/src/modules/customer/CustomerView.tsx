@@ -9,7 +9,7 @@ import { ItemThumbnail } from '../../components/ItemThumbnail';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatRecordTime, isIssuanceGroup, IssuanceItemsDisplay, recordType, RecordTableHeader, reasonLabel } from '../operation-groups/RecordPresentation';
 import type { AppOptions, CatalogItem, Group, Role } from '../../types';
-import { activityRewardLabel, readActivities, type Activity } from '../activities/store';
+import { activityRewardLabel, readActivities, writeActivities, type Activity } from '../activities/store';
 import { expandCompletedStatuses } from '../operation-groups/pagination';
 import { codeForLevel, isEquipment, MAX_EQUIPMENT_LEVEL, normalizeEquipmentLevel, splitEquipmentCode } from '../../shared/item-level';
 
@@ -57,6 +57,16 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
   const loadingRequest = useRef(0);
   const loadingMore = useRef(false);
   useEffect(() => { const sync = () => setActivities(readActivities()); window.addEventListener('storage', sync); window.addEventListener('activities-updated', sync); return () => { window.removeEventListener('storage', sync); window.removeEventListener('activities-updated', sync); }; }, []);
+  useEffect(() => {
+    if (section !== 'operations') return;
+    let active = true;
+    void client.activities().then(({ activities: remote }) => {
+      if (!active) return;
+      setActivities(remote);
+      writeActivities(remote);
+    }).catch(() => { /* retain the local cache when the API is temporarily unavailable */ });
+    return () => { active = false; };
+  }, [client, section]);
 
   const load = async (append = false) => {
     if (append && loadingMore.current) return;

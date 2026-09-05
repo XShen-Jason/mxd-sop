@@ -1,4 +1,4 @@
-import type { AppOptions, CatalogItem, Group, ManagerGroup, Page, Role, Session, User } from '../types';
+import type { Activity, AppOptions, CatalogItem, Group, ManagerGroup, Page, Role, Session, User } from '../types';
 
 export class ApiError extends Error {
   constructor(public readonly code: string, message: string, public readonly status: number) { super(message); }
@@ -107,6 +107,8 @@ export class ApiClient {
   deleteUser(id: string) { return this.request<User>(`/api/v1/auth/users/${encodeURIComponent(id)}/delete`, { method: 'POST' }); }
 
   options() { return this.request<AppOptions>('/api/v1/operation-groups/options'); }
+  activities() { return this.request<{ activities: Activity[] }>('/api/v1/activities'); }
+  saveActivities(activities: Activity[]) { return this.request<{ activities: Activity[] }>('/api/v1/activities', { method: 'PUT', body: JSON.stringify({ activities }) }); }
   searchItems(query: string, signal?: AbortSignal, cursor?: string, limit = 12) {
     const params = new URLSearchParams({ q: query, limit: String(limit) });
     if (cursor) params.set('cursor', cursor);

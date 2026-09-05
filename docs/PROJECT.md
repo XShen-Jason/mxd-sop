@@ -37,7 +37,7 @@ The operation-groups workflow contracts now include update-group, approve-group,
 | auth | 登录会话、三层角色和受控账号目录 | backend/src/modules/auth; frontend/src/App.tsx; docs/modules/auth.md | backend + frontend | auth.login, auth.logout, auth.me, auth.list-users, auth.create-user, auth.update-user, auth.delete-user | user persistence/session adapter |
 | operation-groups | 工单组提交、分组、角色视图、取消、完成和归档状态 | backend/src/modules/operation-groups; frontend/src/modules/operation-groups, frontend/src/modules/customer, frontend/src/modules/manager; manifest docs/modules/operation-groups.md | backend + frontend | operation-groups.list-options, operation-groups.submit-group, operation-groups.list-own, operation-groups.update-group, operation-groups.cancel-group, operation-groups.list-queue, operation-groups.list-reviews, operation-groups.complete-group, operation-groups.list-archive, operation-groups.remind-customer, operation-groups.list-reminders, operation-groups.workspace-counts, operation-groups.events | item-catalog（提交时校验/快照）；身份适配器；持久化适配器 |
 | item-catalog | 物品表导入、代码/名称映射、模糊搜索和分类读取 | backend/src/modules/item-catalog; manifest docs/modules/item-catalog.md; data/item-catalog/source | backend + frontend consumer | item-catalog.search, item-catalog.by-class | CSV 导入适配器；持久化适配器 |
-| activities | 客服活动与奖励配置、申请表单快捷填充 | frontend/src/modules/activities; manifest docs/modules/activities.md | frontend | local activity storage | item-catalog.search/by-class；operation-groups form |
+| activities | 客服活动与奖励配置、申请表单快捷填充 | backend/src/modules/activities; frontend/src/modules/activities; manifest docs/modules/activities.md | backend + frontend | activities.list, activities.replace | SQLite/JSON activity repository；item-catalog.search/by-class；operation-groups form |
 | command-generation | 根据已校验操作生成可执行指令并按上限拆分 | backend/src/modules/command-generation; manifest docs/modules/command-generation.md | backend | command-generation.generate | 无外部业务依赖；接收 operation-groups 的不可变快照 |
 
 模块说明的完整内容见 docs/modules/；前端只消费契约，不导入后端内部文件。
@@ -71,6 +71,8 @@ Auth contracts are defined in `docs/contracts/auth.md`: `auth.login`, `auth.logo
 | operation-groups.complete-group | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend 管理 |
 | operation-groups.list-archive | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend 管理 |
 | item-catalog.search | HTTP API | docs/contracts/item-catalog.md | item-catalog | v1 | frontend 客服/管理 |
+| activities.list | HTTP API | docs/contracts/activities.md | activities | v1 | frontend all roles |
+| activities.replace | HTTP API | docs/contracts/activities.md | activities | v1 | frontend manager/super_admin |
 | command-generation.generate | module interface | docs/contracts/command-generation.md | command-generation | v1 | backend operation-groups 管理投影 |
 | operation-groups.remind-customer | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend |
 | operation-groups.list-reminders | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend |
@@ -115,9 +117,10 @@ File-size/quality check: `Get-ChildItem backend/src,frontend/src -Recurse -File 
 ## Update rule
 
 新增应用、模块、契约、依赖或性能约束时先更新本表，再更新对应模块/契约文档。模块和契约的详细规则只保留一份。
-Production persistence is SQLite for both `auth` and `operation-groups`; JSON
+Production persistence is SQLite for `auth`, `operation-groups`, and
+`activities`; JSON
 repositories remain test-only adapters. Sessions use the SQLite session table,
 and the production identity path does not accept demo headers.
 
-The frontend `activities` capability provides a local activity/reward workspace
-and shortcut selection in customer issuance requests; see `docs/modules/activities.md`.
+The `activities` capability provides a shared activity/reward workspace and
+shortcut selection in customer issuance requests; see `docs/modules/activities.md`.

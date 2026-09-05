@@ -50,3 +50,14 @@ export interface ManagerGroup extends Group { commands: GeneratedCommand[]; comm
 export interface Page<T> { groups: T[]; nextCursor: string | null }
 export interface User { id: string; username: string; displayName: string; role: Role; active: boolean; createdAt: string; createdBy?: { id: string; displayName: string } }
 export interface Session { token?: string; expiresAt: string; user: User }
+
+export interface ActivityReward {
+  kind: 'item' | 'cash';
+  quantity: number;
+  itemCode?: string;
+  itemLevel?: number;
+  itemName?: string;
+  itemClass?: string;
+  image?: string;
+}
+export interface Activity { id: string; name: string; description: string; rewards: ActivityReward[]; updatedAt: string }

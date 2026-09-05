@@ -44,6 +44,14 @@ export function openDatabase(filePath: string) {
     CREATE INDEX IF NOT EXISTS groups_server_status ON operation_groups(server_id, status, submitted_at DESC);
     CREATE INDEX IF NOT EXISTS groups_submitter_idempotency ON operation_groups(submitted_by_id, idempotency_key);
     CREATE INDEX IF NOT EXISTS groups_submitted_id ON operation_groups(submitted_at DESC, id DESC);
+    CREATE TABLE IF NOT EXISTS activities (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      rewards_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS activities_updated ON activities(updated_at DESC, id DESC);
   `);
   const columns = db.prepare('PRAGMA table_info(operation_groups)').all() as Array<{ name: string }>;
   const existing = new Set(columns.map((column) => column.name));

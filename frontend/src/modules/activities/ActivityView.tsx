@@ -10,6 +10,7 @@ import { activityRewardLabel, catalogToReward, readActivities, writeActivities, 
 import { codeForLevel, isEquipment, MAX_EQUIPMENT_LEVEL, normalizeEquipmentLevel } from '../../shared/item-level';
 
 const RECENT_ITEMS_KEY = 'game-support-recent-items';
+const ACTIVITIES_MIGRATED_KEY = 'game-support-activities-migrated';
 const ITEM_TYPE_LABELS: Record<string, string> = {
   consume: '消耗品', equip: '装备', fashion: '时装', material: '材料', chair: '椅子', quest: '任务', title: '称号'
 };
@@ -26,6 +27,7 @@ function readRecentItems() {
 
 export function ActivityView({ role = 'manager', token }: { role?: Role; token?: string }) {
   const client = useMemo(() => new ApiClient(role, token), [role, token]);
+  const canEdit = role === 'manager' || role === 'super_admin';
   const [activities, setActivities] = useState<Activity[]>(readActivities);
   const [editing, setEditing] = useState<Activity | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -40,8 +42,32 @@ export function ActivityView({ role = 'manager', token }: { role?: Role; token?:
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const catalogCursor = catalogPage.cursors[catalogPage.index];
 
-  useEffect(() => writeActivities(activities), [activities]);
-  useEffect(() => { try { localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(recentItems)); } catch { /* storage may be unavailable */ } }, [recentItems]);
+  useEffect(() => { if (canEdit) writeActivities(activities); }, [activities, canEdit]);
+  useEffect(() => {
+    if (!canEdit) return;
+    let active = true;
+    void client.activities().then(({ activities: remote }) => {
+      if (!active) return;
+      const cached = readActivities();
+      const migrated = localStorage.getItem(ACTIVITIES_MIGRATED_KEY) === '1';
+      if (!remote.length && cached.length && !migrated) {
+        setActivities(cached);
+        void client.saveActivities(cached).then(({ activities: saved }) => {
+          if (!active) return;
+          setActivities(saved);
+          localStorage.setItem(ACTIVITIES_MIGRATED_KEY, '1');
+        }).catch(() => { /* keep the local migration fallback */ });
+        return;
+      }
+      setActivities(remote);
+      writeActivities(remote);
+      localStorage.setItem(ACTIVITIES_MIGRATED_KEY, '1');
+    }).catch((error) => {
+      if (active && error instanceof ApiError) setNotice({ kind: 'error', text: error.message });
+    });
+    return () => { active = false; };
+  }, [canEdit, client]);
+  useEffect(() => { if (!canEdit) return; try { localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(recentItems)); } catch { /* storage may be unavailable */ } }, [canEdit, recentItems]);
   useEffect(() => {
     const text = query.trim();
     const source = typeFilter ? `class:${typeFilter}` : text ? `search:${text}` : '';
@@ -81,10 +107,11 @@ export function ActivityView({ role = 'manager', token }: { role?: Role; token?:
 
   const hasCatalogQuery = Boolean(typeFilter || query.trim());
   const visibleItems = useMemo(() => hasCatalogQuery ? catalogItems : recentItems, [catalogItems, hasCatalogQuery, recentItems]);
-  const startAdd = () => { setEditing(null); setDraft(emptyActivity()); setEditorOpen(true); };
-  const startEdit = (activity: Activity) => { const cash = activity.rewards.find((reward) => reward.kind === 'cash'); const itemRewards = activity.rewards.filter((reward) => reward.kind === 'item'); setEditing(activity); setDraft({ ...activity, rewards: [cash ?? { kind: 'cash', quantity: 0 }, ...itemRewards].map((reward) => ({ ...reward })) }); setEditorOpen(true); };
+  const startAdd = () => { if (!canEdit) return; setEditing(null); setDraft(emptyActivity()); setEditorOpen(true); };
+  const startEdit = (activity: Activity) => { if (!canEdit) return; const cash = activity.rewards.find((reward) => reward.kind === 'cash'); const itemRewards = activity.rewards.filter((reward) => reward.kind === 'item'); setEditing(activity); setDraft({ ...activity, rewards: [cash ?? { kind: 'cash', quantity: 0 }, ...itemRewards].map((reward) => ({ ...reward })) }); setEditorOpen(true); };
   const setReward = (index: number, next: Partial<ActivityReward>) => setDraft((current) => ({ ...current, rewards: current.rewards.map((reward, i) => i === index ? { ...reward, ...next } : reward) }));
-  const save = () => {
+  const save = async () => {
+    if (!canEdit) return;
     const cleanName = draft.name.trim();
     const rewards = draft.rewards.filter((reward) => reward.quantity > 0 && (reward.kind === 'cash' || reward.itemCode));
     if (!cleanName) { setNotice({ kind: 'error', text: '请输入活动名称' }); return; }
@@ -98,19 +125,37 @@ export function ActivityView({ role = 'manager', token }: { role?: Role; token?:
     const itemCodes = normalizedRewards.filter((reward) => reward.kind === 'item').map((reward) => codeForLevel(reward.itemCode as string, reward.itemClass, reward.itemLevel));
     if (new Set(itemCodes).size !== itemCodes.length) { setNotice({ kind: 'error', text: '同一物品和等级不能重复添加' }); return; }
     const next = { ...draft, id: editing?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`), name: cleanName, description: draft.description.trim(), rewards: normalizedRewards, updatedAt: new Date().toISOString() };
-    setActivities((current) => editing ? current.map((activity) => activity.id === editing.id ? next : activity) : [next, ...current]);
-    setEditing(null); setDraft(emptyActivity()); setEditorOpen(false); setNotice({ kind: 'success', text: editing ? '活动已更新' : '活动已添加' }); window.dispatchEvent(new Event('activities-updated'));
+    const nextActivities = editing ? activities.map((activity) => activity.id === editing.id ? next : activity) : [next, ...activities];
+    try {
+      const result = await client.saveActivities(nextActivities);
+      setActivities(result.activities);
+      writeActivities(result.activities);
+      localStorage.setItem(ACTIVITIES_MIGRATED_KEY, '1');
+      setEditing(null); setDraft(emptyActivity()); setEditorOpen(false); setNotice({ kind: 'success', text: editing ? '活动已更新' : '活动已添加' }); window.dispatchEvent(new Event('activities-updated'));
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof ApiError ? error.message : '活动保存失败' });
+      return;
+    }
   };
-  const remove = (activity: Activity) => setDeleteTarget(activity);
+  const remove = (activity: Activity) => { if (canEdit) setDeleteTarget(activity); };
   const selectType = (next: string) => { setTypeFilter(next); setQuery(''); };
-  const confirmRemove = () => {
-    if (!deleteTarget) return;
-    setActivities((current) => current.filter((activity) => activity.id !== deleteTarget.id));
-    setDeleteTarget(null); setNotice({ kind: 'success', text: '活动已删除' });
-    window.dispatchEvent(new Event('activities-updated'));
+  const confirmRemove = async () => {
+    if (!canEdit || !deleteTarget) return;
+    try {
+      const result = await client.saveActivities(activities.filter((activity) => activity.id !== deleteTarget.id));
+      setActivities(result.activities);
+      writeActivities(result.activities);
+      localStorage.setItem(ACTIVITIES_MIGRATED_KEY, '1');
+      setDeleteTarget(null);
+      setNotice({ kind: 'success', text: '活动已删除' });
+      window.dispatchEvent(new Event('activities-updated'));
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof ApiError ? error.message : '活动删除失败' });
+    }
+    return;
   };
   const chooseItem = (item: CatalogItem) => {
-    if (!editorOpen) return;
+    if (!canEdit || !editorOpen) return;
     if (!isEquipment(item.itemClass) && draft.rewards.some((reward) => reward.kind === 'item' && reward.itemCode === item.code)) { setNotice({ kind: 'error', text: '同一物品不能重复添加' }); return; }
     const index = draft.rewards.findIndex((reward) => reward.kind === 'item' && !reward.itemCode);
     setDraft((current) => index >= 0 ? { ...current, rewards: current.rewards.map((reward, i) => i === index ? catalogToReward(item, reward.quantity || 1) : reward) } : { ...current, rewards: [...current.rewards, catalogToReward(item)] });
@@ -122,6 +167,8 @@ export function ActivityView({ role = 'manager', token }: { role?: Role; token?:
   const previousPage = () => setCatalogPage((current) => current.index > 0 ? { ...current, index: current.index - 1, nextCursor: null } : current);
   const nextPage = () => setCatalogPage((current) => current.nextCursor ? { ...current, index: current.index + 1, cursors: [...current.cursors.slice(0, current.index + 1), current.nextCursor], nextCursor: null } : current);
   const totalPages = catalogPage.totalCount === null ? 0 : Math.ceil(catalogPage.totalCount / ITEMS_PER_PAGE);
+
+  if (!canEdit) return null;
 
   return <section className="workspace activity-workspace"><div className="page-heading manager-heading"><div><p className="eyebrow">活动与道具</p><h1>活动与道具</h1></div><div className="heading-stat"><span>活动数量</span><strong>{activities.length}</strong></div></div><div className="activity-layout">
     <section className="activity-left">{editorOpen ? <ActivityEditor draft={draft} setDraft={setDraft} setReward={setReward} onSave={save} onCancel={cancelEditor} /> : <><div className="activity-list-heading"><div><p className="eyebrow">活动列表</p><h2>已配置活动</h2></div><button type="button" className="primary-button" onClick={startAdd}><Plus size={16} />添加活动</button></div><div className="activity-cards">{activities.length ? activities.map((activity) => <article className="activity-card" key={activity.id}><div className="activity-card-header"><div><h3>{activity.name}</h3>{activity.description && <p>{activity.description}</p>}</div><div className="activity-card-actions"><button type="button" className="icon-button" aria-label="编辑活动" onClick={() => startEdit(activity)}><Pencil size={15} /></button><button type="button" className="icon-button danger-button" aria-label="删除活动" onClick={() => remove(activity)}><Trash2 size={15} /></button></div></div><div className="activity-reward-list">{activity.rewards.map((reward, index) => <span className={`activity-reward-pill ${reward.kind}`} key={`${reward.kind}-${reward.itemCode ?? index}-${reward.itemLevel ?? 1}`}>{activityRewardLabel(reward)}</span>)}</div></article>) : <div className="empty-state"><h3>还没有活动</h3></div>}</div></>}</section>

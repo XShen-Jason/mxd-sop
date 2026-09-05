@@ -15,6 +15,9 @@ import { registerOperationRoutes } from './modules/operation-groups/interface/ht
 import { OperationGroupsService } from './modules/operation-groups/public/index.js';
 import { JsonGroupRepository } from './modules/operation-groups/public/index.js';
 import { SqliteGroupRepository } from './modules/operation-groups/infrastructure/sqlite-store.js';
+import { registerActivityRoutes } from './modules/activities/interface/http.js';
+import { ActivitiesService, JsonActivityRepository } from './modules/activities/public/index.js';
+import { SqliteActivityRepository } from './modules/activities/infrastructure/sqlite-store.js';
 import { openDatabase } from './infrastructure/sqlite.js';
 import { loadEnvironment } from './config/environment.js';
 
@@ -25,6 +28,7 @@ export interface AppConfig {
   catalogImageMapPath?: string;
   dataPath?: string;
   usersPath?: string;
+  activitiesPath?: string;
   databasePath?: string;
   initialAdmin?: { username: string; displayName: string; password: string };
 }
@@ -61,6 +65,9 @@ export async function createApp(config: AppConfig = {}) {
   const databaseExisted = !testPersistence && fs.existsSync(databasePath);
   const db = testPersistence ? undefined : openDatabase(databasePath);
   const repository = testPersistence ? new JsonGroupRepository(config.dataPath ?? projectPath('data/generated/operation-groups.json')) : new SqliteGroupRepository(db!);
+  const activitiesRepository = testPersistence
+    ? new JsonActivityRepository(config.activitiesPath ?? `${config.dataPath ?? projectPath('data/generated/operation-groups.json')}.activities.json`)
+    : new SqliteActivityRepository(db!);
   let auth: AuthService;
   try {
     auth = testPersistence
@@ -79,6 +86,7 @@ export async function createApp(config: AppConfig = {}) {
   const service = new OperationGroupsService({ repository, catalog, options: appOptions, resolveDisplayName: (id) => auth.resolveDisplayName(id) });
   registerAuthRoutes(app, auth);
   registerOperationRoutes(app, service, catalog, auth);
+  registerActivityRoutes(app, new ActivitiesService(activitiesRepository), auth);
   app.get('/health', async () => ({ status: 'ok', catalogItems: catalog.size }));
   if (db) app.addHook('onClose', async () => { db.close(); });
   return app;

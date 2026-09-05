@@ -160,3 +160,21 @@ export interface ManagerGroupProjection extends CustomerGroupProjection {
   commands: GeneratedCommand[];
   commandRuleVersion: string;
 }
+
+export interface ActivityReward {
+  kind: 'item' | 'cash';
+  quantity: number;
+  itemCode?: string;
+  itemLevel?: number;
+  itemName?: string;
+  itemClass?: string;
+  image?: string;
+}
+
+export interface Activity {
+  id: string;
+  name: string;
+  description: string;
+  rewards: ActivityReward[];
+  updatedAt: string;
+}
