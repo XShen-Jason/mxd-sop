@@ -10,9 +10,9 @@ describe('HTTP role projections', () => {
   let app: FastifyInstance;
   const dataPath = path.join(os.tmpdir(), `game-support-ops-${randomUUID()}.json`);
   const usersPath = path.join(os.tmpdir(), `game-support-users-${randomUUID()}.json`);
-  const catalogPath = fs.existsSync(path.resolve(process.cwd(), 'data/item-catalog/source/道具表.xlsx'))
-    ? path.resolve(process.cwd(), 'data/item-catalog/source/道具表.xlsx')
-    : path.resolve(process.cwd(), '..', 'data/item-catalog/source/道具表.xlsx');
+  const catalogPath = fs.existsSync(path.resolve(process.cwd(), 'data/item-catalog/source/道具表-9-5.csv'))
+    ? path.resolve(process.cwd(), 'data/item-catalog/source/道具表-9-5.csv')
+    : path.resolve(process.cwd(), '..', 'data/item-catalog/source/道具表-9-5.csv');
   const customerHeaders = { 'x-user-role': 'customer', 'x-user-id': 'customer-a', 'x-display-name': '客服 A' };
   const managerHeaders = { 'x-user-role': 'manager', 'x-user-id': 'manager-b', 'x-display-name': '管理 B' };
 
@@ -54,5 +54,6 @@ describe('HTTP role projections', () => {
     const response = await app.inject({ method: 'GET', url: '/api/v1/item-catalog/by-class?class=consume&limit=2', headers: customerHeaders });
     expect(response.statusCode).toBe(200);
     expect(response.json().items.every((item: { itemClass?: string }) => item.itemClass === 'consume')).toBe(true);
+    expect(response.json().items[0].image).toMatch(/^\/item-images\/.+\.png$/u);
   });
 });

@@ -10,9 +10,9 @@ import { openDatabase } from '../src/infrastructure/sqlite.js';
 const databasePath = path.join(os.tmpdir(), `ops-${randomUUID()}.sqlite`);
 const reminderDatabasePath = path.join(os.tmpdir(), `ops-reminders-${randomUUID()}.sqlite`);
 const legacyDatabasePath = path.join(os.tmpdir(), `ops-legacy-${randomUUID()}.sqlite`);
-const catalogPath = fs.existsSync(path.resolve(process.cwd(), 'data/item-catalog/source/道具表.xlsx'))
-  ? path.resolve(process.cwd(), 'data/item-catalog/source/道具表.xlsx')
-  : path.resolve(process.cwd(), '..', 'data/item-catalog/source/道具表.xlsx');
+const catalogPath = fs.existsSync(path.resolve(process.cwd(), 'data/item-catalog/source/道具表-9-5.csv'))
+  ? path.resolve(process.cwd(), 'data/item-catalog/source/道具表-9-5.csv')
+  : path.resolve(process.cwd(), '..', 'data/item-catalog/source/道具表-9-5.csv');
 
 describe('SQLite deployment persistence', () => {
   afterAll(() => {

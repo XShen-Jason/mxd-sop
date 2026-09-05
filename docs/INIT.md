@@ -12,7 +12,7 @@
 2. 保留 frontend、backend 应用实现目录，项目文档和契约正文统一放在 docs/；不创建 worker，因为当前没有异步任务要求。
 3. 业务能力按责任划分为 auth、operation-groups、item-catalog、command-generation。
 4. 后端是授权、校验、状态和指令的唯一权威；前端只负责交互和展示。
-5. Excel 放在 data/item-catalog/source/，作为原始输入，不在前端复制一份。
+5. CSV 放在 data/item-catalog/source/，作为原始输入，不在前端复制一份。
 6. 服务器、理由预设和操作类型使用可扩展的字符串配置；初始值记录在 docs/modules/operation-groups.md。
 7. 指令规则、数量拆分和客服不可见规则写入稳定契约，后续实现必须以契约为准。
 
@@ -39,7 +39,7 @@ MVP 使用 JSON 持久化和请求头身份适配器，以便在没有供应商�
 
 ## Implementation order
 
-1. 固化物品目录导入映射：Excel 的 item_id 为命令代码，按字符串保存；name 为显示名称，class 保留为目录属性，Id 仅作为源行标识。
+1. 固化物品目录导入映射：CSV 的 item_id 为命令代码，按字符串保存；name 为显示名称，class 保留为目录属性，Id 仅作为源行标识。
 2. 实现并测试 command-generation.generate，覆盖 1000、1001、2888、多个物品和非法数量。
 3. 实现 operation-groups 的提交/取消/完成状态机和客服/管理两种投影。
 4. 加入有界分页、角色授权、审计和持久化适配器。

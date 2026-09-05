@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
-import { CatalogError, ItemCatalog, loadCatalogFromExcel, loadCatalogFromJson } from '../src/modules/item-catalog/public/index.js';
+import { CatalogError, ItemCatalog, loadCatalogFromCsv, loadCatalogFromJson, loadCatalogImageMap } from '../src/modules/item-catalog/public/index.js';
+
+const requestedMedals = [
+  ['01142392', '人级勋章'], ['01142977', '地级勋章'], ['01142504', '天级勋章'],
+  ['01143012', '王级勋章'], ['01142867', '皇级勋章'], ['01142744', '仙级勋章'],
+  ['01142803', '霸级勋章'], ['01142802', '超越级勋章'], ['01142580', '星耀级勋章'],
+  ['01142935', '星辰级勋章'], ['01142577', '行星级勋章'], ['01142578', '银河级勋章'],
+  ['01142579', '星云级勋章'], ['01142440', '星河级勋章'], ['01143343', '黑洞级勋章'],
+  ['01142908', '混沌级勋章'], ['01143024', '宇宙级勋章'], ['01142949', '终极勋章']
+] as const;
 
 describe('item-catalog.search', () => {
   const catalog = new ItemCatalog([
@@ -32,12 +41,33 @@ describe('item-catalog.search', () => {
     expect(() => catalog.listByClass('consume', 0)).toThrowError(CatalogError);
   });
 
-  it('loads the supplied workbook while retaining text codes', () => {
-    const fromWorkspace = path.resolve(process.cwd(), 'data/item-catalog/source/道具表.xlsx');
-    const fromBackend = path.resolve(process.cwd(), '..', 'data/item-catalog/source/道具表.xlsx');
-    const loaded = loadCatalogFromExcel(fs.existsSync(fromWorkspace) ? fromWorkspace : fromBackend, { skipInvalidRows: true });
-    expect(loaded.lookup('02000000')).toMatchObject({ code: '02000000' });
+  it('loads the supplied UTF-8 CSV while retaining text codes', () => {
+    const fromWorkspace = path.resolve(process.cwd(), 'data/item-catalog/source/道具表-9-5.csv');
+    const fromBackend = path.resolve(process.cwd(), '..', 'data/item-catalog/source/道具表-9-5.csv');
+    const mapFromWorkspace = path.resolve(process.cwd(), 'data/item-catalog/source/item-image-map.json');
+    const mapFromBackend = path.resolve(process.cwd(), '..', 'data/item-catalog/source/item-image-map.json');
+    const images = loadCatalogImageMap(fs.existsSync(mapFromWorkspace) ? mapFromWorkspace : mapFromBackend);
+    const loaded = loadCatalogFromCsv(fs.existsSync(fromWorkspace) ? fromWorkspace : fromBackend, { skipInvalidRows: true, images });
+    expect(loaded.lookup('02000000')).toMatchObject({ code: '02000000', name: '红色药水', itemClass: 'consume', image: '/item-images/02000000.png' });
+    expect(loaded.lookup('02000000_1')).toMatchObject({ image: '/item-images/02000000.png' });
     expect(typeof loaded.lookup('02000000')?.code).toBe('string');
+  });
+
+  it('loads the requested medal titles without duplicate item codes', () => {
+    const csvPath = fs.existsSync(path.resolve(process.cwd(), 'data/item-catalog/source/道具表-9-5.csv'))
+      ? path.resolve(process.cwd(), 'data/item-catalog/source/道具表-9-5.csv')
+      : path.resolve(process.cwd(), '..', 'data/item-catalog/source/道具表-9-5.csv');
+    const mapPath = fs.existsSync(path.resolve(process.cwd(), 'data/item-catalog/source/item-image-map.json'))
+      ? path.resolve(process.cwd(), 'data/item-catalog/source/item-image-map.json')
+      : path.resolve(process.cwd(), '..', 'data/item-catalog/source/item-image-map.json');
+    const loaded = loadCatalogFromCsv(csvPath, { skipInvalidRows: true, images: loadCatalogImageMap(mapPath) });
+    const csv = fs.readFileSync(csvPath, 'utf8');
+    for (const [code, name] of requestedMedals) {
+      expect(loaded.lookup(code)).toMatchObject({ code, name, itemClass: 'title' });
+      expect(csv.match(new RegExp(`"${code}"`, 'gu'))).toHaveLength(1);
+      if (code !== '01142580') expect(loaded.lookup(code)?.image).toBe(`/item-images/${code}.png`);
+    }
+    expect(loaded.lookup('01142580')?.image).toBeUndefined();
   });
 
   it('loads the bundled JSON catalog with optional image URLs', () => {

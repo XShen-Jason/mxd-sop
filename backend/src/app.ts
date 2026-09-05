@@ -10,7 +10,7 @@ import { JsonUserRepository } from './modules/auth/public/index.js';
 import { SqliteUserRepository } from './modules/auth/infrastructure/sqlite-users.js';
 import { SqliteSessionRepository } from './modules/auth/infrastructure/sqlite-sessions.js';
 import { registerAuthRoutes } from './modules/auth/interface/http.js';
-import { loadCatalogFromExcel, loadCatalogFromJson } from './modules/item-catalog/public/index.js';
+import { loadCatalogFromCsv, loadCatalogFromExcel, loadCatalogFromJson, loadCatalogImageMap } from './modules/item-catalog/public/index.js';
 import { registerOperationRoutes } from './modules/operation-groups/interface/http.js';
 import { OperationGroupsService } from './modules/operation-groups/public/index.js';
 import { JsonGroupRepository } from './modules/operation-groups/public/index.js';
@@ -22,6 +22,7 @@ loadEnvironment();
 
 export interface AppConfig {
   catalogPath?: string;
+  catalogImageMapPath?: string;
   dataPath?: string;
   usersPath?: string;
   databasePath?: string;
@@ -46,10 +47,15 @@ export async function createApp(config: AppConfig = {}) {
   });
   const projectRoot = findProjectRoot(process.cwd());
   const projectPath = (relative: string) => path.isAbsolute(relative) ? relative : path.join(projectRoot, relative);
-  const catalogPath = config.catalogPath ?? projectPath('data/item-catalog/source/items.json');
-  const catalog = path.extname(catalogPath).toLowerCase() === '.json'
+  const catalogPath = config.catalogPath ?? projectPath('data/item-catalog/source/道具表-9-5.csv');
+  const catalogExtension = path.extname(catalogPath).toLowerCase();
+  const imageMapPath = config.catalogImageMapPath ?? projectPath('data/item-catalog/source/item-image-map.json');
+  const tabularOptions = () => ({ skipInvalidRows: true, images: loadCatalogImageMap(imageMapPath) });
+  const catalog = catalogExtension === '.json'
     ? loadCatalogFromJson(catalogPath, { skipInvalidRows: true })
-    : loadCatalogFromExcel(catalogPath, { skipInvalidRows: true });
+    : catalogExtension === '.csv'
+      ? loadCatalogFromCsv(catalogPath, tabularOptions())
+      : loadCatalogFromExcel(catalogPath, tabularOptions());
   const testPersistence = Boolean(config.dataPath || config.usersPath);
   const databasePath = projectPath(config.databasePath ?? process.env.DATABASE_PATH ?? 'data/ops.sqlite');
   const databaseExisted = !testPersistence && fs.existsSync(databasePath);

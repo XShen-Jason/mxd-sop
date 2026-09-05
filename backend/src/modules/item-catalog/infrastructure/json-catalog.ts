@@ -1,6 +1,6 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import { CatalogError, ItemCatalog, type CatalogItem } from '../domain/catalog.js';
+import { imageUrl } from './image-map.js';
 
 type JsonRow = {
   item_id?: unknown;
@@ -11,11 +11,6 @@ type JsonRow = {
 
 function text(value: unknown) {
   return value == null ? '' : String(value).trim();
-}
-
-function imageUrl(value: unknown) {
-  const filename = path.basename(text(value));
-  return /^[A-Za-z0-9._-]+\.png$/iu.test(filename) ? `/item-images/${filename}` : undefined;
 }
 
 export function loadCatalogFromJson(filePath: string, options: { skipInvalidRows?: boolean } = {}): ItemCatalog {

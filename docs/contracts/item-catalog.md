@@ -48,7 +48,7 @@ unauthorized（401）、invalid-query（400）、invalid-cursor（400）、catal
 
 ## Image extension
 
-Search results may include an optional `image` field containing a static URL such as `/item-images/02000000.png`. Rows without a matching asset omit the field. Existing `code`, `name`, and `itemClass` fields remain unchanged.
+Search results may include an optional `image` field containing a static URL such as `/item-images/02000000.png`. The item-catalog module resolves it from the independent item-code/image mapping, so replacing the CSV does not discard existing image associations. Rows without a matching asset omit the field. Existing `code`, `name`, and `itemClass` fields remain unchanged.
 
 ## Examples
 

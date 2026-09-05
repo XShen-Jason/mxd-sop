@@ -16,7 +16,7 @@
                                             ├─ command-generation
                                             ├─ identity adapter (replaceable)
                                             └─ persistence adapter (replaceable)
-data/item-catalog/source/道具表.xlsx ───────> item-catalog import adapter
+data/item-catalog/source/道具表-9-5.csv ────────> item-catalog import adapter
 ~~~
 
 当前不需要 worker。指令生成是确定性的有界同步规则；目录导入可以作为受控管理/部署步骤，未来若变成大批量任务再增加 worker。

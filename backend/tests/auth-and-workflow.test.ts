@@ -10,14 +10,14 @@ describe('authentication and approval workflow', () => {
   let app: FastifyInstance;
   const dataPath = path.join(os.tmpdir(), `ops-groups-${randomUUID()}.json`);
   const usersPath = path.join(os.tmpdir(), `ops-users-${randomUUID()}.json`);
-  const catalogPath = path.resolve(process.cwd(), 'data/item-catalog/source/道具表.xlsx');
+  const catalogPath = path.resolve(process.cwd(), 'data/item-catalog/source/道具表-9-5.csv');
   let superToken = '';
   let superAdminId = '';
   let managerToken = '';
   let customerToken = '';
 
   beforeAll(async () => {
-    app = await createApp({ catalogPath: fs.existsSync(catalogPath) ? catalogPath : path.resolve(process.cwd(), '..', 'data/item-catalog/source/道具表.xlsx'), dataPath, usersPath, initialAdmin: { username: 'superadmin', displayName: '超级管理员', password: 'AdminTestPass1!' } });
+    app = await createApp({ catalogPath: fs.existsSync(catalogPath) ? catalogPath : path.resolve(process.cwd(), '..', 'data/item-catalog/source/道具表-9-5.csv'), dataPath, usersPath, initialAdmin: { username: 'superadmin', displayName: '超级管理员', password: 'AdminTestPass1!' } });
     const login = async (username: string, password: string) => (await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username, password } })).json().token as string;
     superToken = await login('superadmin', 'AdminTestPass1!');
     const seededUsers = await app.inject({ method: 'GET', url: '/api/v1/auth/users', headers: { authorization: `Bearer ${superToken}` } });

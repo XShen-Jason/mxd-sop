@@ -15,7 +15,7 @@
 
 - modules/auth.md：登录会话、三层权限和账号目录。
 - modules/operation-groups.md：工单组生命周期与角色投影。
-- modules/item-catalog.md：物品目录与 Excel 导入语义。
+- modules/item-catalog.md：物品目录与 CSV 导入语义。
 - modules/command-generation.md：指令模板和数量拆分。
 - contracts/：前后端及模块公开契约。
 - applications/：backend/frontend 的实现边界。

@@ -100,7 +100,7 @@ Out of scope:
 
 ## Data, configuration, and assets
 
-建议的持久化聚合为 group + ordered operations + status audit。服务器/理由/operation 选项应有版本或更新时间，避免配置更新改写历史。物品原始文件位于 data/item-catalog/source/道具表.xlsx，导入规则见 item-catalog 模块。item operation 可保存由目录解析出的可选 itemImage 展示快照。
+建议的持久化聚合为 group + ordered operations + status audit。服务器/理由/operation 选项应有版本或更新时间，避免配置更新改写历史。物品原始文件位于 data/item-catalog/source/道具表-9-5.csv，导入规则见 item-catalog 模块。item operation 可保存由目录解析出的可选 itemImage 展示快照。
 
 ## Tests
 
