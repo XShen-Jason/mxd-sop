@@ -91,7 +91,7 @@ if [ -n "$(sudo -u mxd-sop git status --porcelain)" ]; then
 fi
 
 sudo env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \
-  /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
+  sh /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
 sudo /usr/local/sbin/mxd-player-backup
 
 sudo -u mxd-sop git pull --ff-only origin main

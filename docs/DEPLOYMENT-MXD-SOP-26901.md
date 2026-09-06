@@ -245,7 +245,7 @@ fi
 
 # 先备份运营台和 player 的 SQLite 数据库。
 sudo env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \
-  /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
+  sh /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
 sudo /usr/local/sbin/mxd-player-backup
 
 sudo -u mxd-sop git pull --ff-only origin main
@@ -468,7 +468,7 @@ git push origin main
 
 ```bash
 sudo env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \
-  /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
+  sh /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
 
 sudo systemctl stop mxd-sop
 sudo -u mxd-sop git -C /opt/mxd-sop pull --ff-only
