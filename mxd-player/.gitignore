@@ -1,0 +1,15 @@
+# Frontend dependencies and build output
+frontend-player/node_modules/
+frontend-player/dist/
+frontend-player/.vite/
+
+# Runtime and test persistence
+backend-player/data/*.sqlite
+backend-player/data/*.sqlite-wal
+backend-player/data/*.sqlite-shm
+
+# Private deployment account exports
+backend-player/data/char-user-qq/*.csv
+
+# Local development output
+*.log
