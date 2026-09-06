@@ -8,7 +8,7 @@ Name: 游戏客服操作工单系统
 Purpose and users: 客服提交玩家操作申请，管理审核、复制指令、完成并归档
 Scale: Standard
 Primary languages: TypeScript, SQLite (production persistence), JSON (legacy test adapter)
-Applications: frontend, backend
+Applications: frontend, backend, mxd-player/frontend-player, mxd-player/backend-player
 Current roles: customer (普通客服), manager (管理), super_admin (超级管理)
 Roles: customer（客服 A）, manager（管理 B）
 ~~~
@@ -23,10 +23,21 @@ Authentication uses three roles: `customer` (普通客服), `manager` (管理), 
 | --- | --- | --- | --- | --- |
 | frontend | 客服/管理界面、角色视图、搜索与复制交互；不生成指令 | TypeScript + React + Vite | frontend/src/main.tsx | `npm run dev --workspace frontend` |
 | backend | 授权、持久化、目录查询、工单生命周期、指令生成 | TypeScript + Fastify | backend/src/server.ts | `npm run dev --workspace backend` |
+| mxd-player/frontend-player | 玩家验证、组队创建/加入界面 | TypeScript + React + Vite | mxd-player/frontend-player/src/main.tsx | `cd mxd-player/frontend-player; npm run dev` |
+| mxd-player/backend-player | 玩家验证、队伍规则与 SQLite 持久化 | Go + SQLite | mxd-player/backend-player/cmd/mxd-player/main.go | `cd mxd-player/backend-player; go run ./cmd/mxd-player` |
 
 认证、数据库和部署供应商尚未选择，均必须通过后端边界接入，不得进入领域规则。
 
 ## Module registry
+
+`player-registration` is the public player raid-registration capability. It is
+implemented independently under `mxd-player/frontend-player` and
+`mxd-player/backend-player` so player traffic and its database do not share the
+operations desk process.
+
+| Module ID | Capability | Implementation location(s) | Owner application(s) | Public contracts | Dependencies |
+| --- | --- | --- | --- | --- | --- |
+| player-registration | 玩家身份验证、角色选择、黑龙/扎昆组队与邀请码加入 | mxd-player/backend-player; mxd-player/frontend-player | player backend + player frontend | player.verify, player.me, player.teams, player.teams.join | SQLite WAL adapter |
 
 The `auth` capability is implemented in `backend/src/modules/auth` and `frontend/src/App.tsx`.
 
@@ -73,6 +84,9 @@ Auth contracts are defined in `docs/contracts/auth.md`: `auth.login`, `auth.logo
 | item-catalog.search | HTTP API | docs/contracts/item-catalog.md | item-catalog | v1 | frontend 客服/管理 |
 | activities.list | HTTP API | docs/contracts/activities.md | activities | v1 | frontend all roles |
 | activities.replace | HTTP API | docs/contracts/activities.md | activities | v1 | frontend manager/super_admin |
+| team-view.read | HTTP API | docs/contracts/team-view.md | team-view | v1 | frontend all authenticated roles |
+| player-integration.status | HTTP API | docs/contracts/player-integration.md | player-integration | v1 | frontend super_admin |
+| player-integration.switch | HTTP API | docs/contracts/player-integration.md | player-integration | v1 | frontend super_admin |
 | command-generation.generate | module interface | docs/contracts/command-generation.md | command-generation | v1 | backend operation-groups 管理投影 |
 | operation-groups.remind-customer | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend |
 | operation-groups.list-reminders | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend |
@@ -124,3 +138,17 @@ and the production identity path does not accept demo headers.
 
 The `activities` capability provides a shared activity/reward workspace and
 shortcut selection in customer issuance requests; see `docs/modules/activities.md`.
+
+The `player-directory` capability is owned by `backend/src/modules/player-directory`
+and `frontend/src/modules/player-directory`. It exposes
+`player-directory.search` to all authenticated roles and
+`player-directory.import` to `super_admin`; its own CSV snapshot lives under
+the operations database and synchronizes through the active `mxd-player`
+internal HTTP contract; it never reads the player database directly.
+
+| Module ID | Capability | Implementation location(s) | Owner application(s) | Public contracts | Dependencies |
+| --- | --- | --- | --- | --- | --- |
+| player-directory | player account and QQ lookup with super-admin CSV replacement | backend/src/modules/player-directory; frontend/src/modules/player-directory | backend + frontend | player-directory.search, player-directory.import | SQLite/JSON directory repository; auth identity |
+
+| team-view | daily locked-team snapshot and read-only server/type workspace | backend/src/modules/team-view; frontend/src/modules/team-view; docs/modules/team-view.md | backend + frontend | team-view.read | mxd-player snapshot source adapter; SQLite/JSON snapshot repository; auth identity |
+| player-integration | active local/remote player endpoint, transactional account sync, and locked-team source selection | backend/src/modules/player-integration; frontend/src/modules/player-integration | backend + frontend | player-integration.status, player-integration.switch | mxd-player internal HTTP contracts; SQLite state; service token |

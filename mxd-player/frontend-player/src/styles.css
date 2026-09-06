@@ -75,6 +75,8 @@ body{overflow-x:hidden}
 /* Secondary actions remain visible on dark mobile cards. */
 .secondary{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;padding:11px 13px;border:1px solid var(--line);border-radius:9px;color:#d0c7e8;background:#ffffff0d;font-weight:600}
 .secondary:hover{background:#ffffff18}
+.lock-notice,.create-guidance{display:flex;align-items:flex-start;gap:11px;margin:0 0 17px;padding:15px 16px;border:1px solid #edc87455;border-radius:12px;color:#ffe1a3;background:#edc87414}.lock-notice svg,.create-guidance svg{flex:none;margin-top:2px;color:#ffd077}.lock-notice strong,.create-guidance strong{display:block;font-size:13px}.lock-notice p,.create-guidance p{margin:4px 0 0;color:#bcb0c5;font-size:11px;line-height:1.6}.create-guidance{margin:17px 0 0;border-color:#a779ff44;color:#d7c7ff;background:#a779ff0d}.create-guidance svg{color:#b998ff}
+.invite-row .leave-team{display:flex;align-items:center;gap:4px;margin-left:auto;padding:5px 7px;border:1px solid #ff8eaa55;border-radius:6px;color:#ffabc0;background:#ff8eaa12;font-size:10px}.invite-row .leave-team + button{margin-left:0}.invite-row .leave-team:hover:not(:disabled){background:#ff8eaa24}
 
 /* Keep controls inside their responsive track and leave room around inline errors. */
 input,.player-select{min-width:0;max-width:100%}
@@ -108,7 +110,8 @@ input,.player-select{min-width:0;max-width:100%}
 .card-action .player-select-trigger{padding:9px 11px;font-size:12px}
 .join-controls .player-select{width:100px;flex:0 1 100px}
 .join-controls .player-select-trigger{padding:10px 11px;font-size:12px}
-.player-select-menu{position:fixed;z-index:100;display:grid;gap:2px;padding:4px;box-sizing:border-box;max-width:calc(100vw - 24px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;border:1px solid #8d6bea66;border-radius:10px;background:#211b35;box-shadow:0 18px 45px #000b;color:#f5f1ff;isolation:isolate;-webkit-overflow-scrolling:touch}
+/* Portaled menus must sit above the modal backdrop (z-index: 200). */
+.player-select-menu{position:fixed;z-index:300;display:grid;gap:2px;padding:4px;box-sizing:border-box;max-width:calc(100vw - 24px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;border:1px solid #8d6bea66;border-radius:10px;background:#211b35;box-shadow:0 18px 45px #000b;color:#f5f1ff;isolation:isolate;-webkit-overflow-scrolling:touch}
 .player-select-menu.is-above{box-shadow:0 -18px 45px #000b}
 .player-select-option{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-width:0;min-height:44px;padding:10px 11px;border:0;border-radius:7px;-webkit-appearance:none;appearance:none;color:#e9e3f7;background:transparent;text-align:left;font-size:13px;line-height:1.25;cursor:pointer}
 .player-select-option:hover,.player-select-option.is-active{background:#7650dc3d;color:#fff}
@@ -116,6 +119,9 @@ input,.player-select{min-width:0;max-width:100%}
 .player-select-option-label{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .player-select-option svg{flex:none;color:#9ff0c8}
 .player-select-empty{display:block;padding:14px 11px;color:#a9a0bc;font-size:12px;text-align:center}
+
+.pending-actions{display:flex;gap:6px;margin-left:auto}.pending-actions button{margin-left:0}.pending-actions .reject-request{border-color:#ff8eaa55;color:#ffabc0;background:#ff8eaa12}.pending-actions .reject-request:hover:not(:disabled){background:#ff8eaa24}
+.toast{top:max(18px,env(safe-area-inset-top));bottom:auto}
 
 @media(max-width:500px){
   .card-action .player-select,.join-controls .player-select{width:100%;min-width:0;flex:1 1 0}

@@ -1,0 +1,54 @@
+.team-view-heading { align-items: flex-end; }
+.team-view-toolbar { display: flex; align-items: center; gap: 22px; padding: 15px 18px; margin-bottom: 20px; }
+.team-date-field { display: grid; gap: 6px; min-width: 170px; }
+.team-date-field > span { color: var(--muted); font-size: 11px; font-weight: 700; }
+.team-date-input { display: flex; align-items: center; gap: 8px; height: 39px; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px; color: var(--teal); background: #fbfdfc; }
+.team-date-input input { width: 132px; padding: 0; border: 0; background: transparent; font-size: 12px; }
+.team-date-input input:focus { box-shadow: none; }
+.team-date-explanation { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.team-sync-state { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1; }
+.team-sync-state strong, .team-sync-state small { display: block; }
+.team-sync-state strong { color: var(--ink); font-size: 12px; }
+.team-sync-state small { margin-top: 3px; color: var(--muted); font-size: 11px; }
+.team-state-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: #c4cfca; box-shadow: 0 0 0 3px #edf1ef; }
+.team-state-dot.ready { background: #38a57f; box-shadow: 0 0 0 3px #dff2eb; }
+.team-refresh { width: 35px; height: 35px; padding: 0; border: 1px solid var(--line); background: #fff; }
+.team-server-filter-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+.team-server-filters { flex: 1; min-width: 0; margin-top: 0; }
+.team-id-note { flex: 0 0 auto; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.team-server-list { display: grid; gap: 18px; }
+.team-server-section { padding: 0; }
+.team-server-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+.team-server-heading .eyebrow { margin-bottom: 5px; color: #8b9993; font-size: 9px; }
+.team-server-heading h2 { font-size: 19px; }
+.team-server-total { color: var(--muted); font-size: 11px; }
+.team-type-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.team-type-section { min-width: 0; border: 1px solid #e1e9e5; border-radius: 6px; background: #fbfdfc; overflow: hidden; }
+.team-type-section > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; border-bottom: 1px solid #e7eeeb; }
+.team-type-section > header > div { display: flex; align-items: center; gap: 7px; }
+.team-type-section h3 { font-size: 14px; }
+.team-type-section > header > span { color: var(--muted); font-size: 10px; }
+.team-boss-mark { width: 8px; height: 8px; border-radius: 50%; background: #c86d58; }
+.team-boss-mark.zakum { background: #4e88a5; }
+.team-list { display: grid; gap: 8px; padding: 8px; background: #f5f9f7; }
+.team-row { display: flex; align-items: center; gap: 12px; min-height: 50px; padding: 9px 12px; border: 1px solid #e1e9e5; border-radius: 5px; background: #fff; }
+.team-sequence { width: 29px; flex: 0 0 29px; padding-top: 2px; color: var(--teal); font: 700 12px/1.2 "SFMono-Regular", Consolas, monospace; }
+.team-character-list { display: flex; flex-wrap: nowrap; gap: 5px; min-width: 0; flex: 1; margin: 0; overflow-x: auto; scrollbar-width: thin; }
+.team-character-list code { flex: 0 0 auto; padding: 3px 6px; border: 1px solid #dce7e2; border-radius: 4px; color: #49655b; background: #f7faf8; font: 11px "SFMono-Regular", Consolas, monospace; white-space: nowrap; }
+.team-type-empty { padding: 18px 13px; color: #96a39e; font-size: 11px; }
+.team-empty-state { min-height: 230px; border: 1px dashed #cbd8d2; border-radius: 8px; background: rgba(255,255,255,.56); }
+.team-empty-state p { max-width: 340px; }
+@media (max-width: 760px) {
+  .team-view-toolbar { align-items: stretch; flex-wrap: wrap; gap: 12px; }
+  .team-date-field { flex: 1; }
+  .team-sync-state { order: 3; flex-basis: calc(100% - 48px); }
+  .team-refresh { align-self: flex-end; }
+  .team-type-grid { grid-template-columns: 1fr; }
+  .team-server-filter-row { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .team-server-filters { width: 100%; }
+}
+@media (max-width: 520px) {
+  .team-server-heading { margin-bottom: 12px; }
+  .team-date-input input { width: 120px; }
+  .team-date-explanation { white-space: normal; line-height: 1.4; }
+}

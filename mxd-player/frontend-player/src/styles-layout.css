@@ -1,0 +1,261 @@
+/* Layout and readability refinement */
+html,
+body {
+  min-width: 0;
+}
+
+.app,
+.landing {
+  min-height: 100svh;
+}
+
+.topbar {
+  min-height: 72px;
+  height: auto;
+  padding-block: 14px;
+}
+
+.login-main {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 410px);
+  padding-inline: clamp(18px, 5vw, 72px);
+}
+
+.intro,
+.verify-card,
+.dashboard,
+.content-grid,
+.boss-card,
+.join-card,
+.merge-workspace {
+  min-width: 0;
+}
+
+.intro > p:not(.kicker) {
+  max-width: 44ch;
+  overflow-wrap: anywhere;
+}
+
+.intro h1,
+.hero h1 {
+  letter-spacing: 0;
+}
+
+.dashboard {
+  max-width: 1320px;
+  padding-inline: clamp(16px, 4vw, 56px);
+}
+
+.content-grid {
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  gap: clamp(28px, 4vw, 56px);
+  align-items: start;
+}
+
+.join-card-primary {
+  grid-template-columns: auto minmax(0, 1fr) minmax(270px, 1.25fr);
+}
+
+.form-error,
+.warning,
+.lock-notice,
+.create-guidance,
+.pending-box,
+.merge-request {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.form-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.warning {
+  align-items: flex-start;
+  padding: 14px;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.warning svg {
+  margin-top: 3px;
+}
+
+.lock-notice,
+.create-guidance {
+  padding: 15px 16px;
+}
+
+.lock-notice strong,
+.create-guidance strong {
+  font-size: 14px;
+}
+
+.lock-notice p,
+.create-guidance p {
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.toast {
+  width: min(calc(100vw - 32px), 520px);
+  min-height: 52px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.toast-success {
+  color: #bff8dc;
+  background: #16392c;
+  border-color: #65e0a377;
+}
+
+.toast-error {
+  color: #ffd3dd;
+  background: #4d1e32;
+  border-color: #ff769666;
+  box-shadow: 0 8px 34px #0009, inset 3px 0 #ff7696;
+}
+
+.toast button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+@media (max-width: 980px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 36px;
+  }
+
+  .hero-badge {
+    align-self: flex-start;
+  }
+
+  .join-card-primary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .join-card-primary .join-controls {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 850px) {
+  .login-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .topbar {
+    min-height: 64px;
+  }
+
+  .login-main {
+    align-items: start;
+    gap: 32px;
+    min-height: calc(100svh - 64px);
+    padding-top: 42px;
+  }
+
+  .intro > p:not(.kicker) {
+    max-width: 30ch;
+    margin-inline: auto;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  .raid-pills {
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+
+  .verify-card {
+    padding: 20px;
+  }
+
+  .card-top {
+    margin-bottom: 20px;
+  }
+
+  .join-card-primary .join-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .join-card-primary .join-controls button {
+    grid-column: auto;
+  }
+
+  .hero {
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero > div:first-child {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hero-copy {
+    max-width: 30ch;
+  }
+
+  .hero-badge {
+    align-self: center;
+  }
+
+  .status-strip {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .status-strip span {
+    justify-content: center;
+  }
+
+  .section-heading {
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    text-align: center;
+  }
+
+  .section-heading > div {
+    display: grid;
+    justify-items: center;
+  }
+}
+
+@media (max-width: 360px) {
+  .login-main {
+    gap: 28px;
+    padding-top: 32px;
+  }
+
+  .intro > p:not(.kicker) {
+    max-width: 27ch;
+  }
+}

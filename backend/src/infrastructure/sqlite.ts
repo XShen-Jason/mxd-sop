@@ -6,8 +6,11 @@ export function openDatabase(filePath: string) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const db = new Database(filePath);
   db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = NORMAL');
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
+  db.pragma('temp_store = MEMORY');
+  db.pragma('cache_size = -64000');
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -52,6 +55,35 @@ export function openDatabase(filePath: string) {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS activities_updated ON activities(updated_at DESC, id DESC);
+    CREATE TABLE IF NOT EXISTS player_directory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id TEXT NOT NULL,
+      source_file TEXT NOT NULL,
+      char_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      username TEXT NOT NULL,
+      bind_qq TEXT NOT NULL,
+      imported_at TEXT NOT NULL,
+      UNIQUE(server_id, char_id, user_id, username, bind_qq)
+    );
+    CREATE INDEX IF NOT EXISTS player_directory_search ON player_directory(server_id, username COLLATE NOCASE, char_id);
+    CREATE INDEX IF NOT EXISTS player_directory_user_id ON player_directory(server_id, user_id COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS player_directory_char_id ON player_directory(char_id, server_id);
+    CREATE INDEX IF NOT EXISTS player_directory_qq ON player_directory(bind_qq, server_id);
+    CREATE TABLE IF NOT EXISTS team_view_snapshots (
+      date TEXT PRIMARY KEY,
+      fetched_at TEXT NOT NULL,
+      source TEXT NOT NULL,
+      payload_json TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS team_view_snapshots_fetched ON team_view_snapshots(fetched_at DESC);
+    CREATE TABLE IF NOT EXISTS player_integration_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      mode TEXT NOT NULL CHECK (mode IN ('local', 'remote')),
+      updated_at TEXT NOT NULL,
+      updated_by_id TEXT,
+      updated_by_name TEXT
+    );
   `);
   const columns = db.prepare('PRAGMA table_info(operation_groups)').all() as Array<{ name: string }>;
   const existing = new Set(columns.map((column) => column.name));

@@ -1,4 +1,4 @@
-import type { Activity, AppOptions, CatalogItem, Group, ManagerGroup, Page, Role, Session, User } from '../types';
+import type { Activity, AppOptions, CatalogItem, DirectoryImportResult, DirectoryPage, Group, ManagerGroup, Page, PlayerDeploymentMode, PlayerIntegrationStatus, Role, Session, TeamViewResult, User } from '../types';
 
 export class ApiError extends Error {
   constructor(public readonly code: string, message: string, public readonly status: number) { super(message); }
@@ -9,6 +9,8 @@ const errorMessages: Record<string, string> = {
   unauthorized: '登录状态已失效，请重新登录',
   forbidden: '无权执行此操作',
   'invalid-input': '输入内容不符合要求',
+  'invalid-query': '搜索条件不符合要求',
+  'invalid-file': 'CSV 文件格式不符合要求',
   'username-taken': '用户名已存在',
   'user-not-found': '账号不存在',
   'last-super-admin': '必须保留至少一个已启用的超级管理账号',
@@ -21,6 +23,13 @@ const errorMessages: Record<string, string> = {
   'group-not-found': '申请记录不存在',
   'invalid-status-transition': '当前状态无法执行此操作',
   'invalid-cursor': '分页信息已失效，请刷新后重试',
+  'invalid-date': '日期格式不正确，请重新选择',
+  'source-unavailable': '队伍数据源暂时不可用',
+  'confirmation-required': '请完成二次确认并输入指定文本',
+  'endpoint-not-configured': '玩家服务端点未配置',
+  'endpoint-unavailable': '玩家服务暂时不可用',
+  'player-import-failed': '玩家账号同步失败，客服目录未更新',
+  'player-sync-failed': '玩家账号同步失败，客服目录未更新',
   'invalid-status': '状态筛选无效',
   'generation-failed': '指令生成失败',
   'internal-error': '服务暂时不可用'
@@ -109,6 +118,21 @@ export class ApiClient {
   options() { return this.request<AppOptions>('/api/v1/operation-groups/options'); }
   activities() { return this.request<{ activities: Activity[] }>('/api/v1/activities'); }
   saveActivities(activities: Activity[]) { return this.request<{ activities: Activity[] }>('/api/v1/activities', { method: 'PUT', body: JSON.stringify({ activities }) }); }
+  searchPlayerDirectory(query = '', serverId?: string, signal?: AbortSignal, cursor?: string, limit = 20) {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    if (serverId) params.set('serverId', serverId);
+    if (cursor) params.set('cursor', cursor);
+    return this.request<DirectoryPage>(`/api/v1/player-directory/search?${params}`, { signal });
+  }
+  importPlayerDirectory(serverId: string, file: { name: string; content: string }) {
+    return this.request<DirectoryImportResult>('/api/v1/player-directory/import', { method: 'POST', body: JSON.stringify({ serverId, file }) });
+  }
+  teamView(date?: string, signal?: AbortSignal) {
+    const params = date ? `?date=${encodeURIComponent(date)}` : '';
+    return this.request<TeamViewResult>(`/api/v1/team-view${params}`, { signal });
+  }
+  playerIntegrationStatus() { return this.request<PlayerIntegrationStatus>('/api/v1/player-integration/status'); }
+  switchPlayerIntegration(mode: PlayerDeploymentMode, confirmation: string) { return this.request<{ mode: PlayerDeploymentMode; activeEndpoint: string; updatedAt: string }>('/api/v1/player-integration/switch', { method: 'POST', body: JSON.stringify({ mode, confirmation }) }); }
   searchItems(query: string, signal?: AbortSignal, cursor?: string, limit = 12) {
     const params = new URLSearchParams({ q: query, limit: String(limit) });
     if (cursor) params.set('cursor', cursor);

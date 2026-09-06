@@ -50,9 +50,30 @@ Frontend GET requests use a short-lived in-memory cache keyed by role and full
 request URL, and concurrent reads for the same key share one promise. Mutations
 and SSE changes invalidate the cache; login/logout also closes the shared SSE
 connection so credentials are never reused across sessions.
+
+The player directory uses indexed SQLite fields, grouped bounded queries, a
+maximum page size of 50, and one server-scoped transactional replacement for
+each CSV import. The frontend debounces directory searches and cancels obsolete
+requests; it does
+not poll or download the raw CSV snapshot.
+
+The team-view workspace reads one bounded snapshot row per date. Its frontend
+does not poll; a user-triggered refresh is a single GET and normal GET caching
+coalesces concurrent requests. The backend scheduler performs one external
+fetch at Beijing 00:05, with a 10-second timeout and no write when the source
+fails. The scheduler stays idle when no source URL is configured. Snapshots
+are replaced atomically in SQLite/JSON adapters.
+
+Player integration keeps one bounded account-import request per CSV and sends
+the validated file once to the active player endpoint before replacing the
+support directory. The player endpoint parses and upserts rows in one SQLite
+transaction, with a 1,000,000-character file limit and no filesystem copy.
+Health checks and the super-admin switch are explicit requests; they do not
+poll or fall back silently during an account write.
 ## Current deployment baseline
 
-For up to 10 internal users, SQLite in WAL mode is the selected persistence
+For up to 10 internal users, SQLite in WAL mode with `synchronous=NORMAL`,
+memory temporary storage, and a bounded page cache is the selected persistence
 adapter. It provides transactional writes and indexed status/submitter queries
 without an additional database service. Keep one backend process on the host;
 do not add polling, workers, Redis, or PostgreSQL until measurements show a

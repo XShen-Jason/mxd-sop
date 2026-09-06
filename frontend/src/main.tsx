@@ -7,5 +7,8 @@ import './styles-activities-editor.css';
 import './styles-activities-chooser.css';
 import './styles-roles.css';
 import './styles-mobile.css';
+import './styles-player-directory.css';
+import './styles-team-view.css';
+import './styles-player-integration.css';
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);

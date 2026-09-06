@@ -51,6 +51,31 @@ export interface Page<T> { groups: T[]; nextCursor: string | null }
 export interface User { id: string; username: string; displayName: string; role: Role; active: boolean; createdAt: string; createdBy?: { id: string; displayName: string } }
 export interface Session { token?: string; expiresAt: string; user: User }
 
+export interface DirectoryAccount {
+  server: ServerOption;
+  userId: string;
+  username: string;
+  bindQQ: string;
+  characterIds: string[];
+  sourceFiles: string[];
+}
+export interface DirectoryPage { accounts: DirectoryAccount[]; nextCursor: string | null; totalCount: number }
+export interface DirectoryImportResult { serverId: string; fileCount: number; rowCount: number; skippedRows: number; importedAt: string }
+
+export type TeamBossType = 'black-dragon' | 'zakum';
+export interface TeamViewTeam { id: string; sequence: number; memberCount: number; members: string[] }
+export interface TeamViewType { type: TeamBossType; displayName: string; teams: TeamViewTeam[] }
+export interface TeamViewServer { server: ServerOption; types: TeamViewType[] }
+export interface TeamViewResult { date: string; fetchedAt: string | null; sourceStatus: 'ready' | 'unavailable'; servers: TeamViewServer[] }
+
+export type PlayerDeploymentMode = 'local' | 'remote';
+export interface PlayerIntegrationStatus {
+  mode: PlayerDeploymentMode;
+  activeEndpoint: string | null;
+  endpoints: Record<PlayerDeploymentMode, { configured: boolean; available: boolean | null }>;
+  checkedAt: string;
+}
+
 export interface ActivityReward {
   kind: 'item' | 'cash';
   quantity: number;

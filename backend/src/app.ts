@@ -11,6 +11,12 @@ import { SqliteUserRepository } from './modules/auth/infrastructure/sqlite-users
 import { SqliteSessionRepository } from './modules/auth/infrastructure/sqlite-sessions.js';
 import { registerAuthRoutes } from './modules/auth/interface/http.js';
 import { loadCatalogFromCsv, loadCatalogFromExcel, loadCatalogFromJson, loadCatalogImageMap } from './modules/item-catalog/public/index.js';
+import { JsonDirectoryRepository, PlayerDirectoryService, SqliteDirectoryRepository } from './modules/player-directory/public/index.js';
+import { registerPlayerDirectoryRoutes } from './modules/player-directory/interface/http.js';
+import { HttpPlayerIntegrationClient, loadPlayerEndpointConfig, MemoryPlayerIntegrationRepository, PlayerIntegrationService, SqlitePlayerIntegrationRepository, type PlayerEndpointConfig, type PlayerIntegrationClient } from './modules/player-integration/public/index.js';
+import { registerPlayerIntegrationRoutes } from './modules/player-integration/interface/http.js';
+import { HttpLockedTeamSource, JsonTeamViewRepository, SqliteTeamViewRepository, TeamViewScheduler, TeamViewService, type LockedTeamSource } from './modules/team-view/public/index.js';
+import { registerTeamViewRoutes } from './modules/team-view/interface/http.js';
 import { registerOperationRoutes } from './modules/operation-groups/interface/http.js';
 import { OperationGroupsService } from './modules/operation-groups/public/index.js';
 import { JsonGroupRepository } from './modules/operation-groups/public/index.js';
@@ -29,6 +35,12 @@ export interface AppConfig {
   dataPath?: string;
   usersPath?: string;
   activitiesPath?: string;
+  playerDirectoryPath?: string;
+  teamViewPath?: string;
+  teamSource?: LockedTeamSource;
+  enableTeamScheduler?: boolean;
+  playerIntegration?: PlayerEndpointConfig;
+  playerIntegrationClient?: PlayerIntegrationClient;
   databasePath?: string;
   initialAdmin?: { username: string; displayName: string; password: string };
 }
@@ -68,6 +80,18 @@ export async function createApp(config: AppConfig = {}) {
   const activitiesRepository = testPersistence
     ? new JsonActivityRepository(config.activitiesPath ?? `${config.dataPath ?? projectPath('data/generated/operation-groups.json')}.activities.json`)
     : new SqliteActivityRepository(db!);
+  const directoryRepository = testPersistence
+    ? new JsonDirectoryRepository(config.playerDirectoryPath ?? `${config.dataPath ?? projectPath('data/generated/operation-groups.json')}.player-directory.json`)
+    : new SqliteDirectoryRepository(db!);
+  const teamRepository = testPersistence
+    ? new JsonTeamViewRepository(config.teamViewPath ?? `${config.dataPath ?? projectPath('data/generated/operation-groups.json')}.team-view.json`)
+    : new SqliteTeamViewRepository(db!);
+  const integrationConfig = { ...loadPlayerEndpointConfig(), ...config.playerIntegration };
+  const integrationRepository = testPersistence ? new MemoryPlayerIntegrationRepository() : new SqlitePlayerIntegrationRepository(db!);
+  const integration = new PlayerIntegrationService(integrationRepository, integrationConfig, config.playerIntegrationClient ?? new HttpPlayerIntegrationClient(integrationConfig.timeoutMs));
+  const sourceUrl = process.env.MXD_PLAYER_TEAM_SNAPSHOT_URL;
+  const teamSource = config.teamSource ?? (sourceUrl ? new HttpLockedTeamSource(sourceUrl, process.env.MXD_PLAYER_TEAM_SNAPSHOT_TOKEN) : new HttpLockedTeamSource(() => integration.teamSnapshotEndpoint(), () => integration.serviceToken()));
+  const sourceConfigured = Boolean(config.teamSource || sourceUrl || integration.hasConfiguredEndpoint());
   let auth: AuthService;
   try {
     auth = testPersistence
@@ -87,8 +111,15 @@ export async function createApp(config: AppConfig = {}) {
   registerAuthRoutes(app, auth);
   registerOperationRoutes(app, service, catalog, auth);
   registerActivityRoutes(app, new ActivitiesService(activitiesRepository), auth);
+  const playerSync = config.playerIntegrationClient || process.env.NODE_ENV !== 'test' ? integration : undefined;
+  registerPlayerDirectoryRoutes(app, new PlayerDirectoryService(directoryRepository, appOptions.servers, playerSync), auth);
+  registerPlayerIntegrationRoutes(app, integration, auth);
+  const teamViewService = new TeamViewService(teamRepository, teamSource, appOptions.servers);
+  registerTeamViewRoutes(app, teamViewService, auth);
+  const scheduler = new TeamViewScheduler(teamViewService);
+  if (config.enableTeamScheduler !== false && sourceConfigured) scheduler.start();
   app.get('/health', async () => ({ status: 'ok', catalogItems: catalog.size }));
-  if (db) app.addHook('onClose', async () => { db.close(); });
+  app.addHook('onClose', async () => { scheduler.stop(); db?.close(); });
   return app;
 }
 

@@ -9,6 +9,9 @@ coverage/
 .env
 .env.*
 !.env.example
+mxd-player/backend-player/.env
+mxd-player/backend-player/.env.*
+!mxd-player/backend-player/.env.example
 *.db
 *.sqlite
 *.sqlite-wal
@@ -17,6 +20,7 @@ coverage/
 # Generated catalog/import output
 data/item-catalog/generated/
 data/generated/
+data/player-directory/source/
 frontend/.screenshots/
 frontend/.chrome-debug/
 frontend/.shot-profile/

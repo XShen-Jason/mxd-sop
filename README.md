@@ -64,6 +64,19 @@ On a new production database, startup refuses to continue unless
 `INITIAL_ADMIN_PASSWORD` is set. Exactly one `super_admin` is created, public
 registration remains disabled, and later accounts are created by that admin.
 
+同机部署运营台和 `mxd-player` 的长期更新流程见
+[docs/DEPLOYMENT-UPDATE.md](docs/DEPLOYMENT-UPDATE.md)。
+
 For local development, set the same initialization variables before starting
 the backend (PowerShell: `$env:INITIAL_ADMIN_PASSWORD='local-only-password'`).
 There is no default password and an empty database will refuse to start.
+
+## 独立玩家项目
+
+`mxd-player/` 是同仓库中的独立项目，拥有自己的 Go 后端、React 前端和
+SQLite 数据库，不与客服工单服务共享进程或数据表。运行 `mxd-player/start-player.ps1`
+可同时启动玩家前后端。生产环境通过 `MXD_PLAYER_LOCAL_URL`、可选的
+`MXD_PLAYER_REMOTE_URL` 和双方一致的 `MXD_PLAYER_SERVICE_TOKEN` 打通两个
+服务；超管在“玩家服务”工作区执行带二次确认的本地/远程切换。CSV 上传先
+同步到 player SQLite，再更新客服账号目录，队伍快照也从同一活跃 player 端点
+按日同步。

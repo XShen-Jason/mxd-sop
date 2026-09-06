@@ -1,0 +1,19 @@
+.player-integration-status { padding: 20px; }
+.integration-status-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.integration-status-heading h2 { margin-top: 4px; font-size: 18px; }
+.integration-endpoints { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.integration-endpoint-card { border: 1px solid var(--line); border-radius: 6px; padding: 16px; background: #fbfdfc; }
+.integration-endpoint-card.active { border-color: #8ec8b8; background: #f2faf7; box-shadow: inset 3px 0 var(--teal); }
+.integration-endpoint-top { display: flex; align-items: flex-start; gap: 10px; min-height: 46px; }
+.integration-endpoint-icon { display: inline-flex; color: #bf6d43; }
+.integration-endpoint-card.active .integration-endpoint-icon { color: var(--teal); }
+.integration-endpoint-top h3 { color: var(--ink); font-size: 14px; }
+.integration-endpoint-top p { margin-top: 3px; color: var(--muted); font-size: 11px; }
+.integration-active-badge { margin-left: auto; color: #176f5d; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.integration-endpoint-state { margin: 16px 0 12px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.integration-endpoint-card .secondary-button { min-height: 34px; }
+.integration-check-time { margin-top: 14px; color: var(--muted); font-size: 11px; }
+.player-integration-notice { display: flex; align-items: flex-start; gap: 11px; margin-top: 14px; padding: 16px 18px; color: var(--teal); }
+.player-integration-notice strong { color: var(--ink); font-size: 13px; }
+.player-integration-notice p { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+@media (max-width: 680px) { .integration-endpoints { grid-template-columns: 1fr; } .player-integration-status { padding: 15px; } }

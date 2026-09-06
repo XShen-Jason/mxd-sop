@@ -11,14 +11,40 @@ Response: `{ token, account: { server, qq, gameAccount, characters[] } }`
 Errors: `invalid-input`, `account-not-found`, `internal-error`  
 Authentication: none. The selected server must be one of the published server names.
 
+## player.me
+
+`GET /api/v1/player/me` returns `{ account }` for a valid bearer token issued by
+`player.verify`. It is used to restore the player session after a browser
+refresh. Invalid or expired tokens return `unauthorized`.
+
 ## player.teams
 
 Owner: player-registration  
 Version: v1  
-GET response: `{ teams[] }`. POST request: `{ bossType, characterId }`. A
-successful create returns the team and a six-character invite code. The opaque
-team ID is omitted from JSON. Errors include `unauthorized`,
-`character-not-owned`, `already-in-team`, and `internal-error`.
+GET response: `{ teams[], applications[], history[], day }`. POST request:
+`{ bossType, characterId }`. A successful create returns the team and a
+six-character invite code. The opaque team ID is omitted from JSON. Errors
+include `unauthorized`, `character-not-owned`, `already-in-team`, and
+`internal-error`.
+Every successful create targets the next Beijing business day; the team and
+its invite stop being mutable or joinable when that target day starts at 00:00.
+
+## Related team operations
+
+`player.servers` is `GET /api/v1/player/servers` and returns the published
+server names. `player.teams.preview` is `POST /api/v1/player/teams/preview`
+with `{ inviteCode }` and returns the invite's boss, day, and member count
+before the role picker opens. `player.teams.approve` is
+`POST /api/v1/player/teams/approve` with `{ requestId }` and returns the updated
+team after a leader approves a pending application. `player.teams.leave` is
+`POST /api/v1/player/teams/leave` with `{ inviteCode }`; a non-leader member can
+leave directly and the approved application is recorded as rejected. Leaders
+cannot leave their own team; errors include `unauthorized`, `team-not-found`,
+`not-in-team`, and `leader-cannot-leave`. `player.teams.merge` and
+`player.teams.merge.approve` use the two merge endpoints described below.
+`player.teams.reject` is `POST /api/v1/player/teams/reject` with `{ requestId }`;
+the team leader can reject a pending application, which remains in the
+applicant's history with `reason: "leader-rejected"`.
 
 ## player.teams.join
 
@@ -27,21 +53,36 @@ Version: v1
 Request: `{ inviteCode, characterId }`. The invite is normalized to uppercase;
 the account and selected character are checked in one transaction. Errors:
 `invalid-input`, `team-not-found`, `server-mismatch`, `team-full`,
-`already-in-team`, `character-not-owned`.
+`already-in-team`, `already-applied`, `character-not-owned`. Each account has
+at most one application and one membership row per team. Repeating a pending
+application with the same character returns `already-applied`; repeating it
+with another character updates the existing pending row and reuses its request
+ID, so the leader sees the replacement character without an extra request.
 
 ## Daily approval rules (v2 behavior)
 
 All team and application records are scoped to the Beijing business day
 (`Asia/Shanghai`, reset at 00:00). Old invite codes are not accepted after the
-boundary. A player may create or apply to multiple teams, but a transaction
-allows at most one approved team per boss for that day. Applications remain in
+boundary. A team created during a calendar day is assigned to the next Beijing
+business day and becomes locked when that target day starts at 00:00 Beijing
+time. A player may create or apply to multiple teams, but a transaction allows
+at most one approved team per boss for that day. Applications remain in
 `player_team_applications` as the player's join history.
 
 `POST /api/v1/player/teams/join` creates a `pending` application and returns
 HTTP 202. It never grants membership. The leader approves with
 `POST /api/v1/player/teams/approve` and `{ requestId }`; approval atomically
-checks capacity and the one-team-per-boss rule. There is deliberately no
-remove/kick contract for the current day.
+checks capacity and the one-team-per-boss rule. A member can leave with
+`POST /api/v1/player/teams/leave` before the target day locks; the leader cannot
+leave and there is no leader kick operation. Only active team records count when
+checking whether an account is a locked leader; a merged source team no longer
+blocks that account from applying to another team.
+
+When an account is approved into or creates a team for a boss, all of that
+account's other pending applications for the same boss and day are rejected in
+the same transaction with `reason: "joined-other-team"`. This keeps the other
+leaders' pending lists accurate and tells the player why those applications
+closed. Application history may also report `left-team` or `team-merged`.
 
 `POST /api/v1/player/teams/preview` validates an invite before the role picker
 opens and returns the boss type. It rejects an already-approved membership and
@@ -55,4 +96,24 @@ combined capacity transactionally, moves all source members into the target,
 and marks the source team merged.
 
 `GET /api/v1/player/teams` returns `{ teams, applications, history, day }`.
-Leader-owned teams include `pendingRequests`; team IDs remain private.
+Leader-owned teams include `pendingRequests` containing only request ID,
+character ID, and request time; account usernames are never returned in team
+or approval data. Team IDs remain private.
+
+## Operations integration (internal)
+
+`POST /api/v1/internal/player/accounts/import` requires `Authorization: Bearer
+<PLAYER_SERVICE_TOKEN>` and accepts `{ serverId, file: { name, content } }`.
+The player backend validates the canonical server/file mapping and
+`char_id,user_id,username,bindQQ` rows, then upserts accounts and characters in
+one SQLite transaction. It returns `{ serverId, rowCount, skippedRows,
+importedAt }`. It does not write the CSV to disk or delete accounts, sessions,
+teams, or memberships. Replaying the same file is safe: account and character
+rows are upserted through unique keys.
+
+`GET /api/v1/internal/player/teams/snapshot?date=YYYY-MM-DD` uses the same
+service token and returns `{ date, teams: [{ id, serverId, bossType, createdAt,
+members: [{ characterId, joinedAt }] }] }`. It contains no account names, QQ,
+session tokens, invite codes, or pending requests. The response is bounded to
+the first 500 active teams by creation order, with every selected team's
+members included.

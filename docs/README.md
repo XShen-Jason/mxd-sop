@@ -17,6 +17,15 @@
 - modules/operation-groups.md：工单组生命周期与角色投影。
 - modules/item-catalog.md：物品目录与 CSV 导入语义。
 - modules/command-generation.md：指令模板和数量拆分。
+- modules/player-directory.md：客服账号目录和 CSV 同步。
+- modules/player-integration.md：player 服务端点健康检查、切换和跨服务导入。
+- modules/team-view.md：每日锁定队伍快照。
 - contracts/：前后端及模块公开契约。
 - applications/：backend/frontend 的实现边界。
 - data/item-catalog.md：原始物品表资产说明。
+
+## 部署
+
+- [DEPLOYMENT-UPDATE.md](DEPLOYMENT-UPDATE.md)：同机部署的长期更新流程。
+- [DEPLOYMENT-MXD-SOP-26901.md](DEPLOYMENT-MXD-SOP-26901.md)：运营台首次部署与同机升级。
+- [../mxd-player/DEPLOYMENT.md](../mxd-player/DEPLOYMENT.md)：mxd-player 首次部署与同机升级。

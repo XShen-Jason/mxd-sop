@@ -86,7 +86,9 @@ label em { font-style: normal; color: #9ba7a2; margin-left: 4px; }
 input, select, textarea { width: 100%; color: var(--ink); background: #fbfcfb; border: 1px solid #d7e1dc; border-radius: 5px; padding: 10px 11px; font-size: 13px; transition: border-color .15s, box-shadow .15s; }
 input::placeholder, textarea::placeholder { color: #a3afab; }
 input:focus, select:focus, textarea:focus { border-color: #71b7a9; box-shadow: 0 0 0 3px rgba(23,124,112,.1); outline: 0; }
-select { appearance: auto; }
+select:not([multiple]) { appearance: none; -webkit-appearance: none; padding-right: 38px; background-color: #fbfcfb; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%236c7975' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; background-size: 16px; cursor: pointer; }
+select:not([multiple]):hover:not(:disabled) { border-color: #8bc4b5; }
+select:not([multiple]):disabled { cursor: not-allowed; opacity: .62; background-color: #f0f4f1; }
 .reason-fields { margin-top: 18px; display: grid; gap: 17px; }
 textarea { resize: vertical; min-height: 62px; }
 .operation-list { display: grid; gap: 10px; }

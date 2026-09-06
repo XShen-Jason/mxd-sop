@@ -78,16 +78,29 @@ HOST=127.0.0.1
 PORT=26902
 DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite
 COOKIE_SECURE=true
+MXD_PLAYER_LOCAL_URL=http://127.0.0.1:26906
+# MXD_PLAYER_REMOTE_URL=https://player.example.internal
+MXD_PLAYER_SERVICE_TOKEN=请替换为与player服务相同的长随机令牌
+MXD_PLAYER_DEPLOYMENT_MODE=local
 
 INITIAL_ADMIN_USERNAME=superadmin
 INITIAL_ADMIN_DISPLAY_NAME=System Administrator
 INITIAL_ADMIN_PASSWORD=请替换为强密码
 ```
 
+player 服务令牌推荐使用下面的命令生成：
+
+```bash
+openssl rand -hex 32
+```
+
+它会输出 64 个十六进制字符（32 字节随机值），只包含 `0-9` 和 `a-f`，
+不包含空格或标点。将完全相同的值写入两个 env 文件。
+
 确认数据库路径没有变回模板中的 `/var/lib/ops-desk`：
 
 ```bash
-sudo grep -E '^(HOST|PORT|DATABASE_PATH|COOKIE_SECURE)=' \
+sudo grep -E '^(HOST|PORT|DATABASE_PATH|COOKIE_SECURE|MXD_PLAYER_LOCAL_URL|MXD_PLAYER_DEPLOYMENT_MODE)=' \
   /etc/mxd-sop/mxd-sop.env
 ```
 
@@ -175,6 +188,118 @@ sudo ln -sfn /etc/nginx/sites-available/mxd-sop.conf \
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+
+## 14. 本次修改的同机升级命令（运营台 + mxd-player）
+
+下面整段命令在同一台服务器执行。两个服务使用同一个代码仓库、两个独立
+进程和两个 SQLite 数据库；先备份，再构建，构建成功后才替换 player 二进制。
+令牌只在编辑器中填写，不要写进命令行或提交到 Git。
+
+### 14.1 单独编辑并加载 env 配置
+
+如果只需要修改令牌，先单独执行下面这段。它会编辑两个配置文件，检查令牌
+一致且不是占位值，确认两个 systemd 服务确实引用对应的 `EnvironmentFile`，
+然后重载并重启服务使配置生效。只替换等号后的值，不要加引号；令牌内容不会被打印。
+
+```bash
+(
+set -eu
+sudoedit /etc/mxd-sop/mxd-sop.env
+sudoedit /etc/mxd-player/mxd-player.env
+
+sudo sh -c '
+  set -eu
+  ops=$(sed -n "s/^MXD_PLAYER_SERVICE_TOKEN=//p" /etc/mxd-sop/mxd-sop.env | head -n1)
+  player=$(sed -n "s/^PLAYER_SERVICE_TOKEN=//p" /etc/mxd-player/mxd-player.env | head -n1)
+  test -n "$ops" && test "$ops" = "$player"
+  case "$ops" in replace-with-*|*" "*) echo "令牌仍是占位值或包含空格" >&2; exit 1;; esac
+'
+sudo chmod 600 /etc/mxd-sop/mxd-sop.env /etc/mxd-player/mxd-player.env
+sudo systemctl cat mxd-sop | grep -F 'EnvironmentFile=/etc/mxd-sop/mxd-sop.env'
+sudo systemctl cat mxd-player | grep -F 'EnvironmentFile=/etc/mxd-player/mxd-player.env'
+sudo systemctl daemon-reload
+sudo systemctl restart mxd-player mxd-sop
+sudo systemctl is-active --quiet mxd-player
+sudo systemctl is-active --quiet mxd-sop
+curl -fsS http://127.0.0.1:26906/health
+curl -fsS http://127.0.0.1:26902/health
+)
+```
+
+### 14.2 同机升级
+
+```bash
+(
+set -eu
+sudo -v
+
+cd /opt/mxd-sop
+if [ -n "$(sudo -u mxd-sop git status --porcelain)" ]; then
+  echo '工作区有未提交修改，已停止；请先保存或提交后再升级' >&2
+  exit 1
+fi
+
+# 先备份运营台和 player 的 SQLite 数据库。
+sudo env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \
+  /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
+sudo /usr/local/sbin/mxd-player-backup
+
+sudo -u mxd-sop git pull --ff-only origin main
+
+# 运营台：依赖、测试、类型检查和前后端构建。
+sudo -u mxd-sop bash -lc '
+  set -eu
+  cd /opt/mxd-sop
+  npm ci
+  npm test
+  npm run lint
+  npm run build
+  npm prune --omit=dev
+'
+
+# player 前端与 Go 后端：先构建临时二进制，成功后再原子替换。
+sudo -u mxd-sop bash -lc '
+  set -eu
+  cd /opt/mxd-sop/mxd-player/frontend-player
+  if [ -f package-lock.json ]; then npm ci; else npm install --no-package-lock; fi
+  npm run lint
+  npm run build
+  . /opt/mxd-player/toolchain.env
+  cd /opt/mxd-sop/mxd-player/backend-player
+  "$GO_BIN" mod download
+  "$GO_BIN" test ./...
+  "$GO_BIN" vet ./...
+  "$GO_BIN" build -trimpath -ldflags="-s -w" -o /opt/mxd-player/bin/mxd-player.new ./cmd/mxd-player
+'
+sudo -u mxd-sop mv /opt/mxd-player/bin/mxd-player.new /opt/mxd-player/bin/mxd-player
+sudo chmod 755 /opt/mxd-player/bin/mxd-player
+
+# 第 14.1 节已经编辑并加载 env；这里再次无输出校验两边令牌一致。
+sudo sh -c '
+  set -eu
+  ops=$(sed -n "s/^MXD_PLAYER_SERVICE_TOKEN=//p" /etc/mxd-sop/mxd-sop.env | head -n1)
+  player=$(sed -n "s/^PLAYER_SERVICE_TOKEN=//p" /etc/mxd-player/mxd-player.env | head -n1)
+  test -n "$ops" && test "$ops" = "$player"
+  case "$ops" in replace-with-*|*" "*) echo "令牌仍是占位值或包含空格" >&2; exit 1;; esac
+'
+sudo chmod 600 /etc/mxd-sop/mxd-sop.env /etc/mxd-player/mxd-player.env
+
+sudo systemctl daemon-reload
+sudo systemctl restart mxd-player
+sudo systemctl restart mxd-sop
+sudo systemctl is-active --quiet mxd-player
+sudo systemctl is-active --quiet mxd-sop
+curl -fsS http://127.0.0.1:26906/health
+curl -fsS http://127.0.0.1:26902/health
+sudo nginx -t
+sudo systemctl reload nginx
+curl -fsS https://mxd-teams.5202345.xyz/health
+curl -fsS https://mxd-sop.5202345.xyz/health
+)
+```
+
+升级完成后，先用本机地址确认两个后端均返回 `{"status":"ok"}`，再从两个
+域名登录检查玩家登录、CSV 导入、客服“玩家列表”和“所有队伍”。
 
 ## 7. 申请 HTTPS 证书
 
@@ -331,7 +456,11 @@ git commit -m "描述本次更新"
 git push origin main
 ```
 
-### 12.2 服务器拉取并发布
+### 12.2 服务器拉取并发布（仅运营台单独升级）
+
+本仓库的运营台和 `mxd-player` 在同一台服务器上。不要把本节和 player 文档
+的升级段落各自完整执行两遍；本次修改请直接执行文档末尾第 14 节的统一升级
+命令，并先执行第 14.1 节的 env 配置命令。
 
 ```bash
 sudo env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \

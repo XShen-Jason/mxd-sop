@@ -10,6 +10,11 @@ Contract ID 使用 module-id.operation-name，版本单独记录。所有 ID 为
 
 ## Contract registry
 
+玩家公开报名站使用独立的 `player-registration` 契约（v1）：
+`player.verify`、`player.me`、`player.teams`、`player.teams.join`。后端负责
+服务器/QQ/游戏账号匹配、角色归属、每个副本每账号一次、队伍最多 10 人和
+并发加入事务；前端只消费这些 HTTP 接口，不读取数据库。
+
 认证契约登记于 `docs/contracts/auth.md`：auth.login、auth.logout、auth.me、auth.list-users、auth.create-user、auth.update-user、auth.delete-user。operation-groups 还提供 update-group、approve-group、reject-group、issue-group 和 list-overview；新申请状态为 pending、approved、rejected、issued（旧 completed 仅兼容读取）。
 
 | Contract ID | Owner | Version | Consumers | Canonical definition |
@@ -38,11 +43,39 @@ Contract ID 使用 module-id.operation-name，版本单独记录。所有 ID 为
 | command-generation.generate | command-generation | v1 | backend manager projection | contracts/command-generation.md |
 | activities.list | activities | v1 | frontend all roles | contracts/activities.md |
 | activities.replace | activities | v1 | frontend manager/super_admin | contracts/activities.md |
+| team-view.read | team-view | v1 | frontend all authenticated roles | contracts/team-view.md |
 
 | operation-groups.remind-customer | operation-groups | v1 | frontend super_admin | contracts/operation-groups.md |
 | operation-groups.list-reminders | operation-groups | v1 | frontend all roles | contracts/operation-groups.md |
 | operation-groups.workspace-counts | operation-groups | v1 | frontend | contracts/operation-groups.md |
 | operation-groups.events | operation-groups | v1 | frontend | contracts/operation-groups.md |
+
+## player-directory contracts
+
+`player-directory.search` (`GET /api/v1/player-directory/search`) is available
+to all authenticated roles and returns bounded, grouped account results with
+opaque cursor pagination. `player-directory.import`
+(`POST /api/v1/player-directory/import`) is restricted to `super_admin`,
+accepts one server-selected validated CSV, and replaces only that server's
+rows.
+The canonical request and response definitions live in
+`docs/contracts/player-directory.md`.
+
+## team-view contracts
+
+`team-view.read` (`GET /api/v1/team-view`) is available to all authenticated
+roles and returns a bounded projection of the usage-date snapshot grouped by
+the five servers and the two boss types. The canonical definition lives in
+`docs/contracts/team-view.md`.
+
+## player-integration contracts
+
+`player-integration.status` (`GET /api/v1/player-integration/status`) and
+`player-integration.switch` (`POST /api/v1/player-integration/switch`) are
+super-admin-only controls. The switch request is `{ "mode": "local" | "remote",
+"confirmation": "SWITCH PLAYER SERVER" }`; the server health-checks the target
+endpoint before persisting the mode. Endpoint URLs and service tokens are
+server configuration, never client input.
 
 ## Portable data semantics
 
