@@ -162,6 +162,28 @@ sudo nginx -t
 
 如果是 Git 工作区有未提交修改，先确认这些修改属于谁，再保存或提交后重新执行第 3 节。不要覆盖服务器上的 env 文件或 SQLite 数据库。
 
+如果状态只包含服务器工具产生的缓存目录（例如 `.cache/`、`.config/`、`.lesshst`、`.npm/`、`go/`）以及旧部署留下的 `package-lock.json` 或执行权限变化，可以先做可恢复备份，再执行：
+
+```bash
+sudo install -d -o mxd-sop -g mxd-sop -m 700 /var/backups/mxd-sop
+sudo -u mxd-sop git -C /opt/mxd-sop diff \
+  > /var/backups/mxd-sop/worktree-before-update.patch
+
+sudo -u mxd-sop tee -a /opt/mxd-sop/.git/info/exclude >/dev/null <<'EXCLUDE'
+.cache/
+.config/
+.lesshst
+.npm/
+go/
+EXCLUDE
+
+sudo -u mxd-sop git -C /opt/mxd-sop stash push \
+  -m "server-worktree-before-mxd-player-update"
+sudo -u mxd-sop git -C /opt/mxd-sop status --short
+```
+
+确认最后一条没有输出后，再重新执行第 3 节。`git stash list` 可以查看已保存的旧修改；不要在确认内容前执行 `stash pop`。
+
 ## 5. 相关部署文档
 
 - [运营台部署文档](DEPLOYMENT-MXD-SOP-26901.md)
