@@ -38,13 +38,21 @@ git push origin main
 
 ## 2. 只修改令牌或环境变量
 
-代码不变时，不需要拉取仓库或重新构建。服务器执行下面的命令，两个配置文件必须使用同一个令牌。
+已有部署不要执行 `sudo cp /opt/mxd-sop/.env.example /etc/mxd-sop/mxd-sop.env`。
+这会覆盖现有生产配置，可能改变数据库路径、Cookie 配置和初始化密码占位值。
+代码不变时，不需要拉取仓库或重新构建；只备份并编辑已有 env 文件，两个配置文件必须使用同一个令牌。
 令牌建议使用 `openssl rand -hex 32` 生成的 64 个十六进制字符；只替换等号后的值，不加引号。
+
+`INITIAL_ADMIN_PASSWORD` 只在数据库的 `users` 表为空时用于创建第一个超级管理员。
+已有用户和密码不会因为修改 env 或重启而改变；请保留现有值，不要用 `.env.example`
+中的占位值覆盖它。如果初始密码已经按部署文档删除，也不要重新添加占位值。
 
 ```bash
 (
 set -eu
 sudo -v
+sudo cp -a /etc/mxd-sop/mxd-sop.env /etc/mxd-sop/mxd-sop.env.before-player-integration
+sudo cp -a /etc/mxd-player/mxd-player.env /etc/mxd-player/mxd-player.env.before-player-integration
 sudoedit /etc/mxd-sop/mxd-sop.env
 sudoedit /etc/mxd-player/mxd-player.env
 

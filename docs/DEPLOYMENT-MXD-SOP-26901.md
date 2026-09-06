@@ -62,6 +62,10 @@ sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm prune --omit=dev'
 
 ## 4. 创建生产环境变量
 
+本节只用于首次部署。已有服务不要再次复制 `.env.example` 覆盖
+`/etc/mxd-sop/mxd-sop.env`；后续只在原文件中追加或修改必要的变量，保留当前
+数据库路径、Cookie 配置和已有初始化配置。
+
 ```bash
 sudo cp /opt/mxd-sop/.env.example /etc/mxd-sop/mxd-sop.env
 sudo chmod 600 /etc/mxd-sop/mxd-sop.env
