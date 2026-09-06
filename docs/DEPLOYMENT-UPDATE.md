@@ -1,190 +1,238 @@
-# 同机部署更新手册
+# MXDCMD 同机部署更新手册
 
-本文是 `/opt/mxd-sop` 同一台服务器同时运行运营台和 `mxd-player` 时的长期更新流程。
-两个服务共用 Git 仓库，但使用独立进程、端口和 SQLite 数据库。
+本文适用于运营台（mxd-sop）和玩家项目（mxd-player）已经部署在同一台
+Debian 服务器的情况。
 
-不要再分别执行两份旧的“后续升级”命令。每次代码发布只执行本文第 3 节一次。
-运营台部署文档的第 14 节和 player 部署文档的第 11 节是同一套流程的现场说明。
+固定路径和服务：
 
-## 1. 本地提交并推送
+- Git 仓库根目录：/opt/mxd-sop。这里包含完整的 MXDCMD 仓库和
+  mxd-player 子项目；不要把两个项目拆成两个仓库上传。
+- 运营台服务：mxd-sop，本机端口 26902，数据库
+  /var/lib/mxd-sop/ops.sqlite。
+- 玩家服务：mxd-player，本机端口 26906，数据库
+  /var/lib/mxd-player/player.sqlite。
+- 运营台配置：/etc/mxd-sop/mxd-sop.env。
+- 玩家配置：/etc/mxd-player/mxd-player.env。
 
-在开发机项目根目录执行。不要使用 `git add .`，避免把数据库、令牌或本地运行文件提交到 Git。
+每次代码发布都先把完整 MXDCMD Git 仓库推送到 origin/main，再在服务器
+执行下面其中一个“只更新”流程。服务器只执行 git pull，不通过 SCP 覆盖
+生产目录；env 文件和 SQLite 数据库始终位于仓库外，不会被代码更新覆盖。
 
-```bash
+## 本地 SSH 连接
+
+只在本机新开的 PowerShell 窗口执行。输入 IP 后，OpenSSH 会在隐藏的密码提示
+中读取 root 密码；不要把密码写入命令、脚本或聊天。SSH 端口固定为 22。
+
+~~~powershell
+$serverIp = Read-Host "服务器 IP"
+ssh -p 22 root@$serverIp
+~~~
+
+## 0. 本地推送完整仓库
+
+在 Windows 开发机的仓库根目录执行。gitignore 已排除 .env、SQLite、
+node_modules 和构建目录；提交前仍要检查暂存文件列表，确认没有令牌或数据
+库。
+
+~~~powershell
+Set-Location C:\Users\22734\Desktop\PROJECTS\MXDCMD
 git status --short
 git diff --check
-git add -u
-# 本次首次打通功能的新增源码和文档需要显式加入：
-git add backend/src/modules/player-directory backend/src/modules/player-integration \
-  backend/src/modules/team-view backend/tests/player-directory.test.ts \
-  backend/tests/player-integration.test.ts backend/tests/team-view.test.ts \
-  docs/contracts/player-directory.md docs/contracts/player-integration.md \
-  docs/contracts/team-view.md docs/modules/player-directory.md \
-  docs/modules/player-integration.md docs/modules/team-view.md \
-  frontend/src/modules/player-directory frontend/src/modules/player-integration \
-  frontend/src/modules/team-view frontend/src/styles-player-directory.css \
-  frontend/src/styles-player-integration.css frontend/src/styles-team-view.css \
-  mxd-player/backend-player/cmd mxd-player/backend-player/internal \
-  mxd-player/backend-player/.env.example mxd-player/frontend-player/src/features \
-  mxd-player/frontend-player/src/styles-layout.css mxd-player/frontend-player/README.md \
-  mxd-player/start-player.ps1 docs/DEPLOYMENT-UPDATE.md
+git add -A
 git diff --cached --name-status
 git diff --cached --check
-git commit -m "更新 player 与运营台部署流程"
+$forbidden = git diff --cached --name-only | Where-Object {
+  (($_ -match '(^|/)\.env($|\.)') -and ($_ -notmatch '(^|/)\.env\.example$')) -or
+  ($_ -match '\.(sqlite|sqlite-wal|sqlite-shm|db)$') -or
+  ($_ -match '(^|/)(node_modules|dist|build|coverage)/')
+}
+if ($forbidden) { throw "暂存区包含禁止上传的配置、数据库或构建文件：$forbidden" }
+git commit -m "描述本次更新"
 git push origin main
-```
+~~~
 
-推送完成后，确认 GitHub 的 `main` 分支已经包含本次提交，再登录服务器。
+确认 GitHub 的 main 已包含提交后，再登录服务器。不要把令牌写入源码、
+提交信息或命令参数；本地配置文件只用于本地运行。
 
-## 2. 只修改令牌或环境变量
+## 1. 设置令牌
 
-已有部署不要执行 `sudo cp /opt/mxd-sop/.env.example /etc/mxd-sop/mxd-sop.env`。
-这会覆盖现有生产配置，可能改变数据库路径、Cookie 配置和初始化密码占位值。
-代码不变时，不需要拉取仓库或重新构建；只备份并编辑已有 env 文件，两个配置文件必须使用同一个令牌。
-令牌建议使用 `openssl rand -hex 32` 生成的 64 个十六进制字符；只替换等号后的值，不加引号。
+只改令牌或其他生产环境变量时，不要拉取仓库，也不要运行构建。两个配置文件
+中的服务令牌必须完全相同：运营台使用 MXD_PLAYER_SERVICE_TOKEN，玩家服务
+使用 PLAYER_SERVICE_TOKEN。只编辑等号右侧，不加引号。
 
-`INITIAL_ADMIN_PASSWORD` 只在数据库的 `users` 表为空时用于创建第一个超级管理员。
-已有用户和密码不会因为修改 env 或重启而改变；请保留现有值，不要用 `.env.example`
-中的占位值覆盖它。如果初始密码已经按部署文档删除，也不要重新添加占位值。
-
-```bash
+~~~bash
 (
 set -eu
 sudo -v
-sudo cp -a /etc/mxd-sop/mxd-sop.env /etc/mxd-sop/mxd-sop.env.before-player-integration
-sudo cp -a /etc/mxd-player/mxd-player.env /etc/mxd-player/mxd-player.env.before-player-integration
+sudo cp -a /etc/mxd-sop/mxd-sop.env \
+  /etc/mxd-sop/mxd-sop.env.before-token-change
+sudo cp -a /etc/mxd-player/mxd-player.env \
+  /etc/mxd-player/mxd-player.env.before-token-change
 sudoedit /etc/mxd-sop/mxd-sop.env
 sudoedit /etc/mxd-player/mxd-player.env
 
+# 只检查是否一致，不输出令牌内容。
 sudo sh -c '
   set -eu
   ops=$(sed -n "s/^MXD_PLAYER_SERVICE_TOKEN=//p" /etc/mxd-sop/mxd-sop.env | head -n1)
   player=$(sed -n "s/^PLAYER_SERVICE_TOKEN=//p" /etc/mxd-player/mxd-player.env | head -n1)
   test -n "$ops" && test "$ops" = "$player"
-  case "$ops" in replace-with-*|*" "*) echo "令牌仍是占位值或包含空格" >&2; exit 1;; esac
+  case "$ops" in replace-with-*|*" "*) echo "令牌为空、仍是占位值或包含空格" >&2; exit 1;; esac
 '
 sudo chmod 600 /etc/mxd-sop/mxd-sop.env /etc/mxd-player/mxd-player.env
-sudo systemctl cat mxd-sop | grep -F 'EnvironmentFile=/etc/mxd-sop/mxd-sop.env'
-sudo systemctl cat mxd-player | grep -F 'EnvironmentFile=/etc/mxd-player/mxd-player.env'
 sudo systemctl daemon-reload
 sudo systemctl restart mxd-player mxd-sop
 sudo systemctl is-active --quiet mxd-player
 sudo systemctl is-active --quiet mxd-sop
-curl -fsS http://127.0.0.1:26906/health
-curl -fsS http://127.0.0.1:26902/health
+for url in http://127.0.0.1:26906/health http://127.0.0.1:26902/health; do
+  ok=0
+  for attempt in $(seq 1 15); do
+    if curl -fsS "$url"; then ok=1; printf '\n'; break; fi
+    sleep 1
+  done
+  test "$ok" -eq 1
+done
 )
-```
+~~~
 
-## 3. 代码更新（运营台 + mxd-player）
+推荐令牌来源：在服务器上运行 openssl rand -hex 32，再把同一个 64 位
+十六进制值分别写入两个 env 文件。不要把命令输出粘贴到聊天或 Git。
 
-代码推送到 GitHub 后，在服务器 `/opt/mxd-sop` 执行下面整段命令。它只拉取一次代码，先备份两个数据库，构建和测试全部成功后才替换 player 二进制并重启服务。
+## 2. 只更新 SOP 项目
 
-```bash
+这段命令会拉取完整 MXDCMD 仓库，但只安装依赖、测试、构建并重启运营台。
+不会构建或重启 mxd-player，也不会触碰玩家数据库。
+
+core.fileMode=false 只用于忽略服务器上备份脚本的执行权限差异；任何内容
+修改都会停止流程。--package-lock=false 防止服务器 npm 版本把生成的元数据
+写回 Git 工作区。
+
+~~~bash
 (
 set -eu
 sudo -v
 cd /opt/mxd-sop
 
-if [ -n "$(sudo -u mxd-sop git status --porcelain)" ]; then
-  echo '工作区有未提交修改，已停止；请先保存或提交后再更新' >&2
+status=$(sudo -u mxd-sop git -c core.fileMode=false status --porcelain)
+if [ -n "$status" ]; then
+  echo '服务器工作区有未提交的内容修改，已停止：' >&2
+  printf '%s\n' "$status" >&2
   exit 1
 fi
 
-sudo env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \
+env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \
   sh /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
-sudo /usr/local/sbin/mxd-player-backup
-
-sudo -u mxd-sop git pull --ff-only origin main
+sudo -u mxd-sop git -c core.fileMode=false pull --ff-only origin main
 
 sudo -u mxd-sop bash -lc '
   set -eu
   cd /opt/mxd-sop
-  npm ci
+  npm ci --package-lock=false
   npm test
   npm run lint
   npm run build
   npm prune --omit=dev
 '
 
+sudo systemctl restart mxd-sop
+sudo systemctl is-active --quiet mxd-sop
+ok=0
+for attempt in $(seq 1 15); do
+  if curl -fsS http://127.0.0.1:26902/health; then ok=1; printf '\n'; break; fi
+  sleep 1
+done
+test "$ok" -eq 1
+sudo nginx -t
+sudo systemctl reload nginx
+curl -fsS --max-time 20 https://mxd-sop.5202345.xyz/health
+)
+~~~
+
+完成后确认 mxd-player 仍为 active。如果运营台健康检查失败，先查看
+sudo journalctl -u mxd-sop -n 100 --no-pager，不要删除数据库或使用
+git reset --hard。
+
+## 3. 只更新 player 项目
+
+这段命令同样拉取完整 MXDCMD 仓库，但只构建和重启玩家前端/后端。运营台
+进程和数据库不会被停止或写入。
+
+~~~bash
+(
+set -eu
+sudo -v
+cd /opt/mxd-sop
+
+status=$(sudo -u mxd-sop git -c core.fileMode=false status --porcelain)
+if [ -n "$status" ]; then
+  echo '服务器工作区有未提交的内容修改，已停止：' >&2
+  printf '%s\n' "$status" >&2
+  exit 1
+fi
+
+sudo /usr/local/sbin/mxd-player-backup
+sudo -u mxd-sop git -c core.fileMode=false pull --ff-only origin main
+
 sudo -u mxd-sop bash -lc '
   set -eu
   cd /opt/mxd-sop/mxd-player/frontend-player
-  if [ -f package-lock.json ]; then npm ci; else npm install --no-package-lock; fi
+  if [ -f package-lock.json ]; then npm ci --package-lock=false; else npm install --no-package-lock; fi
   npm run lint
   npm run build
+'
+
+sudo -u mxd-sop bash -lc '
+  set -eu
   . /opt/mxd-player/toolchain.env
   cd /opt/mxd-sop/mxd-player/backend-player
   "$GO_BIN" mod download
   "$GO_BIN" test ./...
   "$GO_BIN" vet ./...
-  "$GO_BIN" build -trimpath -ldflags="-s -w" -o /opt/mxd-player/bin/mxd-player.new ./cmd/mxd-player
+  "$GO_BIN" build -trimpath -ldflags="-s -w" \
+    -o /opt/mxd-player/bin/mxd-player.new ./cmd/mxd-player
 '
-
-sudo -u mxd-sop mv /opt/mxd-player/bin/mxd-player.new /opt/mxd-player/bin/mxd-player
+sudo mv /opt/mxd-player/bin/mxd-player.new /opt/mxd-player/bin/mxd-player
+sudo chown mxd-sop:mxd-sop /opt/mxd-player/bin/mxd-player
 sudo chmod 755 /opt/mxd-player/bin/mxd-player
 
-# 令牌通常不变；这里无输出确认两个 env 文件仍然一致。
-sudo sh -c '
-  set -eu
-  ops=$(sed -n "s/^MXD_PLAYER_SERVICE_TOKEN=//p" /etc/mxd-sop/mxd-sop.env | head -n1)
-  player=$(sed -n "s/^PLAYER_SERVICE_TOKEN=//p" /etc/mxd-player/mxd-player.env | head -n1)
-  test -n "$ops" && test "$ops" = "$player"
-  case "$ops" in replace-with-*|*" "*) echo "令牌仍是占位值或包含空格" >&2; exit 1;; esac
-'
-sudo chmod 600 /etc/mxd-sop/mxd-sop.env /etc/mxd-player/mxd-player.env
-
-sudo systemctl daemon-reload
 sudo systemctl restart mxd-player
-sudo systemctl restart mxd-sop
 sudo systemctl is-active --quiet mxd-player
-sudo systemctl is-active --quiet mxd-sop
-curl -fsS http://127.0.0.1:26906/health
-curl -fsS http://127.0.0.1:26902/health
+ok=0
+for attempt in $(seq 1 15); do
+  if curl -fsS http://127.0.0.1:26906/health; then ok=1; printf '\n'; break; fi
+  sleep 1
+done
+test "$ok" -eq 1
 sudo nginx -t
 sudo systemctl reload nginx
-curl -fsS https://mxd-teams.5202345.xyz/health
-curl -fsS https://mxd-sop.5202345.xyz/health
+curl -fsS --max-time 20 https://mxd-teams.5202345.xyz/health
 )
-```
+~~~
 
-## 4. 更新失败时
+## 4. 更新失败排查
 
-`set -eu` 会在第一处失败时停止，已经创建的数据库备份不会被删除。先查看服务日志，不要使用 `git reset --hard`：
+先确认两个服务和端口，不要覆盖 env 或 SQLite：
 
-```bash
-sudo systemctl status mxd-player mxd-sop --no-pager -l
-sudo journalctl -u mxd-player -n 100 --no-pager
+~~~bash
+sudo systemctl status mxd-sop mxd-player --no-pager -l
 sudo journalctl -u mxd-sop -n 100 --no-pager
-sudo curl -v http://127.0.0.1:26906/health
-sudo curl -v http://127.0.0.1:26902/health
+sudo journalctl -u mxd-player -n 100 --no-pager
+sudo ss -ltnp | grep -E ':26902\b|:26906\b' || true
+curl -v http://127.0.0.1:26902/health
+curl -v http://127.0.0.1:26906/health
 sudo nginx -t
-```
+~~~
 
-如果是 Git 工作区有未提交修改，先确认这些修改属于谁，再保存或提交后重新执行第 3 节。不要覆盖服务器上的 env 文件或 SQLite 数据库。
+如果 Git 状态只有服务器工具生成的缓存或意外的锁文件，先保存差异再处理，
+不要直接清空工作区：
 
-如果状态只包含服务器工具产生的缓存目录（例如 `.cache/`、`.config/`、`.lesshst`、`.npm/`、`go/`）以及旧部署留下的 `package-lock.json` 或执行权限变化，可以先做可恢复备份，再执行：
-
-```bash
+~~~bash
 sudo install -d -o mxd-sop -g mxd-sop -m 700 /var/backups/mxd-sop
 sudo -u mxd-sop git -C /opt/mxd-sop diff \
   > /var/backups/mxd-sop/worktree-before-update.patch
-
-sudo -u mxd-sop tee -a /opt/mxd-sop/.git/info/exclude >/dev/null <<'EXCLUDE'
-.cache/
-.config/
-.lesshst
-.npm/
-go/
-EXCLUDE
-
-sudo -u mxd-sop git -C /opt/mxd-sop stash push \
-  -m "server-worktree-before-mxd-player-update"
 sudo -u mxd-sop git -C /opt/mxd-sop status --short
-```
+~~~
 
-确认最后一条没有输出后，再重新执行第 3 节。`git stash list` 可以查看已保存的旧修改；不要在确认内容前执行 `stash pop`。
-
-## 5. 相关部署文档
-
-- [运营台部署文档](DEPLOYMENT-MXD-SOP-26901.md)
-- [mxd-player 部署文档](../mxd-player/DEPLOYMENT.md)
+确认没有业务内容修改后，再重新执行对应的“只更新”流程。若两个项目都要
+更新，先执行第 2 节，再执行第 3 节；每一节仍然只重启自己的服务，两个备份
+文件也必须都成功生成。
