@@ -131,7 +131,7 @@ sudo -u mxd-sop bash -lc '
   npm test
   npm run lint
   npm run build
-  npm prune --omit=dev
+  npm prune --omit=dev --package-lock=false
 '
 
 sudo systemctl restart mxd-sop
@@ -265,7 +265,34 @@ curl -v http://127.0.0.1:26906/health
 sudo nginx -t
 ~~~
 
-如果 Git 状态只有服务器工具生成的缓存或意外的锁文件，先保存差异再处理，
+如果刚执行完第 2 节，第 3 节仅报 ` M package-lock.json`，且没有手动修改
+服务器依赖，旧版手册的 `npm prune --omit=dev` 可能改写了锁文件。
+新版已加上 `--package-lock=false`，安装和裁剪依赖时都不写回锁文件。
+以下命令要求工作区只有这一处未暂存修改，先保存完整锁文件，再将它恢复为
+当前提交版本。不会修改 node_modules、配置、数据库或停止服务。
+
+~~~bash
+(
+set -eu
+cd /opt/mxd-sop
+status=$(sudo -u mxd-sop git -c core.fileMode=false status --porcelain)
+if [ "$status" != ' M package-lock.json' ]; then
+  echo '工作区不止一处锁文件修改，请先检查：' >&2
+  printf '%s\n' "$status" >&2
+  exit 1
+fi
+backupDir=$(sudo mktemp -d /var/tmp/mxd-lock-backup.XXXXXX)
+sudo cp -a package-lock.json "$backupDir/package-lock.json"
+sudo -u mxd-sop git restore --source=HEAD --worktree -- package-lock.json
+printf '原锁文件已备份到 %s/package-lock.json\n' "$backupDir"
+sudo -u mxd-sop git -c core.fileMode=false status --short
+)
+~~~
+
+成功后可重新运行第 3 节，无需重跑第 2 节。本次组队同步修复只涉及 SOP，
+若仅部署该修复，第 2 节成功后就已生效，不需要第 3 节。
+
+其他情况下，如果 Git 状态只有服务器工具生成的缓存或意外的锁文件，先保存差异再处理，
 不要直接清空工作区：
 
 ~~~bash
