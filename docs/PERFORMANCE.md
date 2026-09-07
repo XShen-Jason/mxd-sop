@@ -64,8 +64,10 @@ not poll or download the raw CSV snapshot.
 The team-view workspace reads one bounded snapshot row per date. Its frontend
 does not poll; a user-triggered refresh is a single GET and normal GET caching
 coalesces concurrent requests. The backend scheduler performs one external
-fetch at Beijing 00:05, with a 10-second timeout and no write when the source
-fails. The scheduler stays idle when no source URL is configured. Snapshots
+fetch at Beijing 00:05 for the current lock date and one catch-up fetch on
+startup after 00:05. Failed requests retry after 60 seconds with a 10-second
+timeout, at most one request in flight, and no write when the source fails.
+Success resumes daily scheduling. The scheduler stays idle when no source is configured. Snapshots
 are replaced atomically in SQLite/JSON adapters.
 
 Player integration keeps one bounded account-import request per CSV and sends

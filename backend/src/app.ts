@@ -117,9 +117,10 @@ export async function createApp(config: AppConfig = {}) {
   const teamViewService = new TeamViewService(teamRepository, teamSource, appOptions.servers);
   registerTeamViewRoutes(app, teamViewService, auth);
   const scheduler = new TeamViewScheduler(teamViewService);
-  if (config.enableTeamScheduler !== false && sourceConfigured) scheduler.start();
+  const enableTeamScheduler = config.enableTeamScheduler ?? process.env.NODE_ENV !== 'test';
+  if (enableTeamScheduler && sourceConfigured) scheduler.start();
   app.get('/health', async () => ({ status: 'ok', catalogItems: catalog.size }));
-  app.addHook('onClose', async () => { scheduler.stop(); db?.close(); });
+  app.addHook('onClose', async () => { await scheduler.stop(); db?.close(); });
   return app;
 }
 

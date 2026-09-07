@@ -9,7 +9,7 @@ owned by the separately deployed `mxd-player` service.
 
 In scope:
 
-- Persisting one immutable operations-desk snapshot per usage date.
+- Persisting one operations-desk snapshot per lock date, replaceable by a sync.
 - Reading a bounded, read-only projection for customer, manager, and
   super-admin users.
 - Grouping the five configured servers, then `black-dragon` and `zakum`.
@@ -29,8 +29,13 @@ Out of scope:
 
 - The operations desk owns its snapshot copy and never mutates player data.
 - `date` is the usage date for the locked list. The scheduled run at 00:05
-  fetches the next Beijing business date, so teams locked at the preceding
-  midnight are shown for the following day.
+  fetches the current Beijing date: September 7 registrations lock at
+  September 8 00:00 and are fetched as September 8 at 00:05.
+- Startup after 00:05 re-fetches today's snapshot, including existing empty
+  snapshots saved prematurely by older versions. Before 00:05 it waits.
+- Failures retry after 60 seconds, with one request in flight. Success resumes
+  daily scheduling. A retry crossing midnight waits for the new day's 00:05;
+  older missed dates can be repaired with `backend/dist/src/sync-team-view.js`.
 - Character IDs are transported as digit-only strings.
 - A projection always contains every configured server and both boss types,
   including empty groups.
@@ -60,8 +65,13 @@ groups.
 ## Tests
 
 The service tests cover date validation, deterministic ordering, complete
-server/type grouping, source failures, and HTTP role access. The scheduler is
-unref'ed and stopped through the Fastify close hook.
+server/type grouping, source failures, and HTTP role access. Scheduler regression
+tests cover Beijing dates, startup repair, retries, and shutdown. The scheduler
+is unref'ed; the Fastify close hook drains an in-flight sync before closing SQLite.
+
+The deployment command `backend/dist/src/sync-team-view.js YYYY-MM-DD` repairs one
+locked date through the same source and service contracts. It requires an
+existing absolute `DATABASE_PATH` and uses the configured active player endpoint.
 
 ## Migration notes
 

@@ -209,7 +209,49 @@ curl -fsS --max-time 20 https://mxd-teams.5202345.xyz/health
 )
 ~~~
 
-## 4. 更新失败排查
+## 4. 组队名单同步与历史补同步
+
+名单日期是北京时间锁定日。例如 9 月 7 日报名的队伍在 9 月 8 日 00:00
+锁定，由运营台在 9 月 8 日 00:05 主动拉取 `date=2026-09-08`，不是玩家端推送。
+旧版运营台误取次日，且重启错过定时任务后不会补取，可能留下空名单。
+本次修复只需执行第 2 节更新 SOP；玩家端已有锁定和快照接口，无需为此修改数据库。
+
+修复版在 00:05 后启动会重新拉取当天名单，覆盖旧版提前生成的快照；失败每分钟
+重试，成功后恢复每日一次。网页刷新只读取已保存的快照，不触发跨服务同步。
+
+同机配置应为 `MXD_PLAYER_LOCAL_URL=http://127.0.0.1:26906`，两个服务的令牌
+应按第 1 节保持一致。后台“玩家服务”中当前模式应为本机；已保存的模式优先于
+`MXD_PLAYER_DEPLOYMENT_MODE`。若曾设置 `MXD_PLAYER_TEAM_SNAPSHOT_URL`，该旧配置
+会优先使用自己的 URL 和 `MXD_PLAYER_TEAM_SNAPSHOT_TOKEN`，应核对或移除后重启 SOP。
+
+若更新时已经跨天，或需要恢复指定日期，先完成第 2 节部署，再执行以下命令。
+`syncDate` 改成实际锁定日期；命令通过玩家服务接口获取数据，只替换运营台该日
+快照，不改玩家队伍。使用 systemd 加载生产环境文件，避免把令牌写进命令参数。
+
+~~~bash
+(
+set -eu
+syncDate=2026-09-08
+env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \
+  sh /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
+sudo systemd-run --quiet --wait --pipe --collect \
+  --property=User=mxd-sop --property=Group=mxd-sop \
+  --property=WorkingDirectory=/opt/mxd-sop \
+  --property=EnvironmentFile=/etc/mxd-sop/mxd-sop.env \
+  /usr/bin/node /opt/mxd-sop/backend/dist/src/sync-team-view.js "$syncDate"
+)
+~~~
+
+成功输出 `date`、`teamCount` 和 `fetchedAt`。然后在后台选择该日期并刷新。
+`teamCount: 0` 表示玩家接口返回该日没有队伍，需要核对玩家端该日是否确有
+已确认成员；HTTP 401 表示令牌不匹配，连接失败则检查端口、当前模式和服务状态。
+后台健康检查成功只证明服务存活，不代表名单同步成功。同步失败日志查看：
+
+~~~bash
+sudo journalctl -u mxd-sop --since today --no-pager | grep -F 'team-view daily sync failed' || true
+~~~
+
+## 5. 更新失败排查
 
 先确认两个服务和端口，不要覆盖 env 或 SQLite：
 

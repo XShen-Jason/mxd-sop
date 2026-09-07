@@ -10,7 +10,7 @@ export class TeamViewService {
 
   view(actor: Identity, date?: string): TeamViewResult {
     this.requireAuthenticated(actor);
-    const targetDate = normalizeDate(date) ?? nextBusinessDay(new Date());
+    const targetDate = normalizeDate(date) ?? businessDay(new Date());
     const snapshot = this.repository.get(targetDate);
     return this.project(targetDate, snapshot);
   }
@@ -74,11 +74,8 @@ function normalizeDate(value: unknown) {
   return value;
 }
 
-function nextBusinessDay(now: Date) {
-  const date = new Intl.DateTimeFormat('en-CA', { timeZone: beijing, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-  const parsed = new Date(`${date}T00:00:00+08:00`);
-  parsed.setUTCDate(parsed.getUTCDate() + 1);
-  return parsed.toLocaleDateString('en-CA', { timeZone: beijing });
+function businessDay(now: Date) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: beijing, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 
-export { bossNames, normalizeDate, nextBusinessDay };
+export { bossNames, normalizeDate, businessDay };
