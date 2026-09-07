@@ -57,6 +57,10 @@ operation-groups 当前还拥有 `update-group`、`approve-group`、`reject-grou
 
 ## Contract registry
 
+`player.teams.history` is owned by `player-registration` in `mxd-player`;
+its canonical definition is `mxd-player/CONTRACTS.md`. It exposes only the
+authenticated player's locked roster for one Beijing date.
+
 Auth contracts are defined in `docs/contracts/auth.md`: `auth.login`, `auth.logout`, `auth.me`, `auth.list-users`, `auth.create-user`, `auth.update-user`, and `auth.delete-user`.
 
 | Contract ID | Kind/API/event | Canonical definition | Owner | Version | Consumers |

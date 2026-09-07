@@ -1,21 +1,26 @@
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
 import type { TeamApplication } from '../api/types';
 import { formatTargetDay } from '../config/day';
 import { bossName } from '../config/player-config';
+import './application-history.css';
 
-export function ApplicationHistory({ items }: { items: TeamApplication[] }) {
-  if (!items.length) return null;
+export function ApplicationHistory({ items, loading = false }: { items: TeamApplication[]; loading?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? items : items.slice(0, 6);
   return (
-    <details className="application-history">
-      <summary><span className="kicker">JOIN HISTORY</span><small>最近 50 条 · 点击展开</small></summary>
-      <div className="history-list">
-        {items.slice(0, 6).map((item) => (
-          <div className="history-row" key={item.requestId}>
-            <span><b>{bossName(item.bossType)}</b> · 角色 ID {item.characterId}<small>{formatTargetDay(item.day)}</small></span>
-            <em className={`application-status ${item.status}`}>{applicationStatus(item)}</em>
+    <section className="application-records" aria-labelledby="application-records-title">
+      <div className="application-records-heading"><h2 id="application-records-title">入队申请记录</h2><small>最近 {items.length} 条</small></div>
+      <div id="application-records-list" aria-live="polite" aria-busy={loading}>
+        {loading ? <p className="application-records-empty">正在加载申请记录…</p> : !items.length ? <p className="application-records-empty">暂无入队申请记录</p> : visible.map((item) => (
+          <div className="application-record" key={item.requestId}>
+            <div><strong>{bossName(item.bossType)}</strong><span>角色 ID {item.characterId}</span><small>{formatTargetDay(item.day)} · 队伍 {item.inviteCode}</small></div>
+            <span className={`application-status ${item.status}`}>{applicationStatus(item)}</span>
           </div>
         ))}
       </div>
-    </details>
+      {!loading && items.length > 6 && <button type="button" className="application-records-toggle" aria-expanded={expanded} aria-controls="application-records-list" onClick={() => setExpanded(!expanded)}>{expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}{expanded ? '收起记录' : `查看全部 ${items.length} 条`}</button>}
+    </section>
   );
 }
 

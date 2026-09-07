@@ -2,6 +2,7 @@ import { Check, GitMerge, LogOut, Sparkles, Users, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { approveTeamJoin, approveTeamMerge, createTeam, getPlayerAccount, getServers, getTeams, joinTeam, leaveTeam, mergeTeams, previewTeamJoin, rejectTeamJoin, verify, type Account, type Team, type TeamApplication } from './api/client';
 import { ApplicationHistory } from './components/ApplicationHistory';
+import { TeamHistory } from './components/TeamHistory';
 import { CreateConfirmModal, ConfirmModal } from './components/PlayerModals';
 import { Landing, Logo, SessionLoading } from './components/PlayerLanding';
 import { MergeWorkspace } from './components/MergeWorkspace';
@@ -206,7 +207,10 @@ export default function App() {
           <aside><div className="section-heading"><div><p className="kicker">ACTIVE TARGET DAY</p><h2>我的{targetDay}开战队伍</h2></div><span className="team-count">{teams.length} 个</span></div><div className="team-list">{loadingTeams ? <div className="empty"><Sparkles size={20} /><p>正在加载队伍…</p></div> : teams.length ? teams.map((team) => <TeamCard key={team.inviteCode} team={team} targetDay={targetDay} disabled={busy} onLeave={() => void mutate(() => leaveTeam(token, team.inviteCode), '已退出队伍')} onCopy={() => { void navigator.clipboard?.writeText(team.inviteCode); showNotice('邀请码已复制'); }} onApprove={(request) => setModal({ kind: 'approve', request, boss: bossName(team.bossType) })} onReject={(request) => void mutate(() => rejectTeamJoin(token, request.requestId), '已拒绝入队申请')} />) : <div className="empty"><Sparkles size={20} /><p>{targetDay}还没有已入队副本</p><small>可以分别报名黑龙和扎昆</small></div>}</div></aside>
         </div>
         <MergeWorkspace teams={teams} disabled={busy} onMerge={(source, target) => void mutate(() => mergeTeams(token, source, target), '合并申请已提交，等待对方队长同意')} onApprove={(request) => setModal({ kind: 'merge', request, boss: bossName(request.bossType) })} />
-        <ApplicationHistory items={history} />
+        <div className="history-grid">
+          <ApplicationHistory items={history} loading={loadingTeams} />
+          <TeamHistory token={token} />
+        </div>
         {message && <div className={`toast toast-${messageTone}`} role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{message}<button onClick={() => setMessage('')} aria-label="关闭提示"><X size={16} aria-hidden="true" /></button></div>}
         {modal && <ConfirmModal modal={modal} targetDay={targetDay} accountName={account.gameAccount} characters={account.characters} character={joinCharacter} setCharacter={setJoinCharacter} busy={busy} onClose={() => setModal(null)} onJoin={confirmJoin} onApprove={confirmApprove} onApproveMerge={confirmMerge} />}
         {createPrompt && <CreateConfirmModal prompt={createPrompt} targetDay={targetDay} lockTime={lockTime} busy={busy} onClose={() => setCreatePrompt(null)} onConfirm={confirmCreate} />}

@@ -1,0 +1,60 @@
+.team-history {
+  margin-top: 28px;
+  padding-block: 20px;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+  font-size: 13px;
+}
+.team-history-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.team-history-heading h2 { margin: 0; font-size: 16px; letter-spacing: 0; }
+.team-history-heading > span, .history-date, .history-state { color: var(--muted); }
+.team-history-heading > span { font-size: 12px; }
+.team-history-toolbar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px 52px; align-items: center; gap: 6px; margin-top: 14px; width: 100%; max-width: 380px; }
+.team-history button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+}
+.team-history button:hover:not(:disabled) { background: #ffffff12; }
+.team-history button:disabled { opacity: .4; }
+.team-history-toolbar input {
+  color-scheme: dark;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #211b35;
+  color: #f5f1ff;
+  font: inherit;
+  font-size: 13px;
+}
+.team-history-toolbar input::-webkit-date-and-time-value { text-align: center; min-height: 1.4em; }
+.team-history-toolbar input::-webkit-calendar-picker-indicator { cursor: pointer; margin: 0; padding: 0; opacity: .8; }
+.team-history-toolbar input:disabled { opacity: .5; }
+.team-history-toolbar input:hover:not(:disabled) { border-color: var(--accent); }
+.team-history-toolbar .history-today { color: #cdb9ff; border-color: #a779ff44; background: #a779ff12; }
+.history-date { margin: 16px 0 8px; font-size: 12px; }
+.history-roster { padding-block: 12px; border-bottom: 1px solid var(--line); }
+.history-roster h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 14px; }
+.history-roster small { color: var(--muted); font-size: 12px; font-weight: 400; }
+.history-roster ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 16px; margin: 0; padding: 0; list-style: none; }
+.history-roster li { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.history-roster li > span { overflow-wrap: anywhere; }
+.history-roster li > small { flex: none; }
+.history-state { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; line-height: 1.6; }
+@media (max-width: 400px) {
+  .history-roster ul { grid-template-columns: minmax(0, 1fr); }
+}

@@ -1,5 +1,10 @@
 export type Account = { server: string; qq: string; gameAccount: string; characters: string[] };
 export type BossType = 'black-dragon' | 'zakum';
+export type TeamHistory = {
+  day: string;
+  today: string;
+  teams: Array<Pick<Team, 'bossType' | 'members'>>;
+};
 export type TeamRequest = { requestId: string; characterId: string; requestedAt: string };
 export type TeamMergeRequest = { requestId: string; sourceInviteCode: string; bossType: BossType; memberCount: number; requestedAt: string };
 export type Team = {

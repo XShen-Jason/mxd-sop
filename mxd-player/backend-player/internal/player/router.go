@@ -12,6 +12,7 @@ func newPlayerRouter(a *app) http.Handler {
 	mux.HandleFunc("/api/v1/player/verify", a.verify)
 	mux.HandleFunc("/api/v1/player/me", a.me)
 	mux.HandleFunc("/api/v1/player/teams", a.teams)
+	mux.HandleFunc("/api/v1/player/teams/history", a.teamHistory)
 	mux.HandleFunc("/api/v1/player/teams/join", a.join)
 	mux.HandleFunc("/api/v1/player/teams/leave", a.leaveTeam)
 	mux.HandleFunc("/api/v1/player/teams/preview", a.previewJoin)

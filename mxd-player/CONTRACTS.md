@@ -29,6 +29,22 @@ include `unauthorized`, `character-not-owned`, `already-in-team`, and
 Every successful create targets the next Beijing business day; the team and
 its invite stop being mutable or joinable when that target day starts at 00:00.
 
+## player.teams.history
+
+Owner: player-registration. Version: v1.
+`GET /api/v1/player/teams/history?date=YYYY-MM-DD` requires a player bearer
+token. Omitted or empty date defaults to the current Beijing day. Dates after
+today, invalid dates, and dates at or before the legacy unknown-date sentinel
+`1970-01-01` return `invalid-input`.
+Response: `{ day, today, teams: [{ bossType, members: [{ characterId, isLeader }] }] }`.
+Only active teams where the authenticated account is a confirmed member on
+that exact date are included. A pending/rejected application grants no access.
+At most two teams and 20 members are returned; no matches returns `teams: []`.
+The roster is the retained membership locked at Beijing midnight, not an
+application history or proof of an actual Boss kill. Team IDs, invite codes,
+account details and pending requests are omitted. Existing join/create APIs
+continue to target tomorrow exclusively.
+
 ## Related team operations
 
 `player.servers` is `GET /api/v1/player/servers` and returns the published

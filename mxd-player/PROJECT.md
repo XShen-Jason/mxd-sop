@@ -34,6 +34,11 @@ Application source files should remain at or below 300 lines.
 
 ## Application boundaries
 
+`player-registration` also owns `player.teams.history`, the authenticated,
+date-scoped locked roster query and compact mobile team-history view. Its
+implementation lives in `team_history.go` and `components/TeamHistory.tsx`;
+date and membership isolation are covered by `team_history_test.go`.
+
 The frontend is an independent consumer of `CONTRACTS.md`. Its API client,
 session storage, error-message mapping, and player UI components are separate
 from the backend implementation. `src/App.tsx` is a compatibility export;

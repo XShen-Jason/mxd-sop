@@ -1,0 +1,113 @@
+@media (min-width: 981px) {
+  .dashboard {
+    padding-top: 32px;
+  }
+
+  .hero {
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  .hero h1 {
+    font-size: 36px;
+    margin-block: 8px 12px;
+  }
+
+  .hero-badge {
+    flex: none;
+  }
+
+  .status-strip {
+    margin: 0 0 24px;
+  }
+
+  .join-card-primary {
+    grid-template-columns: auto minmax(0, 1fr) minmax(280px, 360px);
+    margin-bottom: 28px;
+  }
+
+  .join-card-primary .join-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .join-card-primary .join-controls input {
+    width: 100%;
+  }
+
+  .content-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .content-grid > section,
+  .content-grid > aside {
+    min-width: 0;
+  }
+
+  .section-heading {
+    align-items: center;
+    min-height: 56px;
+    margin-bottom: 16px;
+  }
+
+  .section-heading h2 {
+    font-size: 20px;
+  }
+
+  .boss-grid,
+  .team-list,
+  .history-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+    align-items: start;
+  }
+
+  .boss-grid {
+    align-items: stretch;
+  }
+
+  .boss-art {
+    width: 110px;
+    flex: none;
+  }
+
+  .boss-info {
+    min-width: 0;
+    padding: 22px 20px;
+  }
+
+  .boss-info p {
+    line-height: 1.7;
+  }
+
+  .card-action {
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+
+  .team-list > .empty {
+    grid-column: 1 / -1;
+    padding: 24px;
+  }
+
+  .history-grid {
+    margin-top: 28px;
+  }
+
+  .history-grid > section {
+    margin-top: 0;
+    min-width: 0;
+  }
+
+  .application-records-heading,
+  .team-history-heading {
+    min-height: 28px;
+  }
+
+  .history-roster ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

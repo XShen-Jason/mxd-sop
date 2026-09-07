@@ -2,7 +2,7 @@
 // player API can provide VITE_PLAYER_API explicitly.
 const API = import.meta.env.VITE_PLAYER_API ?? '';
 export type { Account, BossType, Team, TeamApplication, TeamMergeRequest, TeamRequest } from './types';
-import type { Account, BossType, Team, TeamApplication, TeamMergeRequest, TeamRequest } from './types';
+import type { Account, BossType, Team, TeamApplication, TeamHistory, TeamMergeRequest, TeamRequest } from './types';
 let serversPromise: Promise<string[]> | undefined;
 
 async function call<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
@@ -33,6 +33,7 @@ export const getServers = () => {
   return serversPromise;
 };
 export const getTeams = (token: string) => call<{ teams: Team[]; applications: TeamApplication[]; history: TeamApplication[]; day: string }>('/api/v1/player/teams', token);
+export const getTeamHistory = (token: string, date: string, signal: AbortSignal) => call<TeamHistory>(`/api/v1/player/teams/history${date ? `?date=${encodeURIComponent(date)}` : ''}`, token, { signal });
 export const createTeam = (token: string, bossType: BossType, characterId: string) => call<Team>('/api/v1/player/teams', token, { method: 'POST', body: JSON.stringify({ bossType, characterId }) });
 export const joinTeam = (token: string, inviteCode: string, characterId: string) => call<{ status: 'pending'; requestId: string; bossType: BossType; inviteCode: string; characterId: string }>('/api/v1/player/teams/join', token, { method: 'POST', body: JSON.stringify({ inviteCode, characterId }) });
 export const leaveTeam = (token: string, inviteCode: string) => call<{ status: 'left'; inviteCode: string }>('/api/v1/player/teams/leave', token, { method: 'POST', body: JSON.stringify({ inviteCode }) });
