@@ -104,6 +104,12 @@ Out of scope:
 
 ## Tests
 
+`backend/tests/archive-search.test.ts` covers archive keyword search across
+SQLite, JSON, and the fallback repository, including snapshot fields, literal
+matching, combined filters, pagination, input limits, and authentication.
+The manager archive workspaces submit searches explicitly and keep separate
+keywords for issuance and regular records; clearing resets the active query.
+
 下一阶段至少覆盖：最少字段校验、多个 item 的独立数量、客服只能读自己的 group、客服不能看到 commands、可操作状态的取消/编辑、终态冲突、队列服务器分组和稳定排序、归档包含 pending/completed/cancelled。
 
 ## Migration notes

@@ -178,7 +178,8 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
       const kind = query.kind === undefined ? undefined : String(query.kind) as 'issuance' | 'regular';
       if (kind !== undefined && kind !== 'issuance' && kind !== 'regular') throw new GroupError('invalid-input', 'invalid kind');
       const normalizedStatus = status?.length ? (status.length === 1 ? status[0] : status) : undefined;
-      return reply.send(service.listArchive(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, normalizedStatus, query.serverId ? String(query.serverId) : undefined, kind));
+      if (query.q !== undefined && typeof query.q !== 'string') throw new GroupError('invalid-input', 'invalid search query');
+      return reply.send(service.listArchive(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, normalizedStatus, query.serverId ? String(query.serverId) : undefined, kind, query.q as string | undefined));
     } catch (error) { return sendError(reply, error); }
   });
 }

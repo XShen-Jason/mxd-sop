@@ -1,0 +1,11 @@
+.manager-toolbar.archive-toolbar { display: flex; align-items: center; gap: 12px; }
+.archive-toolbar > .filter-row { flex: 1; min-width: 0; }
+.archive-search { display: flex; align-items: center; gap: 8px; flex: 0 0 340px; max-width: 100%; }
+.archive-search .search-field { flex: 1; min-width: 0; }
+.archive-search input { width: 100%; }
+.archive-search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.archive-search .icon-button { flex: 0 0 40px; width: 40px; height: 40px; }
+@media (max-width: 900px) {
+  .manager-toolbar.archive-toolbar { flex-wrap: wrap; }
+  .archive-toolbar > .filter-row, .archive-search { flex-basis: 100%; }
+}

@@ -36,6 +36,10 @@ Review the backend impact whenever a change adds a request, enlarges a payload,
 changes a query, adds polling, or introduces a synchronous external call.
 
 Operation-group records use bounded keyset pagination in the persistence adapter.
+Archive keyword searches run in SQLite against specific JSON snapshot fields
+before LIMIT; only a bounded result page is decoded and projected. Substring
+search may scan candidate records and does not use a text index. The UI submits
+on Enter or the search button rather than issuing a request per keystroke.
 Review, archive, and own-record filters are applied before payload projection;
 the frontend requests only the active workspace page and guards continuation
 requests against duplicate clicks.

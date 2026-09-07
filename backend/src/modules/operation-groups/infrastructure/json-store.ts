@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { GroupStatus, OperationGroup } from '../../../shared/types.js';
 import { compareAsc, compareDesc } from '../domain/helpers.js';
+import { matchesArchiveSearch } from '../domain/archive-search.js';
 
 export type GroupPageQuery = {
   ownerId?: string;
@@ -9,6 +10,7 @@ export type GroupPageQuery = {
   status?: GroupStatus | GroupStatus[];
   serverId?: string;
   kind?: 'issuance' | 'regular';
+  search?: string;
   limit: number;
   order: 'asc' | 'desc';
   after?: { submittedAt: string; id: string; serverId?: string };
@@ -53,6 +55,7 @@ export class JsonGroupRepository implements GroupRepository {
       if (query.reminded && !(group.reminderCount && group.reminderCount > 0)) return false;
       if (query.status && (Array.isArray(query.status) ? !query.status.includes(group.status) : group.status !== query.status)) return false;
       if (query.serverId && group.server.id !== query.serverId) return false;
+      if (!matchesArchiveSearch(group, query.search)) return false;
       if (query.kind) {
         const issuance = group.operations.some((operation) => operation.type === 'item' || operation.type === 'cash');
         if (query.kind === 'issuance' !== issuance) return false;

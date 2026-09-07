@@ -16,6 +16,7 @@ import { fingerprint, safeText } from './helpers.js';
 import { GroupError } from './errors.js';
 import { normalizeSubmission } from './normalization.js';
 import { readGroupPage } from './pagination.js';
+import { normalizeArchiveSearch } from './archive-search.js';
 import { customerProjection, managerProjection } from './projections.js';
 import { readOverview, readWorkspaceCounts } from './workspace-summary.js';
 import { canCustomerModify, isIssuanceGroup, isNoReviewGroup } from './workflow-rules.js';
@@ -235,13 +236,13 @@ export class OperationGroupsService {
     return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
-  listArchive(identity: Identity, limit = 20, cursor?: string, status?: GroupStatus | GroupStatus[], serverId?: string, kind?: 'issuance' | 'regular') {
+  listArchive(identity: Identity, limit = 20, cursor?: string, status?: GroupStatus | GroupStatus[], serverId?: string, kind?: 'issuance' | 'regular', search = '') {
     this.requireManager(identity);
     if (serverId && !this.options.servers.some((server) => server.id === serverId)) throw new GroupError('unknown-server');
     const statuses = status ? (Array.isArray(status) ? status : [status]) : [];
     if (statuses.some((value) => !['pending', 'approved', 'rejected', 'issued', 'completed', 'cancelled'].includes(value))) throw new GroupError('invalid-status');
     if (kind !== undefined && kind !== 'issuance' && kind !== 'regular') throw new GroupError('invalid-input', 'invalid kind');
-    const page = readGroupPage(this.deps.repository, { status, serverId, kind, limit, order: 'desc' }, cursor);
+    const page = readGroupPage(this.deps.repository, { status, serverId, kind, search: normalizeArchiveSearch(search), limit, order: 'desc' }, cursor);
     return { groups: page.groups.map((group) => managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName)), nextCursor: page.nextCursor };
   }
 

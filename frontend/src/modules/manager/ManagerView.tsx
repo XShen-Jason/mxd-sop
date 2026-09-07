@@ -7,6 +7,7 @@ import { FloatingNotice } from '../../components/FloatingNotice';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatRecordTime, isIssuanceGroup, IssuanceDetails, IssuanceItemsDisplay, reasonLabel, recordType, RecordTableHeader, WorkflowTimeline } from '../operation-groups/RecordPresentation';
 import { UserAdminView } from './UserAdminView';
+import { ArchiveSearch } from './ArchiveSearch';
 import type { AppOptions, GeneratedCommand, ManagerGroup, Role } from '../../types';
 import { appendUniqueById, expandCompletedStatuses } from '../operation-groups/pagination';
 
@@ -40,6 +41,8 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
   const [reissueCursor, setReissueCursor] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<FilterStatus[]>(defaultStatuses);
   const [serverFilter, setServerFilter] = useState('');
+  const [searches, setSearches] = useState({ archive: '', reissue: '' });
+  const search = panel === 'archive' || panel === 'reissue' ? searches[panel] : '';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [rejectTarget, setRejectTarget] = useState<ManagerGroup | null>(null);
@@ -75,7 +78,7 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
           else { setArchive([]); setArchiveCursor(null); }
           return;
         }
-        const result = await client.archive(statuses, serverFilter || undefined, undefined, 20, kind);
+        const result = await client.archive(statuses, serverFilter || undefined, undefined, 20, kind, search);
         if (requestId !== loadRequest.current) return;
         if (panel === 'reissue') { setReissue(result.groups); setReissueCursor(result.nextCursor); }
         else { setArchive(result.groups); setArchiveCursor(result.nextCursor); }
@@ -83,8 +86,8 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
     } catch (err) { if (requestId === loadRequest.current) setError(err instanceof ApiError ? err.message : '暂时无法加载管理数据'); }
     finally { if (requestId === loadRequest.current) setLoading(false); }
   };
-  useEffect(() => { void load(); }, [client, panel, serverFilter, statusFilter.join(',')]);
-  useEffect(() => { let refreshTimer: number | undefined; const refresh = () => { if (panel === 'users') return; if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); refreshTimer = window.setTimeout(() => { refreshTimer = undefined; void load(); }, 50); }; window.addEventListener('operation-groups-changed', refresh); return () => { window.removeEventListener('operation-groups-changed', refresh); if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); }; }, [client, panel, serverFilter, statusFilter.join(',')]);
+  useEffect(() => { void load(); }, [client, panel, serverFilter, statusFilter.join(','), search]);
+  useEffect(() => { let refreshTimer: number | undefined; const refresh = () => { if (panel === 'users') return; if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); refreshTimer = window.setTimeout(() => { refreshTimer = undefined; void load(); }, 50); }; window.addEventListener('operation-groups-changed', refresh); return () => { window.removeEventListener('operation-groups-changed', refresh); if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); }; }, [client, panel, serverFilter, statusFilter.join(','), search]);
   useEffect(() => { setNotice(null); }, [panel]);
   useEffect(() => {
     try { localStorage.setItem(copiedStorageKey, JSON.stringify([...copiedCommands])); } catch { /* Storage may be unavailable in private browsing. */ }
@@ -151,12 +154,12 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
         setReady((current) => appendUniqueById(current, result.groups));
         setReadyCursor(result.nextCursor);
       } else if (panel === 'reissue') {
-        const result = await client.archive(expandCompletedStatuses(statusFilter), serverFilter || undefined, cursor, 20, 'issuance');
+        const result = await client.archive(expandCompletedStatuses(statusFilter), serverFilter || undefined, cursor, 20, 'issuance', search);
         if (requestId !== loadRequest.current) return;
         setReissue((current) => appendUniqueById(current, result.groups));
         setReissueCursor(result.nextCursor);
       } else {
-        const result = await client.archive(expandCompletedStatuses(statusFilter), serverFilter || undefined, cursor, 20, 'regular');
+        const result = await client.archive(expandCompletedStatuses(statusFilter), serverFilter || undefined, cursor, 20, 'regular', search);
         if (requestId !== loadRequest.current) return;
         setArchive((current) => appendUniqueById(current, result.groups));
         setArchiveCursor(result.nextCursor);
@@ -172,7 +175,10 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
   const visibleReissue = reissue.filter(serverMatches).filter((group) => statusFilter.some((status) => status === 'completed' ? group.status === 'issued' || group.status === 'completed' : group.status === status));
   const countGroups = panel === 'queue' ? queue : panel === 'ready' ? ready : panel === 'reissue' ? reissue : archive;
   return <section className="workspace manager-workspace"><div className="page-heading manager-heading"><div><p className="eyebrow">{role === 'super_admin' ? '超级管理' : '管理工作台'}</p><h1>{panel === 'users' ? '账号管理' : panel === 'archive' ? '常规操作记录' : panel === 'reissue' ? '物资发放记录' : panel === 'ready' ? '待完成' : '待审核'}</h1></div>{panel !== 'users' && <div className="manager-metrics"><div><span>待审核</span><strong>{pendingCount}</strong></div><div><span>待完成</span><strong>{approvedCount}</strong></div><div><span>已完成</span><strong>{issuedCount}</strong></div></div>}</div>
-    {panel !== 'users' && <div className="manager-toolbar"><div className="filter-row"><ServerFilters options={options} value={serverFilter} onChange={setServerFilter} counts={Object.fromEntries(options.servers.map((server) => [server.id, countGroups.filter((group) => group.server.id === server.id).length]))} />{(panel === 'archive' || panel === 'reissue') && <StatusFilters value={statusFilter} onChange={setStatusFilter} />}<button type="button" className="icon-button refresh-button" title="刷新" aria-label="刷新" onClick={() => void load()}><RefreshCw size={16} /></button></div></div>}
+    {panel !== 'users' && <div className={`manager-toolbar ${(panel === 'archive' || panel === 'reissue') ? 'archive-toolbar' : ''}`}>
+      {(panel === 'archive' || panel === 'reissue') && <ArchiveSearch key={panel} issuance={panel === 'reissue'} value={search} onSearch={(value) => setSearches((current) => ({ ...current, [panel]: value }))} />}
+      <div className="filter-row"><ServerFilters options={options} value={serverFilter} onChange={setServerFilter} counts={Object.fromEntries(options.servers.map((server) => [server.id, countGroups.filter((group) => group.server.id === server.id).length]))} />{(panel === 'archive' || panel === 'reissue') && <StatusFilters value={statusFilter} onChange={setStatusFilter} />}<button type="button" className="icon-button refresh-button" title="刷新" aria-label="刷新" onClick={() => void load()}><RefreshCw size={16} /></button></div>
+    </div>}
     {panel === 'users' ? <UserAdminView token={token} actorRole={role} actorId={actorId} onRequireRelogin={onRequireRelogin} /> : loading ? <div className="empty-state"><LoaderCircle className="spin" size={24} /></div> : <><RequestList panel={panel} groups={panel === 'queue' ? visibleQueue : panel === 'ready' ? visibleReady : panel === 'reissue' ? visibleReissue : visibleArchive} options={options} role={role} onAction={mutate} copiedCommands={copiedCommands} onCommandCopied={markCommandCopied} onCopyNotice={notifyCommandCopied} />{error && <FloatingNotice kind="error" text={error} onDismiss={() => setError('')} actionLabel="重试" onAction={() => void load()} />}{notice && <FloatingNotice kind={notice.kind} text={notice.text} onDismiss={() => setNotice(null)} />}</>}
     {panel !== 'users' && !loading && (panel === 'queue' ? queueCursor : panel === 'ready' ? readyCursor : panel === 'reissue' ? reissueCursor : archiveCursor) && <button type="button" className="load-more" disabled={loading} onClick={() => void loadMore()}>加载更多</button>}
     {rejectTarget && <TextPromptDialog title="填写驳回原因" description="原因会保存在申请审计记录中，留空也可以直接驳回。" label="驳回原因（可选）" placeholder="输入原因" inputType="text" submitLabel="确认驳回" busy={rejectSaving} onCancel={() => setRejectTarget(null)} onSubmit={(value) => void reject(value)} />}

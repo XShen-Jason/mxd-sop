@@ -290,6 +290,15 @@ unauthorized（401）、forbidden（403）、invalid-cursor（400）、invalid-s
 
 `list-archive` accepts optional repeatable/comma-separated `status` values and `kind=issuance|regular`; filtering occurs before keyset pagination.
 
+Optional `q` searches literal substrings in saved snapshots: issuance records match
+`playerQQ`, `characterId`, item `itemName`, or item `itemCode`; regular records
+match only `characterId`. Matching ignores ASCII letter case, trims surrounding
+whitespace, and treats `%` and `_` literally. Empty queries disable search;
+queries longer than 100 UTF-16 code units or repeated `q` parameters return
+`invalid-input` (400). Search combines with status/server/kind filters before
+pagination; clients reset the cursor when changing a filter. Item catalog changes
+do not change historical name/code matches. Existing authorization is unchanged.
+
 ## v1 workflow extension
 
 The original `completed` state remains readable for MVP records. 物资记录使用 `pending -> approved -> issued`，常规 `kick`/`ban` 记录跳过审核并进入 `approved`（待完成）；物资记录可在 `pending` 状态修改或取消，常规操作记录可在 `approved` 完成前修改或取消。`approve` 可由 `manager` 或 `super_admin` 执行；`issue` 只能由 `super_admin` 执行；常规操作记录由管理角色调用完成接口结束。管理归档和客服投影会保留 approved、rejected、issued 的审计字段，客服投影仍绝不包含 commands。

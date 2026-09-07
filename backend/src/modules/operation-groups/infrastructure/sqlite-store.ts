@@ -23,6 +23,17 @@ export class SqliteGroupRepository implements GroupRepository {
       values.push(...statuses);
     }
     if (query.serverId) { clauses.push('server_id = ?'); values.push(query.serverId); }
+    if (query.search) {
+      // Search snapshot fields with literal substring matching before pagination.
+      clauses.push(`(instr(lower(json_extract(payload_json, '$.characterId')), ?) > 0 OR (
+        EXISTS (SELECT 1 FROM json_each(payload_json, '$.operations') WHERE json_extract(value, '$.type') IN ('item', 'cash'))
+        AND (instr(lower(json_extract(payload_json, '$.playerQQ')), ?) > 0 OR EXISTS (
+          SELECT 1 FROM json_each(payload_json, '$.operations') WHERE json_extract(value, '$.type') = 'item'
+          AND (instr(lower(json_extract(value, '$.itemName')), ?) > 0 OR instr(lower(json_extract(value, '$.itemCode')), ?) > 0)
+        ))
+      ))`);
+      values.push(query.search, query.search, query.search, query.search);
+    }
     if (query.kind === 'issuance') clauses.push("(payload_json LIKE '%\"type\":\"item\"%' OR payload_json LIKE '%\"type\":\"cash\"%')");
     if (query.kind === 'regular') clauses.push("payload_json NOT LIKE '%\"type\":\"item\"%' AND payload_json NOT LIKE '%\"type\":\"cash\"%'");
     if (query.after) {
