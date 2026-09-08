@@ -21,7 +21,9 @@ Errors: unauthorized (401), forbidden (403), unknown-server/invalid-file (400).
 
 The read projection adds `clearedMembers: string[]` and `cleared: boolean` to
 each team. All four matching dimensions must agree. `cleared` requires a
-nonempty team with all members matched. `zakum` displays as `进阶扎昆`.
+nonempty team with all members matched. Type names display as
+`黑龙（150票/队）` and `进阶扎昆（500票/队）`.
+`canApply` is true for a team with more than one member and at least one clear.
 Clears persist independently of snapshot syncs, including uploads before a snapshot exists.
 
 ## team-view.read (v1)
@@ -74,3 +76,39 @@ same active local/remote player endpoint selected for account imports.
 
 Stable errors include `unauthorized`, `invalid-date`, and
 `source-unavailable`.
+
+## team-view.apply-rewards (v1)
+
+`POST /api/v1/team-view/apply` accepts authenticated customer, manager and
+super_admin identities. Body: `{ "date": "2026-09-08", "serverId": "mushroom",
+"type": "black-dragon" }`. Date is required and is the displayed lock date;
+type is black-dragon or zakum. The server reads the saved snapshot and clears;
+clients cannot supply members, quantities, account data or approval identities.
+
+Apply to all eligible teams of the selected server/type/date. Single-member
+teams and teams with no clears are excluded. Every member receives
+`ceil(team tickets / member count)` of item `100000069`; the item name comes
+from item-catalog. Resolve accounts and QQ by exact (server, charid) in the
+operations player_directory table through its public lookup boundary.
+Reason is event-reward; reason.text is `YYYY-MM-DD 黑龙` or
+`YYYY-MM-DD 进阶扎昆`. SubmittedBy is the authenticated clicker. ApprovedBy
+is the internal system-admin identity, displayed as 系统 (no login account required).
+
+Validation completes before a single atomic insertion of approved groups.
+These enter the existing awaiting-issuance workflow; application does not
+execute game commands. One group per character is retained under a stable
+hash of (date, server, type, charid), independent of applicant and team ID.
+Repeated requests, even after restart or issuance, skip existing groups and
+retain the original applicant. Cancelled/rejected records also remain reserved;
+this endpoint never automatically reissues their reward.
+
+Response: `{ "count": 13, "skippedCount": 0, "teamCount": 2 }`.
+No account details or commands are returned. Empty eligibility returns zeros.
+Missing or ambiguous account mappings, duplicate eligible characters, invalid
+catalog entries or submissions fail the whole batch without partial writes.
+Errors: unauthorized (401), unknown-server/invalid-date/invalid-source or
+operation-groups validation errors (400), source-unavailable (503).
+Maximum 2,000 eligible members per call; oversized batches fail before writes.
+One exact indexed directory query, bounded group primary-key lookups, one
+transaction and one operation-groups change notification. No external calls
+or polling. Concurrent writes use the existing single-process SQLite model.

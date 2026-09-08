@@ -134,6 +134,7 @@ export class ApiClient {
   importTeamClears(serverId: string, file: { name: string; content: string }) {
     return this.request<TeamClearImportResult>('/api/v1/team-view/clears/import', { method: 'POST', body: JSON.stringify({ serverId, file }) });
   }
+  applyTeamRewards(input: { date: string; serverId: string; bossType: 'black-dragon' | 'zakum' }) { return this.request<{ count: number; skippedCount: number; teamCount: number }>('/api/v1/team-view/apply', { method: 'POST', body: JSON.stringify({ date: input.date, serverId: input.serverId, type: input.bossType }) }); }
   playerIntegrationStatus() { return this.request<PlayerIntegrationStatus>('/api/v1/player-integration/status'); }
   switchPlayerIntegration(mode: PlayerDeploymentMode, confirmation: string) { return this.request<{ mode: PlayerDeploymentMode; activeEndpoint: string; updatedAt: string }>('/api/v1/player-integration/switch', { method: 'POST', body: JSON.stringify({ mode, confirmation }) }); }
   searchItems(query: string, signal?: AbortSignal, cursor?: string, limit = 12) {
@@ -188,5 +189,6 @@ export class ApiClient {
   reject(id: string, reason?: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/reject`, { method: 'POST', body: JSON.stringify(reason ? { reason } : {}) }); }
   issue(id: string, executionNote?: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/issue`, { method: 'POST', body: JSON.stringify(executionNote ? { executionNote } : {}) }); }
   remind(id: string) { return this.request<Group>(`/api/v1/super-admin/operation-groups/${encodeURIComponent(id)}/remind`, { method: 'POST' }); }
+  markOnline(id: string) { return this.request<Group>(`/api/v1/operation-groups/${encodeURIComponent(id)}/online`, { method: 'POST' }); }
   complete(id: string, executionNote?: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/complete`, { method: 'POST', body: JSON.stringify(executionNote ? { executionNote } : {}) }); }
 }

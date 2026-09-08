@@ -22,6 +22,12 @@ export class PlayerDirectoryService {
     return { accounts: groups, nextCursor: offset + groups.length < result.totalCount ? encodeCursor(offset + groups.length) : null, totalCount: result.totalCount };
   }
 
+  findCharacters(actor: Identity, serverId: string, characterIds: string[]) {
+    this.requireAuthenticated(actor);
+    if (!normalizeServer(serverId, this.servers) || characterIds.length > 2000 || characterIds.some(id => !/^[0-9]+$/u.test(id))) throw new DirectoryError('invalid-query');
+    return this.repository.findCharacters(serverId, [...new Set(characterIds)]);
+  }
+
   async importFile(actor: Identity, serverId: string, file: UploadFile) {
     if (actor.role !== 'super_admin') throw new DirectoryError('forbidden');
     const targetServer = normalizeServer(serverId, this.servers);

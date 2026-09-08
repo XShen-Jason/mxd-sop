@@ -47,6 +47,7 @@ Contract ID 使用 module-id.operation-name，版本单独记录。所有 ID 为
 | team-view.import-clears | team-view | v1 | frontend super_admin | contracts/team-view.md |
 
 | operation-groups.remind-customer | operation-groups | v1 | frontend super_admin | contracts/operation-groups.md |
+| operation-groups.mark-online | operation-groups | v1 | frontend request owner | contracts/operation-groups.md |
 | operation-groups.list-reminders | operation-groups | v1 | frontend all roles | contracts/operation-groups.md |
 | operation-groups.workspace-counts | operation-groups | v1 | frontend | contracts/operation-groups.md |
 | operation-groups.events | operation-groups | v1 | frontend | contracts/operation-groups.md |
@@ -63,6 +64,11 @@ The canonical request and response definitions live in
 `docs/contracts/player-directory.md`.
 
 ## team-view contracts
+
+`team-view.apply-rewards` (`POST /api/v1/team-view/apply`) creates system-approved
+reward requests for eligible teams; see contracts/team-view.md. It consumes
+the internal `player-directory.find-characters` contract in
+contracts/player-directory.md.
 
 `team-view.read` (`GET /api/v1/team-view`) is available to all authenticated
 roles and returns a bounded projection of the usage-date snapshot grouped by

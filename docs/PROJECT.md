@@ -57,6 +57,11 @@ operation-groups 当前还拥有 `update-group`、`approve-group`、`reject-grou
 
 ## Contract registry
 
+`team-view.apply-rewards` is defined in docs/contracts/team-view.md and consumes
+the internal `player-directory.find-characters` contract and operation-groups
+approved batch interface. Their canonical semantics live in their owning
+contract/module documents.
+
 `player.teams.history` is owned by `player-registration` in `mxd-player`;
 its canonical definition is `mxd-player/CONTRACTS.md`. It exposes only the
 authenticated player's locked roster for one Beijing date.
@@ -94,6 +99,7 @@ Auth contracts are defined in `docs/contracts/auth.md`: `auth.login`, `auth.logo
 | player-integration.switch | HTTP API | docs/contracts/player-integration.md | player-integration | v1 | frontend super_admin |
 | command-generation.generate | module interface | docs/contracts/command-generation.md | command-generation | v1 | backend operation-groups 管理投影 |
 | operation-groups.remind-customer | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend |
+| operation-groups.mark-online | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend request owner |
 | operation-groups.list-reminders | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend |
 | operation-groups.workspace-counts | HTTP API | docs/contracts/operation-groups.md | operation-groups | v1 | frontend |
 | operation-groups.events | SSE event stream | docs/contracts/operation-groups.md | operation-groups | v1 | frontend |

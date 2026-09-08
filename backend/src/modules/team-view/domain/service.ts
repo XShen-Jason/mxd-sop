@@ -1,11 +1,11 @@
 import type { Identity, ServerOption } from '../../../shared/types.js';
 import { TeamViewError } from './errors.js';
+import { teamRewards } from './rewards.js';
 import { clearKey, type TeamClearRepository } from './clears.js';
 import { parseClearFile } from '../infrastructure/clear-csv.js';
 import { TEAM_BOSS_TYPES, type LockedTeam, type LockedTeamSource, type TeamBossType, type TeamSnapshot, type TeamViewRepository, type TeamViewResult, type TeamViewServer } from './types.js';
 
 const beijing = 'Asia/Shanghai';
-const bossNames: Record<TeamBossType, string> = { 'black-dragon': '黑龙', zakum: '进阶扎昆' };
 
 export class TeamViewService {
   constructor(private readonly repository: TeamViewRepository, private readonly source: LockedTeamSource, private readonly servers: ServerOption[], private readonly clears?: TeamClearRepository) {}
@@ -49,10 +49,10 @@ export class TeamViewService {
       server,
       types: TEAM_BOSS_TYPES.map((type) => {
         const teams = (groups.get(server.id)?.get(type) ?? []).slice().sort(compareTeams);
-        return { type, displayName: bossNames[type], teams: teams.map((team, index) => {
+        return { type, displayName: `${teamRewards[type].name}（${teamRewards[type].tickets}票/队）`, teams: teams.map((team, index) => {
           const members = team.members.map(member => member.characterId);
           const clearedMembers = members.filter(characterId => cleared.has(clearKey({ date, serverId: server.id, bossType: type, characterId })));
-          return { id: team.id, sequence: index + 1, memberCount: members.length, members, clearedMembers, cleared: members.length > 0 && clearedMembers.length === members.length };
+          return { id: team.id, sequence: index + 1, memberCount: members.length, members, clearedMembers, cleared: members.length > 0 && clearedMembers.length === members.length, canApply: members.length > 1 && clearedMembers.length > 0 };
         }) };
       }),
     }));
@@ -96,4 +96,4 @@ function businessDay(now: Date) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: beijing, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 
-export { bossNames, normalizeDate, businessDay };
+export { normalizeDate, businessDay };

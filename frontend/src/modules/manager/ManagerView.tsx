@@ -10,6 +10,7 @@ import { UserAdminView } from './UserAdminView';
 import { ArchiveSearch } from './ArchiveSearch';
 import type { AppOptions, GeneratedCommand, ManagerGroup, Role } from '../../types';
 import { appendUniqueById, expandCompletedStatuses } from '../operation-groups/pagination';
+import { useOperationGroupRefresh } from '../operation-groups/live-refresh';
 
 type Panel = 'queue' | 'ready' | 'archive' | 'reissue' | 'users';
 type FilterStatus = 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled';
@@ -87,7 +88,8 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
     finally { if (requestId === loadRequest.current) setLoading(false); }
   };
   useEffect(() => { void load(); }, [client, panel, serverFilter, statusFilter.join(','), search]);
-  useEffect(() => { let refreshTimer: number | undefined; const refresh = () => { if (panel === 'users') return; if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); refreshTimer = window.setTimeout(() => { refreshTimer = undefined; void load(); }, 50); }; window.addEventListener('operation-groups-changed', refresh); return () => { window.removeEventListener('operation-groups-changed', refresh); if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); }; }, [client, panel, serverFilter, statusFilter.join(','), search]);
+  useOperationGroupRefresh({ view: panel, serverId: serverFilter,
+    statuses: panel === 'archive' || panel === 'reissue' ? expandCompletedStatuses(statusFilter) : undefined }, load);
   useEffect(() => { setNotice(null); }, [panel]);
   useEffect(() => {
     try { localStorage.setItem(copiedStorageKey, JSON.stringify([...copiedCommands])); } catch { /* Storage may be unavailable in private browsing. */ }
@@ -170,7 +172,12 @@ export function ManagerView({ options, token, role = 'manager', panel = 'queue',
   const pendingCount = queue.filter((group) => group.status === 'pending').length; const approvedCount = role === 'super_admin' ? ready.length : archive.filter((group) => group.status === 'approved').length; const issuedCount = archive.filter((group) => group.status === 'issued' || group.status === 'completed').length;
   const serverMatches = (group: ManagerGroup) => !serverFilter || group.server.id === serverFilter;
   const visibleQueue = queue.filter(serverMatches);
-  const visibleReady = ready.filter(serverMatches);
+  const visibleReady = ready.filter(serverMatches).sort((left, right) => {
+    const leftReminded = (left.reminderCount ?? 0) > 0;
+    const rightReminded = (right.reminderCount ?? 0) > 0;
+    if (leftReminded !== rightReminded) return leftReminded ? 1 : -1;
+    return leftReminded ? (left.lastRemindedAt ?? '').localeCompare(right.lastRemindedAt ?? '') : 0;
+  });
   const visibleArchive = archive.filter(serverMatches).filter((group) => statusFilter.some((status) => status === 'completed' ? group.status === 'issued' || group.status === 'completed' : group.status === status));
   const visibleReissue = reissue.filter(serverMatches).filter((group) => statusFilter.some((status) => status === 'completed' ? group.status === 'issued' || group.status === 'completed' : group.status === status));
   const countGroups = panel === 'queue' ? queue : panel === 'ready' ? ready : panel === 'reissue' ? reissue : archive;
@@ -220,7 +227,7 @@ function RequestCard({ index, panel, group, options, role, expanded, onToggle, o
   const canReview = panel === 'queue' && group.status === 'pending';
   const canIssue = panel === 'ready' && group.status === 'approved' && role === 'super_admin' && issuance;
   const canRemind = panel === 'ready' && group.status === 'approved' && role === 'super_admin';
-  const remindButton = canRemind ? <button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('remind', group); }}><Bell size={13} />{group.reminderCount ? '再次提醒' : '提醒上线'}</button> : null;
+  const remindButton = canRemind ? <button type="button" className={`record-action-button ${group.reminderCount ? 'reminded' : 'primary'}`} title={group.reminderCount ? '已提醒，可再次提醒上线' : undefined} onClick={(event) => { event.stopPropagation(); onAction('remind', group); }}><Bell size={13} />{group.reminderCount ? '再次提醒' : '提醒上线'}</button> : null;
   const canComplete = (panel === 'ready' || panel === 'archive') && group.status === 'approved' && !issuance;
   const isReissuePanel = panel === 'reissue' || panel === 'queue';
   return <article className={`manager-card record-card manager-record status-card-${group.status} ${expanded ? 'is-expanded' : ''}`}>

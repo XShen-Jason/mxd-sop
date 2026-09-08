@@ -2,6 +2,12 @@
 
 Player account lookup and CSV import contracts for the operations desk.
 
+Internal `player-directory.find-characters` takes an authenticated actor,
+configured server and at most 2,000 digit-string character IDs. It returns
+exact matching DirectoryRow values without fuzzy search or pagination.
+Duplicate identities are preserved so consumers can reject ambiguous mappings.
+This module interface is consumed by team-view; it has no additional HTTP route.
+
 ## player-directory.search (v1)
 
 `GET /api/v1/player-directory/search`

@@ -190,6 +190,8 @@ describe('authentication and approval workflow', () => {
       const write = app.inject({ method: 'POST', url: '/api/v1/operation-groups', headers: { authorization: `Bearer ${customerToken}` }, payload: { serverId: 'mushroom', characterId: '777', reason: { code: 'player-request' }, operations: [{ type: 'kick' }] } });
       const changed = decoder.decode((await reader!.read()).value);
       expect(changed).toContain('event: changed');
+      const event = JSON.parse(changed.split('data: ')[1].split('\n')[0]);
+      expect(event).toEqual({ scopes: [{ view: 'records', serverId: 'mushroom', kind: 'regular', status: 'approved' }], counts: true });
       expect((await write).statusCode).toBe(201);
       await reader!.cancel();
     } finally {

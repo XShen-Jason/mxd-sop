@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { saveApprovedBatch, type ApprovedBatchEntry } from './approved-batch.js';
 import { appOptions } from '../../../config/options.js';
 import { isManager, isSuperAdmin } from '../../auth/public/index.js';
 import type { ItemCatalog } from '../../item-catalog/public/index.js';
@@ -20,6 +21,8 @@ import { normalizeArchiveSearch } from './archive-search.js';
 import { customerProjection, managerProjection } from './projections.js';
 import { readOverview, readWorkspaceCounts } from './workspace-summary.js';
 import { canCustomerModify, isIssuanceGroup, isNoReviewGroup } from './workflow-rules.js';
+import { groupChangeState, type GroupChange, type GroupChangeState } from './changes.js';
+import { changeReminder, clearReminder } from './reminders.js';
 
 export { GroupError } from './errors.js';
 export type { GroupErrorCode } from './errors.js';
@@ -38,7 +41,7 @@ export class OperationGroupsService {
   private readonly options: AppOptions;
   private readonly now: () => Date;
   private readonly idFactory: () => string;
-  private readonly listeners = new Set<() => void>();
+  private readonly listeners = new Set<(changes: GroupChange[]) => void>();
 
   constructor(private readonly deps: ServiceDependencies) {
     this.options = deps.options ?? appOptions;
@@ -47,11 +50,20 @@ export class OperationGroupsService {
     if (deps.onChange) this.listeners.add(deps.onChange);
   }
 
-  subscribe(listener: () => void) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
-  private changed() { for (const listener of this.listeners) listener(); }
+  subscribe(listener: (changes: GroupChange[]) => void) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+  private changed(group: OperationGroup, before?: GroupChangeState) {
+    for (const listener of this.listeners) listener([{ before, after: groupChangeState(group) }]);
+  }
 
   getOptions() {
     return structuredClone(this.options);
+  }
+
+  submitApprovedBatch(identity: Identity, entries: ApprovedBatchEntry[]) {
+    this.requireAuthenticated(identity);
+    const result = saveApprovedBatch(this.deps.repository, this.deps.catalog, this.options, identity, entries, this.now());
+    if (result.count) for (const listener of this.listeners) listener(result.groups.map(group => ({ after: groupChangeState(group) })));
+    return { count: result.count, skippedCount: result.skippedCount };
   }
 
   submit(identity: Identity, input: SubmitGroupInput, idempotencyKey?: string): CustomerGroupProjection {
@@ -78,7 +90,7 @@ export class OperationGroupsService {
       requestFingerprint: idempotencyKey ? fingerprint(input) : undefined
     };
     this.deps.repository.insert(group);
-    this.changed();
+    this.changed(group);
     return customerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
@@ -118,11 +130,12 @@ export class OperationGroupsService {
     if (group.submittedBy.id !== identity.id) throw new GroupError('forbidden');
     if (group.status === 'cancelled') return customerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
     if (!canCustomerModify(group)) throw new GroupError('invalid-status-transition');
+    const before = groupChangeState(group);
     group.status = 'cancelled';
     group.cancelledAt = this.now().toISOString();
     group.cancelledBy = { id: identity.id, displayName: identity.displayName };
     this.deps.repository.replace(group);
-    this.changed();
+    this.changed(group, before);
     return customerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
@@ -132,6 +145,7 @@ export class OperationGroupsService {
     if (group.submittedBy.id !== identity.id) throw new GroupError('forbidden');
     if (!canCustomerModify(group)) throw new GroupError('invalid-status-transition');
     const replacement = normalizeSubmission(input, this.options, this.deps.catalog);
+    const before = groupChangeState(group);
     group.server = replacement.server;
     group.account = replacement.account;
     group.characterId = replacement.characterId;
@@ -150,11 +164,9 @@ export class OperationGroupsService {
     delete group.rejectionReason;
     delete group.issuedAt;
     delete group.issuedBy;
-    delete group.reminderCount;
-    delete group.lastRemindedAt;
-    delete group.lastRemindedBy;
+    clearReminder(group);
     this.deps.repository.replace(group);
-    this.changed();
+    this.changed(group, before);
     return customerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
@@ -163,11 +175,12 @@ export class OperationGroupsService {
     const group = this.getGroup(id);
     if (group.status === 'approved') return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
     if (group.status !== 'pending') throw new GroupError('conflict');
+    const before = groupChangeState(group);
     group.status = 'approved';
     group.approvedAt = this.now().toISOString();
     group.approvedBy = { id: identity.id, displayName: identity.displayName };
     this.deps.repository.replace(group);
-    this.changed();
+    this.changed(group, before);
     return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
@@ -176,12 +189,13 @@ export class OperationGroupsService {
     const group = this.getGroup(id);
     if (group.status === 'rejected') return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
     if (group.status !== 'pending') throw new GroupError('conflict');
+    const before = groupChangeState(group);
     group.status = 'rejected';
     group.rejectedAt = this.now().toISOString();
     group.rejectedBy = { id: identity.id, displayName: identity.displayName };
     if (rejectionReason !== undefined) group.rejectionReason = safeText(rejectionReason, 'rejectionReason', 500);
     this.deps.repository.replace(group);
-    this.changed();
+    this.changed(group, before);
     return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
@@ -190,12 +204,13 @@ export class OperationGroupsService {
     const group = this.getGroup(id);
     if (group.status === 'issued') return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
     if (!isIssuanceGroup(group) || group.status !== 'approved') throw new GroupError('invalid-status-transition');
+    const before = groupChangeState(group);
     if (executionNote !== undefined) group.executionNote = safeText(executionNote, 'executionNote', 500);
     group.status = 'issued';
     group.issuedAt = this.now().toISOString();
     group.issuedBy = { id: identity.id, displayName: identity.displayName };
     this.deps.repository.replace(group);
-    this.changed();
+    this.changed(group, before);
     return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
@@ -227,12 +242,13 @@ export class OperationGroupsService {
     const legacyWarp = group.status === 'pending' && group.operations.some((operation) => operation.type === 'warp');
     const regularReady = group.status === 'approved' && isNoReviewGroup(group);
     if (!legacyWarp && !regularReady) throw new GroupError('conflict');
+    const before = groupChangeState(group);
     if (executionNote !== undefined) group.executionNote = safeText(executionNote, 'executionNote', 500);
     group.status = 'completed';
     group.completedAt = this.now().toISOString();
     group.completedBy = { id: identity.id, displayName: identity.displayName };
     this.deps.repository.replace(group);
-    this.changed();
+    this.changed(group, before);
     return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
@@ -246,15 +262,17 @@ export class OperationGroupsService {
     return { groups: page.groups.map((group) => managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName)), nextCursor: page.nextCursor };
   }
 
-  remind(identity: Identity, id: string): CustomerGroupProjection {
-    if (!isSuperAdmin(identity)) throw new GroupError('forbidden');
+  remind(identity: Identity, id: string) { return this.applyReminder(identity, id, 'remind'); }
+  markOnline(identity: Identity, id: string) { return this.applyReminder(identity, id, 'online'); }
+
+  private applyReminder(identity: Identity, id: string, action: 'remind' | 'online'): CustomerGroupProjection {
+    this.requireAuthenticated(identity);
     const group = this.getGroup(id);
-    if (group.status !== 'approved') throw new GroupError('invalid-status-transition');
-    group.reminderCount = (group.reminderCount ?? 0) + 1;
-    group.lastRemindedAt = this.now().toISOString();
-    group.lastRemindedBy = { id: identity.id, displayName: identity.displayName };
-    this.deps.repository.replace(group);
-    this.changed();
+    const before = groupChangeState(group);
+    if (changeReminder(group, identity, this.now(), action)) {
+      this.deps.repository.replace(group);
+      this.changed(group, before);
+    }
     return customerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 

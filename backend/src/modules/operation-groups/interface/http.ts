@@ -3,6 +3,7 @@ import { AuthError, AuthService } from '../../auth/public/index.js';
 import { CatalogError, type ItemCatalog } from '../../item-catalog/public/index.js';
 import { GroupError, type OperationGroupsService } from '../public/index.js';
 import type { GroupStatus, Identity, Role, SubmitGroupInput } from '../../../shared/types.js';
+import { projectGroupChanges } from '../domain/changes.js';
 
 type Query = Record<string, unknown>;
 export { AuthError };
@@ -108,7 +109,7 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
   });
   app.get('/api/v1/operation-groups/events', async (request, reply) => {
     try {
-      identity(request);
+      const subscriber = identity(request);
       reply.hijack();
       reply.raw.writeHead(200, {
         'content-type': 'text/event-stream; charset=utf-8',
@@ -119,7 +120,10 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
       });
       reply.raw.write(': connected\n\n');
       const writeEvent = (payload: string) => { if (reply.raw.writableEnded || reply.raw.destroyed) return; try { reply.raw.write(payload); } catch { /* The client may disconnect between the guard and write. */ } };
-      const unsubscribe = service.subscribe(() => writeEvent('event: changed\ndata: {}\n\n'));
+      const unsubscribe = service.subscribe(changes => {
+        const event = projectGroupChanges(changes, subscriber);
+        if (event.scopes.length) writeEvent(`event: changed\ndata: ${JSON.stringify(event)}\n\n`);
+      });
       const heartbeat = setInterval(() => writeEvent(': keepalive\n\n'), 25_000);
       const close = () => { clearInterval(heartbeat); unsubscribe(); };
       request.raw.once('close', close);
@@ -163,6 +167,9 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
   });
   app.post('/api/v1/super-admin/operation-groups/:groupId/remind', async (request, reply) => {
     try { return reply.send(service.remind(identity(request), (request.params as { groupId: string }).groupId)); } catch (error) { return sendError(reply, error); }
+  });
+  app.post('/api/v1/operation-groups/:groupId/online', async (request, reply) => {
+    try { return reply.send(service.markOnline(identity(request), (request.params as { groupId: string }).groupId)); } catch (error) { return sendError(reply, error); }
   });
   app.post('/api/v1/manager/operation-groups/:groupId/deliver', async (request, reply) => {
     try { const body = bodyObject(request); if (Object.keys(body).some((key) => key !== 'executionNote')) throw new GroupError('invalid-input'); if (body.executionNote !== undefined && typeof body.executionNote !== 'string') throw new GroupError('invalid-input'); return reply.send(service.issue(identity(request), (request.params as { groupId: string }).groupId, body.executionNote as string | undefined)); } catch (error) { return sendError(reply, error); }

@@ -46,8 +46,9 @@ requests against duplicate clicks.
 
 Operation-group collaboration uses one authenticated SSE connection per active
 browser session. Events contain no record payload and are emitted only after a
-write; clients coalesce bursts within 50 ms before refreshing the active
-workspace and compact aggregate count query, with no interval polling. Reminder
+write; clients coalesce bursts within 50 ms before refreshing only an affected
+active workspace. Navigation counts refresh only on membership changes, and
+hidden tabs defer requests until visible, with no interval polling. Reminder
 lists are filtered and paginated in SQLite.
 
 Frontend GET requests use a short-lived in-memory cache keyed by role and full

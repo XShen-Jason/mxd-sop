@@ -32,6 +32,7 @@ export interface DirectorySearchInput {
 }
 
 export interface DirectoryRepository {
+  findCharacters(serverId: string, characterIds: string[]): DirectoryRow[];
   replace(rows: DirectoryRow[]): void;
   replaceServer(serverId: string, rows: DirectoryRow[]): void;
   count(): number;

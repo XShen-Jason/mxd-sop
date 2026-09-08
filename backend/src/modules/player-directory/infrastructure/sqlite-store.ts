@@ -29,6 +29,12 @@ export class SqliteDirectoryRepository implements DirectoryRepository {
 
   count() { return (this.db.prepare('SELECT COUNT(*) AS count FROM player_directory').get() as { count: number }).count; }
 
+  findCharacters(serverId: string, characterIds: string[]) {
+    if (!characterIds.length) return [];
+    return this.db.prepare(`SELECT server_id AS serverId, source_file AS sourceFile, char_id AS charId, user_id AS userId, username, bind_qq AS bindQQ FROM player_directory WHERE server_id = ? AND char_id IN (SELECT value FROM json_each(?))`)
+      .all(serverId, JSON.stringify(characterIds)) as DirectoryRow[];
+  }
+
   search(input: { query: string; serverId?: string; limit: number; offset: number }) {
     const args: Array<string | number> = [];
     const where: string[] = [];

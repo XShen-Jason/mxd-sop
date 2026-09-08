@@ -78,6 +78,20 @@ Out of scope:
 
 ## Public surface
 
+`operation-groups.mark-online` clears the owning submitter's active reminder
+while keeping the request approved. Reminder state changes are owned by
+`domain/reminders.ts`. The reminders UI offers a UserCheck action beside edit
+and cancel, with a wider action column and a separate action row on mobile.
+`frontend/tests/reminder-online.browser.cjs` covers removal, repeat reminders,
+cross-page reset, failure, and action spacing.
+
+Internal `submitApprovedBatch` is used by team-view's validated reward workflow;
+it is never exposed as a generic HTTP auto-approval operation. It validates all
+new submissions with the existing normalization rules, persists approved
+groups atomically, preserves the authenticated applicant and records the system
+reviewer. Repository insertMany must be available; no partial-write fallback.
+See team-view.apply-rewards for reward-specific semantics.
+
 提醒上线由超级管理员在待完成记录上触发，所有角色通过独立的待提醒工作区查看本人被提醒且仍待处理的记录；发物资和常规操作均支持提醒，提醒不新增状态。所有申请在完成前可由提交者修改或取消，修改会清除旧审核及提醒信息并重新进入审核。
 
 | Contract | 用途 |
@@ -104,6 +118,13 @@ Out of scope:
 
 ## Tests
 
+`backend/tests/operation-group-changes.test.ts` covers lifecycle invalidation,
+subscriber isolation, reminder membership, edits across filters, and approved
+batches. `frontend/tests/scoped-refresh.browser.cjs` verifies active-view request
+counts, filter matching, navigation freshness, hidden tabs, and reconnection.
+The backend owns event scope derivation in `domain/changes.ts`; the frontend
+consumes that contract in `modules/operation-groups/live-refresh.ts`.
+
 `backend/tests/archive-search.test.ts` covers archive keyword search across
 SQLite, JSON, and the fallback repository, including snapshot fields, literal
 matching, combined filters, pagination, input limits, and authentication.
@@ -113,6 +134,14 @@ keywords for issuance and regular records; clearing resets the active query.
 下一阶段至少覆盖：最少字段校验、多个 item 的独立数量、客服只能读自己的 group、客服不能看到 commands、可操作状态的取消/编辑、终态冲突、队列服务器分组和稳定排序、归档包含 pending/completed/cancelled。
 
 ## Migration notes
+
+The ready view sorts its currently loaded records with unreminded requests first
+(preserving API order), then reminded requests by `lastRemindedAt` ascending.
+Successful reminders therefore move the record to the bottom of the loaded list;
+the reminder button uses muted styling and remains available for repeat reminders.
+Reloads and additional pages derive the presentation from persisted reminder fields.
+Archive API ordering and cursor semantics remain unchanged.
+Browser coverage: `frontend/tests/ready-reminders.browser.cjs`.
 
 模块 ID 和 group/operation 字段语义必须保持稳定。更换数据库或 API 框架时只替换适配器和接口层；若增加 processing 等状态，先升级契约并记录迁移。
 

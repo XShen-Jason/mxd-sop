@@ -8,7 +8,7 @@
 .team-date-step { width: 25px; height: 25px; padding: 0; }
 .team-row.team-cleared { background: var(--teal-soft); border-color: var(--teal); }
 .team-character-list code.character-cleared { color: #fff; background: var(--teal); border-color: var(--teal); font-weight: 700; }
-.team-clear-status { color: var(--teal); font-size: 11px; font-weight: 700; flex: 0 0 auto; }
+.team-clear-status { color: var(--teal); font-size: 11px; font-weight: 700; flex: 0 0 auto; display: flex; flex-direction: column; gap: 3px; }
 .team-view-toolbar { display: flex; align-items: center; gap: 22px; padding: 15px 18px; margin-bottom: 20px; }
 .team-date-field { display: grid; gap: 6px; min-width: 170px; }
 .team-date-field > span { color: var(--muted); font-size: 11px; font-weight: 700; }
@@ -34,7 +34,8 @@
 .team-server-total { color: var(--muted); font-size: 11px; }
 .team-type-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .team-type-section { min-width: 0; border: 1px solid #e1e9e5; border-radius: 6px; background: #fbfdfc; overflow: hidden; }
-.team-type-section > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; border-bottom: 1px solid #e7eeeb; }
+.team-type-section > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 11px 13px; border-bottom: 1px solid #e7eeeb; }
+.team-apply-button { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; white-space: nowrap; }
 .team-type-section > header > div { display: flex; align-items: center; gap: 7px; }
 .team-type-section h3 { font-size: 14px; }
 .team-type-section > header > span { color: var(--muted); font-size: 10px; }

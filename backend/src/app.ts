@@ -113,13 +113,14 @@ export async function createApp(config: AppConfig = {}) {
   registerOperationRoutes(app, service, catalog, auth);
   registerActivityRoutes(app, new ActivitiesService(activitiesRepository), auth);
   const playerSync = config.playerIntegrationClient || process.env.NODE_ENV !== 'test' ? integration : undefined;
-  registerPlayerDirectoryRoutes(app, new PlayerDirectoryService(directoryRepository, appOptions.servers, playerSync), auth);
+  const playerDirectory = new PlayerDirectoryService(directoryRepository, appOptions.servers, playerSync);
+  registerPlayerDirectoryRoutes(app, playerDirectory, auth);
   registerPlayerIntegrationRoutes(app, integration, auth);
   const teamClears = testPersistence
     ? new JsonTeamClearRepository(`${config.teamViewPath ?? config.dataPath ?? projectPath('data/generated/operation-groups.json')}.clears.json`)
     : new SqliteTeamClearRepository(db!);
   const teamViewService = new TeamViewService(teamRepository, teamSource, appOptions.servers, teamClears);
-  registerTeamViewRoutes(app, teamViewService, auth);
+  registerTeamViewRoutes(app, teamViewService, auth, service, playerDirectory);
   const scheduler = new TeamViewScheduler(teamViewService);
   const enableTeamScheduler = config.enableTeamScheduler ?? process.env.NODE_ENV !== 'test';
   if (enableTeamScheduler && sourceConfigured) scheduler.start();

@@ -56,7 +56,7 @@ describe.each(['json', 'sqlite'] as const)('%s clear persistence and matching', 
       for (const date of ['2026-09-07', '2026-09-08', '2026-09-09', '2026-08-09', '2025-09-08']) await service.sync(date);
       const projection = service.view(admin, '2026-09-08');
       expect(projection.servers[0].types[0].teams[0]).toMatchObject({ clearedMembers: ['17'], cleared: false });
-      expect(projection.servers[0].types[1]).toMatchObject({ displayName: '进阶扎昆', teams: [expect.objectContaining({ clearedMembers: ['193'], cleared: false })] });
+      expect(projection.servers[0].types[1]).toMatchObject({ displayName: '进阶扎昆（500票/队）', teams: [expect.objectContaining({ clearedMembers: ['193'], cleared: false })] });
       expect(projection.servers[1].types.every(type => type.teams[0].clearedMembers.length === 0)).toBe(true);
       for (const date of ['2026-09-07', '2026-08-09', '2025-09-08']) expect(service.view(admin, date).servers[0].types[0].teams[0].clearedMembers).toEqual([]);
       expect(service.view(admin, '2026-09-09').servers[0].types[0].teams[0].clearedMembers).toEqual(['193']);

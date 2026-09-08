@@ -54,6 +54,14 @@ full-snapshot endpoint through a replaceable `LockedTeamSource` port.
 
 ## Dependencies
 
+Reward application is orchestrated in application/apply-rewards.ts using
+player-directory.findCharacters and operation-groups.submitApprovedBatch.
+Eligibility and reward configuration belong to team-view; normalized group
+validation, atomic persistence and approval audit belong to operation-groups.
+The public contract team-view.apply-rewards defines limits and deduplication.
+Regression coverage is in backend/tests/team-rewards.test.ts, including JSON,
+SQLite rollback, HTTP submission, review projections and restart deduplication.
+
 - Authenticated identity from `auth`.
 - Configured server options from `operation-groups`.
 - SQLite in production or JSON in tests.

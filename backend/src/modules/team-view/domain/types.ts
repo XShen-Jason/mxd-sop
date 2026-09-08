@@ -51,6 +51,7 @@ export interface TeamViewTeam {
   members: string[];
   clearedMembers: string[];
   cleared: boolean;
+  canApply: boolean;
 }
 
 export interface TeamViewResult {

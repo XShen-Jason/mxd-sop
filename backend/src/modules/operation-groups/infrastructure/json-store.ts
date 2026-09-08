@@ -23,6 +23,7 @@ export interface GroupRepository {
   findByIdempotency?(submittedById: string, idempotencyKey: string): OperationGroup | undefined;
   listPage?(query: GroupPageQuery): OperationGroup[];
   insert(group: OperationGroup): void;
+  insertMany?(groups: OperationGroup[]): void;
   replace(group: OperationGroup): void;
   workspaceCounts?(ownerId: string): { pending: number; approved: number; reminders: number; reminderIssuance?: number; reminderRegular?: number; ownIssuance?: number; ownRegular?: number };
 }
@@ -76,6 +77,17 @@ export class JsonGroupRepository implements GroupRepository {
   insert(group: OperationGroup) {
     this.groups.push(structuredClone(group));
     this.persist();
+  }
+
+  insertMany(groups: OperationGroup[]) {
+    const previous = this.groups;
+    const ids = new Set(previous.map(group => group.id));
+    for (const group of groups) {
+      if (ids.has(group.id)) throw new Error('duplicate group');
+      ids.add(group.id);
+    }
+    this.groups = [...previous, ...structuredClone(groups)];
+    try { this.persist(); } catch (error) { this.groups = previous; throw error; }
   }
 
   replace(group: OperationGroup) {

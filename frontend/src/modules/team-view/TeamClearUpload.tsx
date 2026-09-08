@@ -1,16 +1,15 @@
 import { FileUp, LoaderCircle, Upload, X } from 'lucide-react';
 import { useState } from 'react';
 import { ApiClient, ApiError } from '../../api/client';
-import { FloatingNotice } from '../../components/FloatingNotice';
 import type { ServerOption, TeamClearImportResult } from '../../types';
 
-export function TeamClearUpload({ client, servers, onImported }: {
+export function TeamClearUpload({ client, servers, onImported, onNotice: setNotice }: {
   client: ApiClient; servers: ServerOption[]; onImported: (result: TeamClearImportResult) => void;
+  onNotice: (notice: { kind: 'success' | 'error'; text: string } | null) => void;
 }) {
   const [serverId, setServerId] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
   async function upload() {
     if (!serverId || !file || uploading) return;
@@ -45,6 +44,5 @@ export function TeamClearUpload({ client, servers, onImported }: {
         {uploading ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />}{uploading ? '上传中…' : '上传通关列表'}
       </button>
     </div>
-    {notice && <FloatingNotice kind={notice.kind} text={notice.text} onDismiss={() => setNotice(null)} />}
   </>;
 }

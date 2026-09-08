@@ -1,0 +1,29 @@
+.reminders-table .record-operation { gap: 8px; }
+.reminders-table .record-online-button { min-width: 100px; }
+.reminders-table .record-online-button:disabled { display: inline-flex; }
+
+@media (min-width: 901px) {
+  .reminders-table .record-table-head.record-table-reissue,
+  .reminders-table .record-table-row.record-table-reissue {
+    grid-template-columns: 30px minmax(76px, .8fr) minmax(80px, .9fr) minmax(80px, .8fr) minmax(66px, .7fr) 54px minmax(110px, 1.2fr) 80px 70px 232px;
+    column-gap: 8px;
+    min-width: 1080px;
+  }
+  .reminders-table .record-table-head.record-table-without-actor,
+  .reminders-table .record-table-row.record-table-without-actor {
+    grid-template-columns: 30px minmax(90px, 1fr) minmax(80px, .8fr) 60px minmax(120px, 1.3fr) 80px 70px 190px;
+    column-gap: 8px;
+    min-width: 850px;
+  }
+}
+
+@media (max-width: 900px) {
+  .reminders-table .record-table-row.record-table-reissue {
+    grid-template-areas: "index index" "server status" "account account" "qq qq" "character type" "reason reason" "time time" "operation operation";
+  }
+  .reminders-table .record-table-row.record-table-without-actor {
+    grid-template-areas: "index index" "server status" "character type" "reason reason" "time time" "operation operation";
+  }
+  .reminders-table .record-operation { flex-wrap: wrap; row-gap: 8px; }
+  .reminders-table .record-operation::before { display: none; }
+}

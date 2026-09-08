@@ -15,6 +15,11 @@ export class JsonDirectoryRepository implements DirectoryRepository {
   }
   count() { return this.rows.length; }
 
+  findCharacters(serverId: string, characterIds: string[]) {
+    const ids = new Set(characterIds);
+    return structuredClone(this.rows.filter(row => row.serverId === serverId && ids.has(row.charId)));
+  }
+
   search(input: { query: string; serverId?: string; limit: number; offset: number }) {
     const normalized = input.query.toLocaleLowerCase();
     const filtered = this.rows.filter((row) => (!input.serverId || row.serverId === input.serverId) && (!normalized || [row.serverId, row.userId, row.username, row.bindQQ, row.charId].some((value) => value.toLocaleLowerCase().includes(normalized))));

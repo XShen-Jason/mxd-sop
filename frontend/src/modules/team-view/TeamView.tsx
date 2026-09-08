@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight, CircleOff, LoaderCircle, RefreshCw, Users } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, CircleOff, LoaderCircle, RefreshCw, Send, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { ApiClient, ApiError } from '../../api/client';
 import { FloatingNotice } from '../../components/FloatingNotice';
@@ -13,6 +13,21 @@ export function TeamView({ role = 'customer', token }: { role?: Role; token?: st
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [applying, setApplying] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+  const applyRewards = async (bossType: 'black-dragon' | 'zakum', targetServerId: string) => {
+    if (applying || !result || loading) return;
+    setApplying(`${targetServerId}:${bossType}`);
+    setError('');
+    setNotice('');
+    try {
+      const applied = await client.applyTeamRewards({ date: result.date, serverId: targetServerId, bossType });
+      setNotice(`已申请并自动过审 ${applied.count} 人，已申请跳过 ${applied.skippedCount} 人`);
+      setRefreshKey(value => value + 1);
+    }
+    catch (reason) { setError(reason instanceof ApiError ? reason.message : '批量申请失败'); }
+    finally { setApplying(null); }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -30,33 +45,34 @@ export function TeamView({ role = 'customer', token }: { role?: Role; token?: st
 
   return <section className="workspace team-view-workspace">
     <div className="page-heading team-view-heading"><div><p className="eyebrow">客服工作台</p><h1>{formatTeamDate(date)}组队名单</h1><p className="heading-copy">名单日期为锁定日：{formatTeamDate(previousTeamDate(date))} 全天开放组队，{formatTeamDate(date)} 00:00 锁定。成员仅显示角色 ID。</p></div><div className="heading-stat"><span>队伍总数</span><strong>{result ? totalTeams(result, serverId) : '—'}</strong></div></div>
-    <section className="team-view-toolbar panel-surface"><label className="team-date-field"><span>名单日期</span><div className="team-date-input"><button type="button" className="icon-button team-date-step" title="前一天" aria-label="前一天" onClick={() => setDate(shiftDate(date, -1))}><ChevronLeft size={16} /></button><CalendarDays size={16} /><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /><button type="button" className="icon-button team-date-step" title="后一天" aria-label="后一天" onClick={() => setDate(shiftDate(date, 1))}><ChevronRight size={16} /></button></div><small className="team-date-explanation">{formatTeamDate(date)} 00:00 锁定前一天的组队名单</small></label><div className="team-sync-state"><span className={`team-state-dot ${result?.sourceStatus === 'ready' ? 'ready' : ''}`} /><div><strong>{result?.sourceStatus === 'ready' ? '已同步锁定队伍' : '等待每日同步'}</strong><small>{result?.fetchedAt ? `同步于 ${formatSyncTime(result.fetchedAt)}` : '每日北京时间 00:05 获取最新快照'}</small></div></div>{role === 'super_admin' && result && <TeamClearUpload client={client} servers={result.servers.map(entry => entry.server)} onImported={imported => { if (imported.dates.length === 1) setDate(imported.dates[0]); setServerId(imported.serverId); setRefreshKey(value => value + 1); }} />}<button type="button" className="icon-button team-refresh" title="刷新队伍快照" aria-label="刷新队伍快照" onClick={() => setRefreshKey((value) => value + 1)} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={17} /></button></section>
+    <section className="team-view-toolbar panel-surface"><label className="team-date-field"><span>名单日期</span><div className="team-date-input"><button type="button" className="icon-button team-date-step" title="前一天" aria-label="前一天" onClick={() => setDate(shiftDate(date, -1))}><ChevronLeft size={16} /></button><CalendarDays size={16} /><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /><button type="button" className="icon-button team-date-step" title="后一天" aria-label="后一天" onClick={() => setDate(shiftDate(date, 1))}><ChevronRight size={16} /></button></div><small className="team-date-explanation">{formatTeamDate(date)} 00:00 锁定前一天的组队名单</small></label><div className="team-sync-state"><span className={`team-state-dot ${result?.sourceStatus === 'ready' ? 'ready' : ''}`} /><div><strong>{result?.sourceStatus === 'ready' ? '已同步锁定队伍' : '等待每日同步'}</strong><small>{result?.fetchedAt ? `同步于 ${formatSyncTime(result.fetchedAt)}` : '每日北京时间 00:05 获取最新快照'}</small></div></div>{role === 'super_admin' && result && <TeamClearUpload onNotice={value => { setError(value?.kind === 'error' ? value.text : ''); setNotice(value?.kind === 'success' ? value.text : ''); }} client={client} servers={result.servers.map(entry => entry.server)} onImported={imported => { if (imported.dates.length === 1) setDate(imported.dates[0]); setServerId(imported.serverId); setRefreshKey(value => value + 1); }} />}<button type="button" className="icon-button team-refresh" title="刷新队伍快照" aria-label="刷新队伍快照" onClick={() => setRefreshKey((value) => value + 1)} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={17} /></button></section>
     {result && <div className="team-server-filter-row"><div className="directory-server-filters team-server-filters" role="group" aria-label="按服务器筛选"><button type="button" className={!serverId ? 'selected' : ''} onClick={() => setServerId('')}>全部服务器</button>{result.servers.map((server) => <button type="button" className={serverId === server.server.id ? 'selected' : ''} key={server.server.id} onClick={() => setServerId(server.server.id)}>{server.server.displayName}</button>)}</div><span className="team-id-note">成员为角色 ID</span></div>}
     {error && <FloatingNotice kind="error" text={error} onDismiss={() => setError('')} actionLabel="重试" onAction={() => setRefreshKey((value) => value + 1)} />}
-    {loading ? <div className="empty-state team-empty-state"><LoaderCircle className="spin" size={24} /></div> : result ? <TeamServers result={result} serverId={serverId} /> : <div className="empty-state team-empty-state"><CircleOff size={22} /><h3>暂时无法显示队伍</h3><p>请稍后刷新队伍快照。</p></div>}
+    {!error && notice && <FloatingNotice kind="success" text={notice} onDismiss={() => setNotice('')} />}
+    {loading ? <div className="empty-state team-empty-state"><LoaderCircle className="spin" size={24} /></div> : result ? <TeamServers result={result} serverId={serverId} onApply={applyRewards} applying={applying} /> : <div className="empty-state team-empty-state"><CircleOff size={22} /><h3>暂时无法显示队伍</h3><p>请稍后刷新队伍快照。</p></div>}
   </section>;
 }
 
-function TeamServers({ result, serverId }: { result: TeamViewResult; serverId: string }) {
+function TeamServers({ result, serverId, onApply, applying }: { result: TeamViewResult; serverId: string; onApply: (type: 'black-dragon' | 'zakum', server: string) => void; applying: string | null }) {
   const servers = serverId ? result.servers.filter((server) => server.server.id === serverId) : result.servers;
   const hasTeams = servers.some((server) => server.types.some((type) => type.teams.length > 0));
   if (!hasTeams) return <div className="empty-state team-empty-state"><div className="empty-icon"><Users size={22} /></div><h3>{result.sourceStatus === 'ready' ? '当天没有已锁定队伍' : '暂无已同步的队伍快照'}</h3><p>{result.sourceStatus === 'ready' ? '服务器和副本类型仍会保留，便于快速定位。' : '快照将在每日北京时间 00:05 从玩家服务同步。'}</p></div>;
-  return <div className="team-server-list">{servers.map((server) => <ServerSection key={server.server.id} server={server} />)}</div>;
+  return <div className="team-server-list">{servers.map((server) => <ServerSection key={server.server.id} server={server} onApply={onApply} applying={applying} />)}</div>;
 }
 
-function ServerSection({ server }: { server: TeamViewServer }) {
-  return <section className="team-server-section"><div className="team-server-heading"><div><span className="eyebrow">SERVER</span><h2>{server.server.displayName}</h2></div><span className="team-server-total">{server.types.reduce((sum, type) => sum + type.teams.length, 0)} 队</span></div><div className="team-type-grid">{server.types.map((type) => <TeamTypeSection key={type.type} type={type} />)}</div></section>;
+function ServerSection({ server, onApply, applying }: { server: TeamViewServer; onApply: (type: 'black-dragon' | 'zakum', server: string) => void; applying: string | null }) {
+  return <section className="team-server-section"><div className="team-server-heading"><div><span className="eyebrow">SERVER</span><h2>{server.server.displayName}</h2></div><span className="team-server-total">{server.types.reduce((sum, type) => sum + type.teams.length, 0)} 队</span></div><div className="team-type-grid">{server.types.map((type) => <TeamTypeSection key={type.type} type={type} onApply={() => onApply(type.type, server.server.id)} applying={applying === `${server.server.id}:${type.type}`} />)}</div></section>;
 }
 
-function TeamTypeSection({ type }: { type: TeamViewType }) {
+function TeamTypeSection({ type, onApply, applying }: { type: TeamViewType; onApply: () => void; applying: boolean }) {
   return <section className="team-type-section">
-    <header><div><span className={`team-boss-mark ${type.type}`} /><h3>{type.displayName}</h3></div><span>{type.teams.length} 队</span></header>
+    <header><div><span className={`team-boss-mark ${type.type}`} /><h3>{type.displayName}</h3></div><span>{type.teams.length} 队</span><button type="button" className="primary-button team-apply-button" disabled={applying || !type.teams.some(team => team.canApply)} onClick={onApply}>{applying ? <LoaderCircle size={14} className="spin" /> : <Send size={14} />}{applying ? '处理中' : '批量申请'}</button></header>
     {type.teams.length ? <div className="team-list">{type.teams.map(team => {
       const cleared = new Set(team.clearedMembers ?? []);
       return <article className={`team-row${team.cleared ? ' team-cleared' : ''}`} key={team.id} aria-label={`第 ${team.sequence} 队，${team.memberCount} 个角色 ID${team.cleared ? '，全员通关' : ''}`}>
         <div className="team-sequence">#{team.sequence}</div>
         <div className="team-character-list" aria-label="角色 ID">{team.members.map(characterId => <code className={cleared.has(characterId) ? 'character-cleared' : undefined} key={characterId} title={`角色 ID ${characterId}${cleared.has(characterId) ? ' · 已通关' : ''}`} aria-label={`${characterId}${cleared.has(characterId) ? ' 已通关' : ''}`}>{characterId}</code>)}</div>
-        {team.cleared && <span className="team-clear-status">全员通关</span>}
+        {(team.cleared || team.canApply) && <span className="team-clear-status">{team.cleared && <span>全员通关</span>}{team.canApply && <span>可申请</span>}</span>}
       </article>;
     })}</div> : <p className="team-type-empty">暂无队伍</p>}
   </section>;

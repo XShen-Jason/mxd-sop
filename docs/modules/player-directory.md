@@ -37,3 +37,8 @@ communicate through the versioned internal HTTP contracts only.
   pagination.
 
 See `docs/contracts/player-directory.md` for the public boundary.
+
+`findCharacters` exposes bounded exact lookup for team-view reward application.
+SQLite uses the existing character/server index with a JSON parameter list;
+JSON tests filter against the same exact string IDs. No per-character fuzzy
+search or direct cross-module database access is used.

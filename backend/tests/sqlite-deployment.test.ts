@@ -69,7 +69,26 @@ describe('SQLite deployment persistence', () => {
     expect(counts.reminders).toBe(1);
     expect(counts.ownIssuance).toBe(1);
     expect(counts.ownRegular).toBe(0);
+    const onlineUrl = `/api/v1/operation-groups/${id}/online`;
+    expect((await second.inject({ method: 'POST', url: onlineUrl })).statusCode).toBe(401);
+    expect((await second.inject({ method: 'POST', url: onlineUrl, headers: { cookie: ownerCookie } })).statusCode).toBe(403);
+    const online = await second.inject({ method: 'POST', url: onlineUrl, headers: { cookie: customerCookie } });
+    expect(online.statusCode).toBe(200);
+    expect(online.json().status).toBe('approved');
+    expect(online.json()).not.toHaveProperty('commands');
+    expect(online.json()).not.toHaveProperty('reminderCount');
     await second.close();
+
+    const third = await createApp({ databasePath: reminderDatabasePath, catalogPath });
+    const clearedReminders = await third.inject({ method: 'GET', url: '/api/v1/operation-groups/reminders', headers: { cookie: customerCookie } });
+    expect(clearedReminders.json().groups).toEqual([]);
+    const ready = await third.inject({ method: 'GET', url: '/api/v1/manager/operation-groups/archive?status=approved', headers: { cookie: ownerCookie } });
+    expect(ready.json().groups).toHaveLength(1);
+    expect(ready.json().groups[0]).not.toHaveProperty('reminderCount');
+    expect(ready.json().groups[0]).not.toHaveProperty('lastRemindedAt');
+    expect(ready.json().groups[0]).not.toHaveProperty('lastRemindedBy');
+    expect((await third.inject({ method: 'POST', url: `/api/v1/super-admin/operation-groups/${id}/remind`, headers: { cookie: ownerCookie } })).json().reminderCount).toBe(1);
+    await third.close();
   });
 
   it('migrates reminder columns on an existing operation group table', () => {

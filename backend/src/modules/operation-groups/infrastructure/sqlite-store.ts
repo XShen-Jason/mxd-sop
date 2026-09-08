@@ -5,6 +5,9 @@ import type { GroupPageQuery, GroupRepository } from './json-store.js';
 type GroupRow = { id: string; submitted_by_id: string; status: string; server_id: string; submitted_at: string; idempotency_key: string | null; request_fingerprint: string | null; payload_json: string };
 
 export class SqliteGroupRepository implements GroupRepository {
+  insertMany(groups: OperationGroup[]) {
+    this.db.transaction(() => { for (const group of groups) this.insert(group); })();
+  }
   constructor(private readonly db: SqliteDatabase) {}
   all() { return (this.db.prepare('SELECT payload_json FROM operation_groups ORDER BY submitted_at DESC, id DESC').all() as Array<{ payload_json: string }>).map((row) => JSON.parse(row.payload_json) as OperationGroup); }
   findById(id: string) { const row = this.db.prepare('SELECT payload_json FROM operation_groups WHERE id = ?').get(id) as { payload_json: string } | undefined; return row ? JSON.parse(row.payload_json) as OperationGroup : undefined; }

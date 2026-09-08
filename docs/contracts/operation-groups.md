@@ -311,13 +311,47 @@ The original `completed` state remains readable for MVP records. 物资记录使
 
 `PUT /api/v1/operation-groups/{groupId}`，认证角色必须是提交者本人；customer、manager、super_admin 均可继承调用。申请在 pending、approved 或 rejected 状态可修改，服务端重新执行完整输入校验、清除旧审核及提醒字段、记录 updatedAt/updatedBy，并统一回到 pending 重新审核；已发放、完成或取消的 group 返回 `invalid-status-transition`。取消契约使用相同的完成前窗口，但取消后不能恢复。
 
+### operation-groups.mark-online
+
+`POST /api/v1/operation-groups/{groupId}/online` accepts an authenticated
+customer, manager, or super-admin only when they are the request's submitter.
+The group must remain `approved`. Success clears `reminderCount`,
+`lastRemindedAt`, and `lastRemindedBy` in one persistence write and returns the
+customer projection without commands. The group stays approved and its
+operations and approval audit remain unchanged. Already-cleared approved groups
+return success without writing or emitting another change. Other owners receive
+403, missing groups 404, and non-approved groups 409.
+
+Cleared groups leave `list-reminders` and its counts; the ready view restores
+the initial reminder button and unreminded ordering. A subsequent reminder
+starts again at count 1. The existing scoped SSE event includes both previous
+and new memberships, updating only affected active views. This operation records
+the submitter's confirmation; it does not query the game server for presence.
+
 ### operation-groups.remind-customer / list-reminders
 
 `POST /api/v1/super-admin/operation-groups/{groupId}/remind` 仅允许 `super_admin` 对 approved 申请调用。调用不改变 status，递增 `reminderCount` 并记录 `lastRemindedAt/lastRemindedBy`；重复调用表示再次提醒，发物资和常规操作均可提醒。
 
 `GET /api/v1/operation-groups/reminders?cursor={opaque-cursor}&limit={n}&kind={issuance|regular}` 允许所有已认证角色调用；只返回当前登录用户提交者本人、仍为 approved、已被提醒的记录。`kind` 可筛选发物资或常规操作，省略时返回两类；使用与 list-own 相同的客服投影和倒序游标分页，绝不返回 commands。
 
-`GET /api/v1/operation-groups/workspace-counts` 返回当前角色可见的小标计数；所有角色均得到自己的 `reminders`，并附带 `reminderIssuance`、`reminderRegular` 分类型计数，以及当前用户全部申请的 `ownIssuance`、`ownRegular` 分类型计数；管理角色额外得到 `pending`，超级管理员额外得到 `ready`。`GET /api/v1/operation-groups/events` 是认证 SSE 变更信号，只发送无业务数据的 changed 事件，客户端据此刷新当前页，不轮询。
+`GET /api/v1/operation-groups/workspace-counts` 返回当前角色可见的小标计数；所有角色均得到自己的 `reminders`，并附带 `reminderIssuance`、`reminderRegular` 分类型计数，以及当前用户全部申请的 `ownIssuance`、`ownRegular` 分类型计数；管理角色额外得到 `pending`，超级管理员额外得到 `ready`。
+
+`GET /api/v1/operation-groups/events` is an authenticated SSE stream. Its `changed`
+event has additive v1 metadata: `{ "scopes": [{ "view": "queue", "serverId":
+"mushroom", "kind": "issuance", "status": "pending" }], "counts": true }`.
+Scopes are deduplicated from both pre-write and post-write membership. Views are
+`queue`, `ready`, `reissue`, `archive`, `records`, and `reminders`. Manager views
+respect the subscriber role; `records` and `reminders` are included only for the
+subscriber's own requests. No record IDs, owner IDs, player details, or commands
+are sent. Subscribers with no relevant scope receive no event.
+
+`counts` indicates a change to that subscriber's navigation-count membership;
+repeat reminders do not change counts. Batch approval emits one combined event
+after persistence; failed writes and idempotent no-ops emit none. Clients refresh
+only the mounted view matching the event's server, kind, and status filters.
+Hidden tabs defer relevant refreshes until visible; navigation loads fresh data.
+SSE reconnection invalidates cached reads and refreshes the active view once to
+recover changes missed while disconnected. No interval polling is used.
 
 ### operation-groups.approve-group / reject-group / issue-group
 
