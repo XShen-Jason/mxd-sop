@@ -1,9 +1,12 @@
 .team-view-heading { align-items: flex-end; }
-.team-clear-upload { display: flex; flex-wrap: wrap; align-items: end; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; background: transparent; padding: 0 0 18px; }
+.team-clear-upload { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; min-width: 0; }
 .team-clear-upload h2 { margin-right: auto; align-self: center; }
 .team-clear-upload h2 { font-size: 16px; }
 .team-clear-upload .directory-file-picker { min-width: 0; max-width: 100%; }
 .team-clear-upload .directory-file-picker span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-clear-upload .directory-server-picker select { width: 145px; }
+.team-clear-upload .directory-file-picker { width: 145px; }
+.team-date-step { width: 25px; height: 25px; padding: 0; }
 .team-row.team-cleared { background: var(--teal-soft); border-color: var(--teal); }
 .team-character-list code.character-cleared { color: #fff; background: var(--teal); border-color: var(--teal); font-weight: 700; }
 .team-clear-status { color: var(--teal); font-size: 11px; font-weight: 700; flex: 0 0 auto; }

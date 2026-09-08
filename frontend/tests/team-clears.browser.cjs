@@ -40,7 +40,7 @@ async function main() {
       await fileInput.waitFor({ state: 'attached' });
       assert.equal(await fileInput.isDisabled(), true);
       await page.getByLabel('通关服务器').selectOption('mushroom');
-      await fileInput.setInputFiles(path.resolve('data/player-directory/source/9-8.csv'));
+      await fileInput.setInputFiles({ name: '9-8.csv', mimeType: 'text/csv', buffer: Buffer.from('char_id,reason,created_at\n17,副本赞助点:黑龙,8/9/2026 20:00:00\n193,副本赞助点:黑龙,8/9/2026 20:00:00\n17,副本赞助点:进阶扎昆,8/9/2026 20:00:00') });
       await page.getByRole('button', { name: '上传通关列表', exact: true }).click();
       await page.locator('.team-cleared').waitFor();
       assert.equal(await page.locator('input[type=date]').inputValue(), '2026-09-08');

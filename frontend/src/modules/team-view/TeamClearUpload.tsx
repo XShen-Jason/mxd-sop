@@ -28,7 +28,7 @@ export function TeamClearUpload({ client, servers, onImported }: {
   }
 
   return <>
-    <section className="directory-upload-panel team-clear-upload" aria-label="上传通关列表">
+    <div className="team-clear-upload" aria-label="上传通关列表">
       <h2>通关列表</h2>
       <label className="directory-server-picker"><span>服务器</span>
         <select aria-label="通关服务器" value={serverId} disabled={uploading} onChange={event => { setServerId(event.target.value); setFile(null); }}>
@@ -45,7 +45,7 @@ export function TeamClearUpload({ client, servers, onImported }: {
       <button type="button" className="primary-button" disabled={!serverId || !file || uploading} onClick={() => void upload()}>
         {uploading ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />}{uploading ? '上传中…' : '上传通关列表'}
       </button>
-    </section>
+    </div>
     {notice && <FloatingNotice kind={notice.kind} text={notice.text} onDismiss={() => setNotice(null)} />}
   </>;
 }

@@ -1,4 +1,4 @@
-import { CalendarDays, CircleOff, LoaderCircle, RefreshCw, Users } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, CircleOff, LoaderCircle, RefreshCw, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { ApiClient, ApiError } from '../../api/client';
 import { FloatingNotice } from '../../components/FloatingNotice';
@@ -30,12 +30,7 @@ export function TeamView({ role = 'customer', token }: { role?: Role; token?: st
 
   return <section className="workspace team-view-workspace">
     <div className="page-heading team-view-heading"><div><p className="eyebrow">客服工作台</p><h1>{formatTeamDate(date)}组队名单</h1><p className="heading-copy">名单日期为锁定日：{formatTeamDate(previousTeamDate(date))} 全天开放组队，{formatTeamDate(date)} 00:00 锁定。成员仅显示角色 ID。</p></div><div className="heading-stat"><span>队伍总数</span><strong>{result ? totalTeams(result, serverId) : '—'}</strong></div></div>
-    {role === 'super_admin' && result && <TeamClearUpload client={client} servers={result.servers.map(entry => entry.server)} onImported={imported => {
-      if (imported.dates.length === 1) setDate(imported.dates[0]);
-      setServerId(imported.serverId);
-      setRefreshKey(value => value + 1);
-    }} />}
-    <section className="team-view-toolbar panel-surface"><label className="team-date-field"><span>名单日期</span><div className="team-date-input"><CalendarDays size={16} /><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div><small className="team-date-explanation">{formatTeamDate(date)} 00:00 锁定前一天的组队名单</small></label><div className="team-sync-state"><span className={`team-state-dot ${result?.sourceStatus === 'ready' ? 'ready' : ''}`} /><div><strong>{result?.sourceStatus === 'ready' ? '已同步锁定队伍' : '等待每日同步'}</strong><small>{result?.fetchedAt ? `同步于 ${formatSyncTime(result.fetchedAt)}` : '每日北京时间 00:05 获取最新快照'}</small></div></div><button type="button" className="icon-button team-refresh" title="刷新队伍快照" aria-label="刷新队伍快照" onClick={() => setRefreshKey((value) => value + 1)} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={17} /></button></section>
+    <section className="team-view-toolbar panel-surface"><label className="team-date-field"><span>名单日期</span><div className="team-date-input"><button type="button" className="icon-button team-date-step" title="前一天" aria-label="前一天" onClick={() => setDate(shiftDate(date, -1))}><ChevronLeft size={16} /></button><CalendarDays size={16} /><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /><button type="button" className="icon-button team-date-step" title="后一天" aria-label="后一天" onClick={() => setDate(shiftDate(date, 1))}><ChevronRight size={16} /></button></div><small className="team-date-explanation">{formatTeamDate(date)} 00:00 锁定前一天的组队名单</small></label><div className="team-sync-state"><span className={`team-state-dot ${result?.sourceStatus === 'ready' ? 'ready' : ''}`} /><div><strong>{result?.sourceStatus === 'ready' ? '已同步锁定队伍' : '等待每日同步'}</strong><small>{result?.fetchedAt ? `同步于 ${formatSyncTime(result.fetchedAt)}` : '每日北京时间 00:05 获取最新快照'}</small></div></div>{role === 'super_admin' && result && <TeamClearUpload client={client} servers={result.servers.map(entry => entry.server)} onImported={imported => { if (imported.dates.length === 1) setDate(imported.dates[0]); setServerId(imported.serverId); setRefreshKey(value => value + 1); }} />}<button type="button" className="icon-button team-refresh" title="刷新队伍快照" aria-label="刷新队伍快照" onClick={() => setRefreshKey((value) => value + 1)} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={17} /></button></section>
     {result && <div className="team-server-filter-row"><div className="directory-server-filters team-server-filters" role="group" aria-label="按服务器筛选"><button type="button" className={!serverId ? 'selected' : ''} onClick={() => setServerId('')}>全部服务器</button>{result.servers.map((server) => <button type="button" className={serverId === server.server.id ? 'selected' : ''} key={server.server.id} onClick={() => setServerId(server.server.id)}>{server.server.displayName}</button>)}</div><span className="team-id-note">成员为角色 ID</span></div>}
     {error && <FloatingNotice kind="error" text={error} onDismiss={() => setError('')} actionLabel="重试" onAction={() => setRefreshKey((value) => value + 1)} />}
     {loading ? <div className="empty-state team-empty-state"><LoaderCircle className="spin" size={24} /></div> : result ? <TeamServers result={result} serverId={serverId} /> : <div className="empty-state team-empty-state"><CircleOff size={22} /><h3>暂时无法显示队伍</h3><p>请稍后刷新队伍快照。</p></div>}
@@ -77,6 +72,7 @@ function formatTeamDate(value: string) {
   return `${Number(month)}月${Number(day)}日`;
 }
 function previousTeamDate(value: string) { if (!value) return ''; const date = new Date(`${value}T00:00:00+08:00`); date.setUTCDate(date.getUTCDate() - 1); return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' }); }
+function shiftDate(value: string, amount: number) { const date = new Date(`${value}T00:00:00+08:00`); date.setUTCDate(date.getUTCDate() + amount); return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' }); }
 function defaultTeamDate() {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
