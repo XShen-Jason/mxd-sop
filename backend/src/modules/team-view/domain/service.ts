@@ -1,12 +1,25 @@
 import type { Identity, ServerOption } from '../../../shared/types.js';
 import { TeamViewError } from './errors.js';
+import { clearKey, type TeamClearRepository } from './clears.js';
+import { parseClearFile } from '../infrastructure/clear-csv.js';
 import { TEAM_BOSS_TYPES, type LockedTeam, type LockedTeamSource, type TeamBossType, type TeamSnapshot, type TeamViewRepository, type TeamViewResult, type TeamViewServer } from './types.js';
 
 const beijing = 'Asia/Shanghai';
-const bossNames: Record<TeamBossType, string> = { 'black-dragon': '黑龙', zakum: '扎昆' };
+const bossNames: Record<TeamBossType, string> = { 'black-dragon': '黑龙', zakum: '进阶扎昆' };
 
 export class TeamViewService {
-  constructor(private readonly repository: TeamViewRepository, private readonly source: LockedTeamSource, private readonly servers: ServerOption[]) {}
+  constructor(private readonly repository: TeamViewRepository, private readonly source: LockedTeamSource, private readonly servers: ServerOption[], private readonly clears?: TeamClearRepository) {}
+
+  importClears(actor: Identity, serverId: unknown, file: unknown) {
+    this.requireAuthenticated(actor);
+    if (actor.role !== 'super_admin') throw new TeamViewError('forbidden');
+    if (typeof serverId !== 'string' || !this.servers.some(server => server.id === serverId)) throw new TeamViewError('unknown-server');
+    const parsed = parseClearFile(file, serverId);
+    const importedAt = new Date().toISOString();
+    if (!this.clears) throw new Error('team clear repository is not configured');
+    this.clears.merge(parsed.rows, importedAt);
+    return { serverId, dates: [...new Set(parsed.rows.map(row => row.date))].sort(), rowCount: parsed.rows.length, skippedRows: parsed.skippedRows, importedAt };
+  }
 
   view(actor: Identity, date?: string): TeamViewResult {
     this.requireAuthenticated(actor);
@@ -25,6 +38,7 @@ export class TeamViewService {
   }
 
   private project(date: string, snapshot: TeamSnapshot | null): TeamViewResult {
+    const cleared = new Set((this.clears?.get(date) ?? []).map(clearKey));
     const groups = new Map<string, Map<TeamBossType, LockedTeam[]>>();
     for (const server of this.servers) groups.set(server.id, new Map(TEAM_BOSS_TYPES.map((type) => [type, []])));
     for (const team of snapshot?.teams ?? []) {
@@ -35,7 +49,11 @@ export class TeamViewService {
       server,
       types: TEAM_BOSS_TYPES.map((type) => {
         const teams = (groups.get(server.id)?.get(type) ?? []).slice().sort(compareTeams);
-        return { type, displayName: bossNames[type], teams: teams.map((team, index) => ({ id: team.id, sequence: index + 1, memberCount: team.members.length, members: team.members.map((member) => member.characterId) })) };
+        return { type, displayName: bossNames[type], teams: teams.map((team, index) => {
+          const members = team.members.map(member => member.characterId);
+          const clearedMembers = members.filter(characterId => cleared.has(clearKey({ date, serverId: server.id, bossType: type, characterId })));
+          return { id: team.id, sequence: index + 1, memberCount: members.length, members, clearedMembers, cleared: members.length > 0 && clearedMembers.length === members.length };
+        }) };
       }),
     }));
     return { date, fetchedAt: snapshot?.fetchedAt ?? null, sourceStatus: snapshot ? 'ready' : 'unavailable', servers };

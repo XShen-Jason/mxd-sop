@@ -70,6 +70,12 @@ timeout, at most one request in flight, and no write when the source fails.
 Success resumes daily scheduling. The scheduler stays idle when no source is configured. Snapshots
 are replaced atomically in SQLite/JSON adapters.
 
+Clear imports accept at most 1,000,000 CSV characters and 20,000 data rows,
+with a 2 MiB HTTP body limit. Each import validates before one atomic merge.
+Read projections retrieve only the requested date through the date-leading
+primary key and match members using a set; no per-team database requests or
+player-service writes are introduced. Upload success triggers one snapshot GET.
+
 Player integration keeps one bounded account-import request per CSV and sends
 the validated file once to the active player endpoint before replacing the
 support directory. The player endpoint parses and upserts rows in one SQLite

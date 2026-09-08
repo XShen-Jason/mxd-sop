@@ -5,3 +5,4 @@ export { JsonTeamViewRepository } from '../infrastructure/json-store.js';
 export { SqliteTeamViewRepository } from '../infrastructure/sqlite-store.js';
 export { HttpLockedTeamSource, UnavailableTeamSource } from '../infrastructure/player-source.js';
 export { TeamViewScheduler } from '../application/scheduler.js';
+export { JsonTeamClearRepository, SqliteTeamClearRepository } from '../infrastructure/clear-store.js';

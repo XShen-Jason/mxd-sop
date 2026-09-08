@@ -17,6 +17,7 @@ import { HttpPlayerIntegrationClient, loadPlayerEndpointConfig, MemoryPlayerInte
 import { registerPlayerIntegrationRoutes } from './modules/player-integration/interface/http.js';
 import { HttpLockedTeamSource, JsonTeamViewRepository, SqliteTeamViewRepository, TeamViewScheduler, TeamViewService, type LockedTeamSource } from './modules/team-view/public/index.js';
 import { registerTeamViewRoutes } from './modules/team-view/interface/http.js';
+import { JsonTeamClearRepository, SqliteTeamClearRepository } from './modules/team-view/public/index.js';
 import { registerOperationRoutes } from './modules/operation-groups/interface/http.js';
 import { OperationGroupsService } from './modules/operation-groups/public/index.js';
 import { JsonGroupRepository } from './modules/operation-groups/public/index.js';
@@ -114,7 +115,10 @@ export async function createApp(config: AppConfig = {}) {
   const playerSync = config.playerIntegrationClient || process.env.NODE_ENV !== 'test' ? integration : undefined;
   registerPlayerDirectoryRoutes(app, new PlayerDirectoryService(directoryRepository, appOptions.servers, playerSync), auth);
   registerPlayerIntegrationRoutes(app, integration, auth);
-  const teamViewService = new TeamViewService(teamRepository, teamSource, appOptions.servers);
+  const teamClears = testPersistence
+    ? new JsonTeamClearRepository(`${config.teamViewPath ?? config.dataPath ?? projectPath('data/generated/operation-groups.json')}.clears.json`)
+    : new SqliteTeamClearRepository(db!);
+  const teamViewService = new TeamViewService(teamRepository, teamSource, appOptions.servers, teamClears);
   registerTeamViewRoutes(app, teamViewService, auth);
   const scheduler = new TeamViewScheduler(teamViewService);
   const enableTeamScheduler = config.enableTeamScheduler ?? process.env.NODE_ENV !== 'test';

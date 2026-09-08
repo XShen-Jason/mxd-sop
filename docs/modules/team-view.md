@@ -7,6 +7,11 @@ owned by the separately deployed `mxd-player` service.
 
 ## Scope
 
+Also owns persisted CSV clear imports (`team-view.import-clears`), exact
+server/date/boss/character matching and per-member/whole-team status. Upload
+permissions and parsing semantics are defined in the contract. This data does
+not mutate the player service and is independent of snapshot replacement.
+
 In scope:
 
 - Persisting one operations-desk snapshot per lock date, replaceable by a sync.
@@ -61,6 +66,14 @@ Production snapshots are stored in `team_view_snapshots`. When the source URL
 is absent, the scheduler stays idle until the future source endpoint is
 configured; the read contract returns an `unavailable` status with empty
 groups.
+
+Clear records live in `team_view_clears`, created by the idempotent SQLite
+startup migration, with a date-leading composite primary key. JSON tests use
+a separate `.clears.json` file. CSV syntax is parsed by `csv-parse`; parsing
+and row validation finish before one atomic merge. No polling is added.
+`backend/tests/team-clears.test.ts` covers the supplied export, exact date,
+server and boss isolation, partial/full clears, invalid-file atomicity,
+deduplication, adapter persistence and HTTP permissions.
 
 ## Tests
 

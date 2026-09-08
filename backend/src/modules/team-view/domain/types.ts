@@ -49,6 +49,8 @@ export interface TeamViewTeam {
   sequence: number;
   memberCount: number;
   members: string[];
+  clearedMembers: string[];
+  cleared: boolean;
 }
 
 export interface TeamViewResult {

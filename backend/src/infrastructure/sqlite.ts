@@ -70,6 +70,14 @@ export function openDatabase(filePath: string) {
     CREATE INDEX IF NOT EXISTS player_directory_user_id ON player_directory(server_id, user_id COLLATE NOCASE);
     CREATE INDEX IF NOT EXISTS player_directory_char_id ON player_directory(char_id, server_id);
     CREATE INDEX IF NOT EXISTS player_directory_qq ON player_directory(bind_qq, server_id);
+    CREATE TABLE IF NOT EXISTS team_view_clears (
+      date TEXT NOT NULL,
+      server_id TEXT NOT NULL,
+      boss_type TEXT NOT NULL CHECK (boss_type IN ('black-dragon', 'zakum')),
+      char_id TEXT NOT NULL,
+      imported_at TEXT NOT NULL,
+      PRIMARY KEY (date, server_id, boss_type, char_id)
+    );
     CREATE TABLE IF NOT EXISTS team_view_snapshots (
       date TEXT PRIMARY KEY,
       fetched_at TEXT NOT NULL,

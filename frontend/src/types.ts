@@ -63,7 +63,8 @@ export interface DirectoryPage { accounts: DirectoryAccount[]; nextCursor: strin
 export interface DirectoryImportResult { serverId: string; fileCount: number; rowCount: number; skippedRows: number; importedAt: string }
 
 export type TeamBossType = 'black-dragon' | 'zakum';
-export interface TeamViewTeam { id: string; sequence: number; memberCount: number; members: string[] }
+export interface TeamViewTeam { id: string; sequence: number; memberCount: number; members: string[]; clearedMembers: string[]; cleared: boolean }
+export interface TeamClearImportResult { serverId: string; dates: string[]; rowCount: number; skippedRows: number; importedAt: string }
 export interface TeamViewType { type: TeamBossType; displayName: string; teams: TeamViewTeam[] }
 export interface TeamViewServer { server: ServerOption; types: TeamViewType[] }
 export interface TeamViewResult { date: string; fetchedAt: string | null; sourceStatus: 'ready' | 'unavailable'; servers: TeamViewServer[] }

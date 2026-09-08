@@ -89,6 +89,7 @@ Auth contracts are defined in `docs/contracts/auth.md`: `auth.login`, `auth.logo
 | activities.list | HTTP API | docs/contracts/activities.md | activities | v1 | frontend all roles |
 | activities.replace | HTTP API | docs/contracts/activities.md | activities | v1 | frontend manager/super_admin |
 | team-view.read | HTTP API | docs/contracts/team-view.md | team-view | v1 | frontend all authenticated roles |
+| team-view.import-clears | HTTP API | docs/contracts/team-view.md | team-view | v1 | frontend super_admin |
 | player-integration.status | HTTP API | docs/contracts/player-integration.md | player-integration | v1 | frontend super_admin |
 | player-integration.switch | HTTP API | docs/contracts/player-integration.md | player-integration | v1 | frontend super_admin |
 | command-generation.generate | module interface | docs/contracts/command-generation.md | command-generation | v1 | backend operation-groups 管理投影 |
@@ -154,5 +155,5 @@ internal HTTP contract; it never reads the player database directly.
 | --- | --- | --- | --- | --- | --- |
 | player-directory | player account and QQ lookup with super-admin CSV replacement | backend/src/modules/player-directory; frontend/src/modules/player-directory | backend + frontend | player-directory.search, player-directory.import | SQLite/JSON directory repository; auth identity |
 
-| team-view | daily locked-team snapshot and read-only server/type workspace | backend/src/modules/team-view; frontend/src/modules/team-view; docs/modules/team-view.md | backend + frontend | team-view.read | mxd-player snapshot source adapter; SQLite/JSON snapshot repository; auth identity |
+| team-view | daily locked-team snapshot, clear imports and server/type workspace | backend/src/modules/team-view; frontend/src/modules/team-view; docs/modules/team-view.md | backend + frontend | team-view.read, team-view.import-clears | mxd-player snapshot source adapter; SQLite/JSON snapshot and clear repositories; auth identity |
 | player-integration | active local/remote player endpoint, transactional account sync, and locked-team source selection | backend/src/modules/player-integration; frontend/src/modules/player-integration | backend + frontend | player-integration.status, player-integration.switch | mxd-player internal HTTP contracts; SQLite state; service token |

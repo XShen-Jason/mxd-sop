@@ -44,6 +44,7 @@ Contract ID 使用 module-id.operation-name，版本单独记录。所有 ID 为
 | activities.list | activities | v1 | frontend all roles | contracts/activities.md |
 | activities.replace | activities | v1 | frontend manager/super_admin | contracts/activities.md |
 | team-view.read | team-view | v1 | frontend all authenticated roles | contracts/team-view.md |
+| team-view.import-clears | team-view | v1 | frontend super_admin | contracts/team-view.md |
 
 | operation-groups.remind-customer | operation-groups | v1 | frontend super_admin | contracts/operation-groups.md |
 | operation-groups.list-reminders | operation-groups | v1 | frontend all roles | contracts/operation-groups.md |

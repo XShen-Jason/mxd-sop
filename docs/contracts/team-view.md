@@ -1,5 +1,29 @@
 # team-view
 
+## team-view.import-clears (v1)
+
+`POST /api/v1/team-view/clears/import` requires `super_admin`, like player-directory imports.
+Body: `{ "serverId": "mushroom", "file": { "name": "9-8.csv", "content": "..." } }`.
+One CSV, at most 1,000,000 characters, 20,000 rows, 2 MiB JSON request.
+Required case-insensitive headers: `char_id`, `reason`, `created_at`.
+Quoted fields, escaped quotes, BOM and CRLF are supported. IDs remain strings.
+`created_at` is Beijing local time in `D/M/YYYY H:mm:ss` (8/9/2026 means
+September 8), or `YYYY-MM-DD HH:mm:ss`; date-only variants are accepted.
+No inference from filenames, current date, timezone conversion or preceding lock day.
+Exact reasons `副本赞助点:黑龙` and `副本赞助点:进阶扎昆` map to
+`black-dragon` and `zakum`. Other reasons are skipped and counted. Invalid
+recognized rows reject the whole file before any write; no recognized rows is an error.
+Records are atomically merged by (date, server, boss, char_id), so repeat uploads
+are idempotent and partial uploads preserve earlier clears. Multiple dates are
+stored separately. Response: `{ serverId, dates: ["2026-09-08"], rowCount,
+skippedRows, importedAt }`; rowCount counts unique recognized rows in the file.
+Errors: unauthorized (401), forbidden (403), unknown-server/invalid-file (400).
+
+The read projection adds `clearedMembers: string[]` and `cleared: boolean` to
+each team. All four matching dimensions must agree. `cleared` requires a
+nonempty team with all members matched. `zakum` displays as `进阶扎昆`.
+Clears persist independently of snapshot syncs, including uploads before a snapshot exists.
+
 ## team-view.read (v1)
 
 `GET /api/v1/team-view`

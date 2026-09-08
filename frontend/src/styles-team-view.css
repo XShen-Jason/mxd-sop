@@ -1,4 +1,12 @@
 .team-view-heading { align-items: flex-end; }
+.team-clear-upload { display: flex; flex-wrap: wrap; align-items: end; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; background: transparent; padding: 0 0 18px; }
+.team-clear-upload h2 { margin-right: auto; align-self: center; }
+.team-clear-upload h2 { font-size: 16px; }
+.team-clear-upload .directory-file-picker { min-width: 0; max-width: 100%; }
+.team-clear-upload .directory-file-picker span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-row.team-cleared { background: var(--teal-soft); border-color: var(--teal); }
+.team-character-list code.character-cleared { color: #fff; background: var(--teal); border-color: var(--teal); font-weight: 700; }
+.team-clear-status { color: var(--teal); font-size: 11px; font-weight: 700; flex: 0 0 auto; }
 .team-view-toolbar { display: flex; align-items: center; gap: 22px; padding: 15px 18px; margin-bottom: 20px; }
 .team-date-field { display: grid; gap: 6px; min-width: 170px; }
 .team-date-field > span { color: var(--muted); font-size: 11px; font-weight: 700; }

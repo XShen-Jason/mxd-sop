@@ -1,4 +1,4 @@
-import type { Activity, AppOptions, CatalogItem, DirectoryImportResult, DirectoryPage, Group, ManagerGroup, Page, PlayerDeploymentMode, PlayerIntegrationStatus, Role, Session, TeamViewResult, User } from '../types';
+import type { Activity, AppOptions, CatalogItem, DirectoryImportResult, DirectoryPage, Group, ManagerGroup, Page, PlayerDeploymentMode, PlayerIntegrationStatus, Role, Session, TeamClearImportResult, TeamViewResult, User } from '../types';
 
 export class ApiError extends Error {
   constructor(public readonly code: string, message: string, public readonly status: number) { super(message); }
@@ -130,6 +130,9 @@ export class ApiClient {
   teamView(date?: string, signal?: AbortSignal) {
     const params = date ? `?date=${encodeURIComponent(date)}` : '';
     return this.request<TeamViewResult>(`/api/v1/team-view${params}`, { signal });
+  }
+  importTeamClears(serverId: string, file: { name: string; content: string }) {
+    return this.request<TeamClearImportResult>('/api/v1/team-view/clears/import', { method: 'POST', body: JSON.stringify({ serverId, file }) });
   }
   playerIntegrationStatus() { return this.request<PlayerIntegrationStatus>('/api/v1/player-integration/status'); }
   switchPlayerIntegration(mode: PlayerDeploymentMode, confirmation: string) { return this.request<{ mode: PlayerDeploymentMode; activeEndpoint: string; updatedAt: string }>('/api/v1/player-integration/switch', { method: 'POST', body: JSON.stringify({ mode, confirmation }) }); }
