@@ -20,7 +20,7 @@ mxd-player/backend-player/.env.*
 # Generated catalog/import output
 data/item-catalog/generated/
 data/generated/
-data/player-directory/source/
+data/player-directory
 frontend/.screenshots/
 frontend/.chrome-debug/
 frontend/.shot-profile/
