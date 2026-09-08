@@ -21,7 +21,11 @@ const teams: LockedTeam[] = servers.flatMap(server => ['black-dragon', 'zakum'].
 
 describe('clear CSV interpretation', () => {
   it('reads the actual day/month/year export and quoted extra columns', () => {
-    const content = fs.readFileSync(path.resolve('../data/player-directory/source/9-8.csv'), 'utf8');
+    const content = [
+      '"uid","char_id","nickname","reason","created_at"',
+      '"16","17","PPP","副本赞助点:进阶扎昆","8/9/2026 21:54:45"',
+      '"194","193","张小凡","副本赞助点:黑龙","8/9/2026 20:43:13"',
+    ].join('\n');
     const result = parseClearFile({ name: '9-8.csv', content }, 'mushroom');
     expect(result.rows).toContainEqual({ date: '2026-09-08', serverId: 'mushroom', bossType: 'zakum', characterId: '17' });
     expect(result.rows).toContainEqual({ date: '2026-09-08', serverId: 'mushroom', bossType: 'black-dragon', characterId: '193' });
