@@ -1,7 +1,5 @@
 .team-view-heading { align-items: flex-end; }
-.team-clear-upload { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; min-width: 0; }
-.team-clear-upload h2 { margin-right: auto; align-self: center; }
-.team-clear-upload h2 { font-size: 16px; }
+.team-clear-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .team-clear-upload .directory-file-picker { min-width: 0; max-width: 100%; }
 .team-clear-upload .directory-file-picker span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .team-clear-upload .directory-server-picker select { width: 145px; }

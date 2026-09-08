@@ -29,7 +29,6 @@ export function TeamClearUpload({ client, servers, onImported }: {
 
   return <>
     <div className="team-clear-upload" aria-label="上传通关列表">
-      <h2>通关列表</h2>
       <label className="directory-server-picker"><span>服务器</span>
         <select aria-label="通关服务器" value={serverId} disabled={uploading} onChange={event => { setServerId(event.target.value); setFile(null); }}>
           <option value="">请选择服务器</option>{servers.map(server => <option key={server.id} value={server.id}>{server.displayName}</option>)}
