@@ -2,6 +2,7 @@
 .team-clear-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .team-clear-upload .directory-file-picker { min-width: 0; max-width: 100%; }
 .team-clear-upload .directory-file-picker span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-clear-upload .directory-server-picker { display: block; }
 .team-clear-upload .directory-server-picker select { width: 145px; }
 .team-clear-upload .directory-file-picker { width: 145px; }
 .team-date-step { width: 25px; height: 25px; padding: 0; }
