@@ -22,13 +22,13 @@ function team(id: string, members: string[], bossType: LockedTeam['bossType'] = 
   return { id, serverId, bossType, members: members.map(characterId => ({ characterId, joinedAt: '2026-09-07T00:00:00Z' })) };
 }
 const teams = [team('six', ['1', '2', '3', '4', '5', '6']), team('seven', ['11', '12', '13', '14', '15', '16', '17']),
-  team('single', ['21']), team('uncleared', ['31', '32']), team('zakum', ['1', '2', '3', '4', '5', '6'], 'zakum'), team('other', ['1', '2'], 'black-dragon', 'yeti')];
+  team('single', ['21']), team('uncleared', ['31', '32']), team('zakum', ['21', '1', '2', '3', '4'], 'zakum'), team('other', ['1', '2'], 'black-dragon', 'yeti')];
 function seed(dir: string) {
   const snapshots = new JsonTeamViewRepository(path.join(dir, 'teams.json'));
   snapshots.save({ date, fetchedAt: `${date}T00:05:00Z`, source: 'test', teams });
   const clears = new JsonTeamClearRepository(`${path.join(dir, 'teams.json')}.clears.json`);
   const service = new TeamViewService(snapshots, { fetch: async () => teams }, appOptions.servers, clears);
-  service.importClears(admin, 'mushroom', { name: 'clears.csv', content: 'char_id,reason,created_at\n1,副本赞助点:黑龙,8/9/2026\n11,副本赞助点:黑龙,8/9/2026\n21,副本赞助点:黑龙,8/9/2026\n1,副本赞助点:进阶扎昆,8/9/2026' });
+  service.importClears(admin, 'mushroom', { name: 'clears.csv', content: 'char_id,reason,created_at\n1,副本赞助点:黑龙,8/9/2026\n11,副本赞助点:黑龙,8/9/2026\n21,副本赞助点:黑龙,8/9/2026\n21,副本赞助点:进阶扎昆,8/9/2026\n1,副本赞助点:进阶扎昆,8/9/2026\n2,副本赞助点:进阶扎昆,8/9/2026\n3,副本赞助点:进阶扎昆,8/9/2026\n4,副本赞助点:进阶扎昆,8/9/2026' });
   return service;
 }
 const rows = [...new Set(teams.flatMap(team => team.members.map(member => member.characterId)))].map(charId => ({
@@ -53,20 +53,27 @@ describe.each(['json', 'sqlite'] as const)('%s team reward chain', adapter => {
       const players = new PlayerDirectoryService(directory, appOptions.servers);
       const view = service.view(actor, date).servers[0].types;
       expect(view.map(type => type.displayName)).toEqual(['黑龙（150票/队）', '进阶扎昆（500票/队）']);
-      expect(view[0].teams.filter(team => team.canApply).map(team => team.id)).toEqual(['seven', 'six']);
-      expect(applyTeamRewards(service, groups, players, actor, input)).toEqual({ count: 13, skippedCount: 0, teamCount: 2 });
+      expect(view[0].teams.filter(team => team.canApply).map(team => team.id)).toEqual(['seven', 'six', 'single']);
+      expect(applyTeamRewards(service, groups, players, actor, input)).toEqual({ count: 14, skippedCount: 0, teamCount: 3 });
       expect(changes).toBe(1);
       for (const group of repository.all()) {
         expect(group).toMatchObject({ account: `account${group.characterId}`, playerQQ: `12345${group.characterId}`, status: 'approved',
           reason: { code: 'event-reward', text: `${date} 黑龙` }, submittedBy: { id: actor.id, displayName: actor.displayName },
           approvedBy: { id: 'system-admin', displayName: '系统' },
-          operations: [{ type: 'item', itemCode: '100000069', itemName: '快乐百宝券', quantity: Number(group.characterId) < 10 ? 25 : 22 }] });
+          operations: [{ type: 'item', itemCode: '100000069', itemName: '快乐百宝券', quantity: group.characterId === '21' ? 150 : Number(group.characterId) < 10 ? 25 : 22 }] });
       }
       expect(groups.listOwn(actor).groups[0]).not.toHaveProperty('commands');
       expect(groups.listReview(admin).groups[0].commands.length).toBeGreaterThan(0);
-      expect(applyTeamRewards(service, groups, players, admin, input)).toMatchObject({ count: 0, skippedCount: 13 });
-      expect(applyTeamRewards(service, groups, players, actor, { ...input, type: 'zakum' })).toMatchObject({ count: 6 });
-      expect(repository.all().filter(group => group.reason.text?.endsWith('进阶扎昆')).every(group => group.operations[0].type === 'item' && group.operations[0].quantity === 84)).toBe(true);
+      expect(applyTeamRewards(service, groups, players, admin, input)).toMatchObject({ count: 0, skippedCount: 14 });
+      expect(applyTeamRewards(service, groups, players, actor, { ...input, type: 'zakum' })).toMatchObject({ count: 5 });
+      expect(repository.all().filter(group => group.reason.text?.endsWith('进阶扎昆')).every(group => group.operations[0].type === 'item' && group.operations[0].quantity === 100)).toBe(true);
+      const characterRewards = repository.all().filter(group => group.characterId === '21');
+      expect(characterRewards).toHaveLength(2);
+      expect(characterRewards).toEqual(expect.arrayContaining([
+        expect.objectContaining({ reason: expect.objectContaining({ text: `${date} 黑龙` }), operations: [expect.objectContaining({ quantity: 150 })] }),
+        expect.objectContaining({ reason: expect.objectContaining({ text: `${date} 进阶扎昆` }), operations: [expect.objectContaining({ quantity: 100 })] }),
+      ]));
+      expect(characterRewards.reduce((sum, group) => sum + (group.operations[0].type === 'item' ? group.operations[0].quantity : 0), 0)).toBe(250);
       const reopened = db ? new SqliteGroupRepository(db) : new JsonGroupRepository(path.join(dir, 'groups.json'));
       expect(applyTeamRewards(service, new OperationGroupsService({ repository: reopened, catalog }), players, admin, input).count).toBe(0);
       expect(reopened.all()).toHaveLength(19);
@@ -116,11 +123,11 @@ it('connects authenticated HTTP submission to own records and manager review wit
     }
     const result = await app.inject({ ...request, headers });
     expect(result.statusCode, result.body).toBe(200);
-    expect(result.json()).toEqual({ count: 13, skippedCount: 0, teamCount: 2 });
+    expect(result.json()).toEqual({ count: 14, skippedCount: 0, teamCount: 3 });
     expect(result.body).not.toContain('commands');
     const own = await app.inject({ method: 'GET', url: '/api/v1/operation-groups/mine', headers });
     expect(own.statusCode, own.body).toBe(200);
-    expect(own.json().groups).toHaveLength(13);
+    expect(own.json().groups).toHaveLength(14);
     expect(own.body).not.toContain('commands');
     const managerHeaders = { 'x-user-id': 'manager-b', 'x-user-role': 'manager' };
     const review = await app.inject({ method: 'GET', url: '/api/v1/manager/operation-groups/reviews', headers: managerHeaders });
@@ -129,6 +136,6 @@ it('connects authenticated HTTP submission to own records and manager review wit
     const issued = await app.inject({ method: 'POST', url: `/api/v1/manager/operation-groups/${id}/issue`, headers: { 'x-user-id': admin.id, 'x-user-role': admin.role } });
     expect(issued.statusCode, issued.body).toBe(200);
     expect(issued.json()).toMatchObject({ status: 'issued', submittedBy: { id: actor.id }, approvedBy: { displayName: '系统' } });
-    expect((await app.inject({ ...request, headers: managerHeaders })).json()).toMatchObject({ count: 0, skippedCount: 13 });
+    expect((await app.inject({ ...request, headers: managerHeaders })).json()).toMatchObject({ count: 0, skippedCount: 14 });
   } finally { await app.close(); }
 });

@@ -23,7 +23,8 @@ The read projection adds `clearedMembers: string[]` and `cleared: boolean` to
 each team. All four matching dimensions must agree. `cleared` requires a
 nonempty team with all members matched. Type names display as
 `黑龙（150票/队）` and `进阶扎昆（500票/队）`.
-`canApply` is true for a team with more than one member and at least one clear.
+`canApply` is true for every nonempty team with at least one clear, including
+single-member teams. A single-member team receives the full team ticket amount.
 Clears persist independently of snapshot syncs, including uploads before a snapshot exists.
 
 ## team-view.read (v1)
@@ -85,8 +86,9 @@ super_admin identities. Body: `{ "date": "2026-09-08", "serverId": "mushroom",
 type is black-dragon or zakum. The server reads the saved snapshot and clears;
 clients cannot supply members, quantities, account data or approval identities.
 
-Apply to all eligible teams of the selected server/type/date. Single-member
-teams and teams with no clears are excluded. Every member receives
+Apply to all eligible teams of the selected server/type/date. Teams with no
+clears are excluded; single-member teams are eligible and their member receives
+the full team ticket amount. Every member receives
 `ceil(team tickets / member count)` of item `100000069`; the item name comes
 from item-catalog. Resolve accounts and QQ by exact (server, charid) in the
 operations player_directory table through its public lookup boundary.

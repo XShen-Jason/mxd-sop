@@ -52,7 +52,7 @@ export class TeamViewService {
         return { type, displayName: `${teamRewards[type].name}（${teamRewards[type].tickets}票/队）`, teams: teams.map((team, index) => {
           const members = team.members.map(member => member.characterId);
           const clearedMembers = members.filter(characterId => cleared.has(clearKey({ date, serverId: server.id, bossType: type, characterId })));
-          return { id: team.id, sequence: index + 1, memberCount: members.length, members, clearedMembers, cleared: members.length > 0 && clearedMembers.length === members.length, canApply: members.length > 1 && clearedMembers.length > 0 };
+          return { id: team.id, sequence: index + 1, memberCount: members.length, members, clearedMembers, cleared: members.length > 0 && clearedMembers.length === members.length, canApply: members.length > 0 && clearedMembers.length > 0 };
         }) };
       }),
     }));

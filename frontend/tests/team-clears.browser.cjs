@@ -25,17 +25,21 @@ async function main() {
           assert.equal(payload.serverId, 'mushroom');
           assert.match(payload.file.content, /8\/9\/2026/);
           imported = true;
-          body = { serverId: 'mushroom', dates: ['2026-09-08'], rowCount: 3, skippedRows: 0, importedAt: new Date().toISOString() };
+          body = { serverId: 'mushroom', dates: ['2026-09-08'], rowCount: 4, skippedRows: 0, importedAt: new Date().toISOString() };
         } else if (url.pathname.endsWith('/team-view/apply')) {
           assert.deepEqual(request.postDataJSON(), { date: '2026-09-08', serverId: 'mushroom', type: 'black-dragon' });
           applications++;
-          body = { count: applications === 1 ? 2 : 0, skippedCount: applications === 1 ? 0 : 2, teamCount: 1 };
+          body = { count: applications === 1 ? 3 : 0, skippedCount: applications === 1 ? 0 : 3, teamCount: 2 };
         } else if (url.pathname.endsWith('/team-view')) {
           const date = url.searchParams.get('date');
           const cleared = imported && date === '2026-09-08';
           body = { date, fetchedAt: '2026-09-08T00:05:00Z', sourceStatus: 'ready', servers: servers.map(server => ({ server, types: ['black-dragon', 'zakum'].map(type => ({
-            type, displayName: type === 'zakum' ? '进阶扎昆（500票/队）' : '黑龙（150票/队）', teams: [{ id: `${server.id}-${type}`, sequence: 1, memberCount: 2, members: ['17', '193'], canApply: cleared && server.id === 'mushroom',
-              clearedMembers: cleared && server.id === 'mushroom' ? type === 'zakum' ? ['17'] : ['17', '193'] : [], cleared: cleared && server.id === 'mushroom' && type === 'black-dragon' }],
+            type, displayName: type === 'zakum' ? '进阶扎昆（500票/队）' : '黑龙（150票/队）', teams: [
+              { id: `${server.id}-${type}`, sequence: 1, memberCount: 2, members: ['17', '193'], canApply: cleared && server.id === 'mushroom',
+                clearedMembers: cleared && server.id === 'mushroom' ? type === 'zakum' ? ['17'] : ['17', '193'] : [], cleared: cleared && server.id === 'mushroom' && type === 'black-dragon' },
+              ...(type === 'black-dragon' ? [{ id: `${server.id}-black-single`, sequence: 2, memberCount: 1, members: ['233'], canApply: cleared && server.id === 'mushroom',
+                clearedMembers: cleared && server.id === 'mushroom' ? ['233'] : [], cleared: cleared && server.id === 'mushroom' }] : []),
+            ],
           })) })) };
         } else if (url.pathname.endsWith('/events')) { await route.fulfill({ contentType: 'text/event-stream', body: ': ready\n\n' }); return; }
         await route.fulfill({ json: body });
@@ -45,16 +49,19 @@ async function main() {
       await fileInput.waitFor({ state: 'attached' });
       assert.equal(await fileInput.isDisabled(), true);
       await page.getByLabel('通关服务器').selectOption('mushroom');
-      await fileInput.setInputFiles({ name: '9-8.csv', mimeType: 'text/csv', buffer: Buffer.from('char_id,reason,created_at\n17,副本赞助点:黑龙,8/9/2026 20:00:00\n193,副本赞助点:黑龙,8/9/2026 20:00:00\n17,副本赞助点:进阶扎昆,8/9/2026 20:00:00') });
+      await fileInput.setInputFiles({ name: '9-8.csv', mimeType: 'text/csv', buffer: Buffer.from('char_id,reason,created_at\n17,副本赞助点:黑龙,8/9/2026 20:00:00\n193,副本赞助点:黑龙,8/9/2026 20:00:00\n233,副本赞助点:黑龙,8/9/2026 20:00:00\n17,副本赞助点:进阶扎昆,8/9/2026 20:00:00') });
       await page.getByRole('button', { name: '上传通关列表', exact: true }).click();
-      await page.locator('.team-cleared').waitFor();
+      await page.locator('.team-cleared').first().waitFor();
       assert.equal(await page.locator('input[type=date]').inputValue(), '2026-09-08');
-      assert.equal(await page.locator('.team-cleared').count(), 1);
-      assert.equal(await page.locator('.character-cleared').count(), 3);
+      assert.equal(await page.locator('.team-cleared').count(), 2);
+      assert.equal(await page.locator('.character-cleared').count(), 4);
       assert.equal(await page.getByRole('heading', { name: '进阶扎昆（500票/队）', exact: true }).count(), 1);
-      assert.equal(await page.getByText('可申请', { exact: true }).count(), 2);
+      assert.equal(await page.getByText('可申请', { exact: true }).count(), 3);
+      const singleTeam = page.locator('.team-row').filter({ hasText: '233' });
+      assert.equal(await singleTeam.getByText('全员通关', { exact: true }).count(), 1);
+      assert.equal(await singleTeam.getByText('可申请', { exact: true }).count(), 1);
       await page.getByRole('button', { name: '批量申请', exact: true }).first().click();
-      await page.getByText('已申请并自动过审 2 人，已申请跳过 0 人', { exact: true }).waitFor();
+      await page.getByText('已申请并自动过审 3 人，已申请跳过 0 人', { exact: true }).waitFor();
       assert.equal(applications, 1);
       await page.screenshot({ path: path.join(os.tmpdir(), `mxdcmd-team-clears-${width}.png`), fullPage: true });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
@@ -63,7 +70,7 @@ async function main() {
       assert.equal(await page.locator('.character-cleared').count(), 0);
       await page.reload();
       await page.locator('input[type=date]').fill('2026-09-08');
-      await page.locator('.team-cleared').waitFor();
+      await page.locator('.team-cleared').first().waitFor();
       role = 'customer';
       await page.reload();
       await page.locator('.team-server-filter-row').waitFor();
