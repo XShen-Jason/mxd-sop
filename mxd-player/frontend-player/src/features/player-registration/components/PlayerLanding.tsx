@@ -44,8 +44,8 @@ export function Landing(p: LandingProps) {
         <div className="intro">
           <p className="kicker">MAPLE WORLD · PARTY FINDER</p>
           <h1>一起<span className="gradient-text">组队</span></h1>
-          <p>验证账号后，创建或申请加入黑龙、扎昆队伍。</p>
-          <div className="raid-pills"><span><Shield size={14} /> 黑龙</span><span><Zap size={14} /> 扎昆</span></div>
+          <p>验证账号后，创建或申请加入黑龙、进阶扎昆队伍。</p>
+          <div className="raid-pills"><span><Shield size={14} /> 黑龙</span><span><Zap size={14} /> 进阶扎昆</span></div>
         </div>
         <form className="verify-card" onSubmit={p.onVerify}>
           <div className="card-top"><div className="card-icon"><Sparkles size={16} aria-hidden="true" /></div><h2>玩家验证</h2></div>

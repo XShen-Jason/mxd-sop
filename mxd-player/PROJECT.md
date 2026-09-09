@@ -4,7 +4,7 @@
 
 Project ID: mxd-player
 Name: 玩家远征组队
-Purpose and users: 为玩家提供账号验证、黑龙/扎昆组队报名和邀请码加入
+Purpose and users: 为玩家提供账号验证、黑龙/进阶扎昆组队报名和邀请码加入
 Scale: Standard
 Primary languages: Go, TypeScript, SQLite
 Applications: frontend-player, backend-player
