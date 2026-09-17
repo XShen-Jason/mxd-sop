@@ -30,7 +30,7 @@ function serverInput(value: Body, partial: boolean): AutoServerInput | Partial<A
   const result: Partial<AutoServerInput> = {};
   if (!partial || value.name !== undefined) result.name = text(value.name, 'name')!;
   if (!partial || value.address !== undefined) result.address = text(value.address, 'address')!;
-  if (!partial || value.version !== undefined) result.version = text(value.version, 'version')!;
+  if (value.version !== undefined) result.version = text(value.version, 'version')!;
   if (!partial || value.map_id !== undefined) result.map_id = text(value.map_id, 'map_id')!;
   if (value.id !== undefined) result.id = text(value.id, 'id');
   if (value.enabled !== undefined) result.enabled = bool(value.enabled, 'enabled');

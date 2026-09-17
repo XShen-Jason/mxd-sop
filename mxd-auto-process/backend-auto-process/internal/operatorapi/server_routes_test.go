@@ -42,15 +42,19 @@ func TestServerCreateIsNotShadowedByReadOnlyCatalogRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(`{"id":"new-server","name":"New server","address":"127.0.0.1:12661","version":"1.0.2","map_id":"211000000"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(`{"id":"new-server","name":"New server","address":"127.0.0.1:12661","map_id":"211000000"}`))
 	request.Header.Set("Authorization", "Bearer service-token")
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("server create was shadowed by the read-only route: got %d %s", recorder.Code, recorder.Body.String())
 	}
-	if _, ok := catalog.Get("new-server"); !ok {
+	created, ok := catalog.Get("new-server")
+	if !ok {
 		t.Fatal("created server was not added to the catalog")
+	}
+	if created.Version != servercatalog.DefaultVersion {
+		t.Fatalf("created server did not use the default version: %q", created.Version)
 	}
 	duplicate := httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(`{"id":"new-server","name":"New server","address":"127.0.0.1:12661","version":"1.0.2","map_id":"211000000"}`))
 	duplicate.Header.Set("Authorization", "Bearer service-token")

@@ -27,11 +27,33 @@ func TestCatalogAppliesDefaultsAndListsEnabledServers(t *testing.T) {
 	if !ok || entry.ConnectTimeoutSeconds != 8 || entry.RequestTimeoutSeconds != 10 || entry.MaxBodyBytes == 0 {
 		t.Fatalf("defaults were not applied: %+v", entry)
 	}
+	if entry.ChatResponseTimeoutSeconds != 3 || entry.SessionConfig().ChatResponseTimeout != 3*time.Second {
+		t.Fatalf("unexpected chat response timeout: %+v", entry)
+	}
+	if entry.Version != DefaultVersion || entry.SessionConfig().Version != DefaultVersion {
+		t.Fatalf("unexpected default protocol version: %+v", entry)
+	}
 	if len(catalog.PublicList()) != 3 {
 		t.Fatalf("unexpected public catalog")
 	}
 	if got := entry.SessionConfig().RetentionMode; got != gamesession.RetainSessionData {
 		t.Fatalf("unexpected default retention mode: %q", got)
+	}
+}
+
+func TestCatalogKeepsPerServerProtocolVersionOverride(t *testing.T) {
+	defaulted := validServer("default-version")
+	defaulted.Version = ""
+	overridden := validServer("overridden-version")
+	overridden.Version = "1.0.3"
+	catalog, err := New([]ServerConfig{defaulted, overridden})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotDefault, _ := catalog.Get(defaulted.ID)
+	gotOverride, _ := catalog.Get(overridden.ID)
+	if gotDefault.Version != "1.0.2" || gotOverride.Version != "1.0.3" || gotOverride.SessionConfig().Version != "1.0.3" {
+		t.Fatalf("unexpected versions: default=%q override=%q", gotDefault.Version, gotOverride.Version)
 	}
 }
 
@@ -48,6 +70,19 @@ func TestCatalogAlwaysUsesFixedHeartbeat(t *testing.T) {
 	config := entry.SessionConfig()
 	if config.HeartbeatInterval != 10*time.Second || config.HeartbeatOperation != 19 {
 		t.Fatalf("heartbeat was not fixed: interval=%s operation=%d", config.HeartbeatInterval, config.HeartbeatOperation)
+	}
+}
+
+func TestCatalogUpgradesLegacyOneSecondChatTimeout(t *testing.T) {
+	server := validServer("legacy-timeout")
+	server.ChatResponseTimeoutSeconds = 1
+	catalog, err := New([]ServerConfig{server})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, _ := catalog.Get(server.ID)
+	if entry.ChatResponseTimeoutSeconds != 3 || entry.SessionConfig().ChatResponseTimeout != 3*time.Second {
+		t.Fatalf("legacy chat timeout was not upgraded: %+v", entry)
 	}
 }
 

@@ -203,7 +203,7 @@ func normalizeConfig(config Config) Config {
 		config.RequestTimeout = 10 * time.Second
 	}
 	if config.ChatResponseTimeout <= 0 {
-		config.ChatResponseTimeout = time.Second
+		config.ChatResponseTimeout = 3 * time.Second
 	}
 	if config.MapReadyTimeout <= 0 {
 		config.MapReadyTimeout = 8 * time.Second

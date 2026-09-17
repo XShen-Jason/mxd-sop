@@ -32,3 +32,7 @@ Overview, setup sessions, server/account CRUD, account lifecycle, messaging,
 and execution routes retain the mappings registered in `docs/CONTRACTS.md`.
 The adapter sends the configured service token and authenticated actor headers;
 credentials remain write-only.
+
+Server create accepts an optional `version`; auto persists `1.0.2` when it is
+omitted. Server update accepts `version` as an independent per-server override,
+and changing it restarts that server's managed account sessions.

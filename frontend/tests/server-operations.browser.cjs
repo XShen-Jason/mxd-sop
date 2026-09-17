@@ -95,6 +95,7 @@ async function runViewport(browser, width) {
         servers: [
           { id: 'mushroom', displayName: 'Mushroom Server' },
           { id: 'yeti', displayName: 'Yeti Server' },
+          { id: 'piaopiao-pig', displayName: 'Piaopiao Pig' },
         ],
         reasons: [], operations: [], commandRuleVersion: 'browser-test',
       };
@@ -157,7 +158,7 @@ async function runViewport(browser, width) {
     } else if (pathname === '/api/v1/auto/servers/mushroom' && request.method() === 'PATCH') {
       const payload = request.postDataJSON();
       serverUpdateRequests += 1;
-      assert.deepEqual(payload, { name: 'Mushroom Server', address: '45.117.11.231:12661' });
+      assert.deepEqual(payload, { name: 'Mushroom Server', address: '45.117.11.231:12661', version: '1.0.3' });
       server = { ...server, ...payload };
       body = server;
     } else if (pathname === '/api/v1/auto/servers/mushroom' && request.method() === 'DELETE') {
@@ -283,7 +284,10 @@ async function runViewport(browser, width) {
 
   await page.locator('.server-configure-button:not([disabled])').click();
   const setup = page.locator('.server-dialog');
+  await setup.locator('select').selectOption('piaopiao-pig');
+  assert.equal(await setup.locator('input[placeholder="1.0.2"]').inputValue(), '1.0.3');
   await setup.locator('select').selectOption('mushroom');
+  assert.equal(await setup.locator('input[placeholder="1.0.2"]').inputValue(), '1.0.2');
   const addressInputs = setup.locator('.tcp-address-grid input');
   await addressInputs.nth(0).fill('45.117.11.230');
   await addressInputs.nth(1).fill('12660');
@@ -406,6 +410,7 @@ async function runViewport(browser, width) {
   const editAddressInputs = serverEditDialog.locator('.tcp-address-grid input');
   await editAddressInputs.nth(0).fill('45.117.11.231');
   await editAddressInputs.nth(1).fill('12661');
+  await serverEditDialog.locator('input[placeholder="1.0.2"]').fill('1.0.3');
   await serverEditDialog.locator('form .primary-button').click();
   await page.locator('.server-list-copy').getByText('45.117.11.231:12661', { exact: true }).waitFor();
   assert.equal(serverUpdateRequests, 1);

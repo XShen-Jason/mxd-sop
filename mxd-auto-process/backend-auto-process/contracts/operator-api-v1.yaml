@@ -470,12 +470,12 @@ components:
             accounts: {type: array, items: {$ref: '#/components/schemas/AccountSnapshot'}}
     CreateServerRequest:
       type: object
-      required: [name, address, version, map_id]
+      required: [name, address, map_id]
       properties:
         id: {type: string}
         name: {type: string, minLength: 1}
         address: {type: string, minLength: 1}
-        version: {type: string, minLength: 1}
+        version: {type: string, minLength: 1, default: 1.0.2}
         map_id: {type: string, minLength: 1}
         enabled: {type: boolean, default: true}
     UpdateServerRequest:

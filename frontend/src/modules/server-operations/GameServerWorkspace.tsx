@@ -113,7 +113,7 @@ export function GameServerWorkspace({ options, userId, token, connectionEnabled,
     const name = editingServer?.name ?? catalog?.displayName;
     if (!name) return setError('请选择服务器');
     const address = formatAddress(value.host, Number(value.port));
-    const action = editingServer ? () => client.updateAutoServer(editingServer.id, { name, address }) : () => client.createAutoServer({ id: value.catalogId, name, address, version: '1.0.2', map_id: '211000000', enabled: true });
+    const action = editingServer ? () => client.updateAutoServer(editingServer.id, { name, address, version: value.version }) : () => client.createAutoServer({ id: value.catalogId, name, address, version: value.version, map_id: '211000000', enabled: true });
     if (await run(`server-${value.catalogId}`, action, editingServer ? '服务器配置已更新' : '服务器已添加')) { setEditingServer(null); setServerDialogOpen(false); }
   };
   const cancelAccountSetup = (sessionId?: string) => {

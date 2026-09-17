@@ -49,6 +49,10 @@ vulnerability scanning.
 - The session snapshot keeps success, failure, and unknown delivery counters
   for written chat frames. Follow-up system notifications are not counted as
   additional sends.
+- Heartbeats and business operations share one transport lock. While a chat or
+  another business operation is in flight, the scheduled heartbeat is skipped;
+  asynchronous `evt=18` messages are ignored while the chat waits for its
+  command-specific terminal result.
 - When a login response supplies a role opaque, the session automatically
   carries it into the matching `op=6` request. No separate opaque-fetch
   operation is implemented until a successful capture identifies its wire
@@ -80,7 +84,9 @@ a runtime resolver may supply it from a successful matching capture (or one
   unambiguous shared capture when the endpoint has no local evidence), so the
   operator does not need to enter the value. Server-specific version,
   map ID, request/response timeouts, retention mode, and optional heartbeat
-  settings come from the server catalog. The opt-in
+  settings come from the server catalog. The protocol version defaults to
+  `1.0.2` when omitted and may be overridden independently for each server.
+  The opt-in
 `minimal` retention mode discards login-derived key/role state and requires a
 selection-time opaque source, either an explicit compatibility value or the
 resolver. Missing or ambiguous automatic input does not destroy the logged-in

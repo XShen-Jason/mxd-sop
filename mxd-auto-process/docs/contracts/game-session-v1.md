@@ -19,6 +19,9 @@ The supported operations are:
 | post-entry init `op=8` | no parameters | `resp`, op 8, `rc=0` |
 | chat `op=10` | field 21=`scene`, `guild`, `team`, `world`, or `privateChat`; field 23 message | frame written, then bounded matching event observation |
 
+Field 35 uses the selected server catalog entry's protocol version. Each
+server stores its own value; omitted versions default to `1.0.2`.
+
 ## Response/handling
 
 The client ignores unrelated framed messages while waiting for the matching
@@ -98,7 +101,7 @@ treated as success.
 ## Limits and side effects
 
 Frames default to 4 MiB; chat messages default to 512 Unicode code points.
-Operations use configured deadlines, including a one-second default chat
+Operations use configured deadlines, including a three-second default chat
 response window. One session has at most one ordered business operation in
 flight. `ChatResult.delivery_status` is the business classification and is
 independent from `status`, which describes whether a server response was

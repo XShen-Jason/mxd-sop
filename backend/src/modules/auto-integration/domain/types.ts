@@ -104,7 +104,7 @@ export interface AutoServerInput {
   id?: string;
   name: string;
   address: string;
-  version: string;
+  version?: string;
   map_id: string;
   enabled?: boolean;
 }

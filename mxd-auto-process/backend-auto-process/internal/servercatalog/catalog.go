@@ -113,13 +113,15 @@ func load(path string, persistence Persistence) (*Catalog, error) {
 func New(entries []ServerConfig) (*Catalog, error) {
 	servers := make(map[string]ServerConfig, len(entries))
 	for _, entry := range entries {
+		entry = upgradeLegacyDefaults(entry)
+		entry = withDefaults(entry)
 		if err := validate(entry); err != nil {
 			return nil, err
 		}
 		if _, exists := servers[entry.ID]; exists {
 			return nil, fmt.Errorf("duplicate server id %q", entry.ID)
 		}
-		servers[entry.ID] = withDefaults(entry)
+		servers[entry.ID] = entry
 	}
 	return &Catalog{servers: servers}, nil
 }
@@ -138,10 +140,10 @@ func (c *Catalog) List() []ServerConfig {
 }
 
 func (c *Catalog) Upsert(entry ServerConfig) error {
+	entry = withDefaults(entry)
 	if err := validate(entry); err != nil {
 		return err
 	}
-	entry = withDefaults(entry)
 	c.mu.Lock()
 	candidate := c.copyLocked()
 	candidate[entry.ID] = entry

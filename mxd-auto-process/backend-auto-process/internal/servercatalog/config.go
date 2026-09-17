@@ -11,6 +11,11 @@ import (
 	"github.com/local/mxd-auto-process/internal/gamesession"
 )
 
+const (
+	DefaultVersion                    = "1.0.2"
+	defaultChatResponseTimeoutSeconds = 3
+)
+
 func (s ServerConfig) SessionConfig() gamesession.Config {
 	requireMapEvents := true
 	if s.RequireMapEvents != nil {
@@ -74,6 +79,9 @@ func validate(entry ServerConfig) error {
 }
 
 func withDefaults(entry ServerConfig) ServerConfig {
+	if strings.TrimSpace(entry.Version) == "" {
+		entry.Version = DefaultVersion
+	}
 	if entry.MaxBodyBytes == 0 {
 		entry.MaxBodyBytes = 4 * 1024 * 1024
 	}
@@ -84,7 +92,7 @@ func withDefaults(entry ServerConfig) ServerConfig {
 		entry.RequestTimeoutSeconds = 10
 	}
 	if entry.ChatResponseTimeoutSeconds <= 0 {
-		entry.ChatResponseTimeoutSeconds = 1
+		entry.ChatResponseTimeoutSeconds = defaultChatResponseTimeoutSeconds
 	}
 	if entry.MapReadyTimeoutSeconds <= 0 {
 		entry.MapReadyTimeoutSeconds = 8
@@ -93,6 +101,16 @@ func withDefaults(entry ServerConfig) ServerConfig {
 		Enabled:         true,
 		IntervalSeconds: int(gamesession.FixedHeartbeatInterval / time.Second),
 		Operation:       gamesession.FixedHeartbeatOperation,
+	}
+	return entry
+}
+
+func upgradeLegacyDefaults(entry ServerConfig) ServerConfig {
+	// One second was the former generated default and is too short for command
+	// batches with interleaved asynchronous server events. Existing catalogs are
+	// persisted in SQLite, so upgrading only servers.json would not affect them.
+	if entry.ChatResponseTimeoutSeconds == 1 {
+		entry.ChatResponseTimeoutSeconds = defaultChatResponseTimeoutSeconds
 	}
 	return entry
 }
