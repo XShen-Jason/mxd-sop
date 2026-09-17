@@ -1,17 +1,26 @@
 export type Role = 'customer' | 'manager' | 'super_admin';
+export type WorkspaceId = 'request' | 'records' | 'reminders' | 'queue' | 'ready' | 'reissue' | 'archive' | 'activities' | 'player-directory' | 'team-view' | 'accounts' | 'server-operations';
+export type WorkspacePermissions = Record<WorkspaceId, boolean>;
+export type UploadPermissionId = 'player-directory' | 'team-view' | 'item-catalog';
+export type UploadPermissions = Record<UploadPermissionId, boolean>;
 export type GroupStatus = 'pending' | 'approved' | 'rejected' | 'issued' | 'completed' | 'cancelled';
+export type AutomationFailureReason = 'no-online-accounts' | 'execution-failed';
 export type OperationType = 'item' | 'cash' | 'kick' | 'ban' | 'warp';
 
 export interface Identity {
   id: string;
   role: Role;
   displayName: string;
+  workspacePermissions?: Partial<WorkspacePermissions>;
+  uploadPermissions?: Partial<UploadPermissions>;
 }
 
 export interface UserSummary extends Identity {
   username: string;
   active: boolean;
   createdAt: string;
+  workspacePermissions: WorkspacePermissions;
+  uploadPermissions: UploadPermissions;
   createdBy?: { id: string; displayName: string };
 }
 
@@ -106,6 +115,7 @@ export interface OperationGroup {
   lastRemindedAt?: string;
   lastRemindedBy?: { id: string; displayName: string };
   executionNote?: string;
+  automationFailureReason?: AutomationFailureReason;
   commandRuleVersion: string;
   idempotencyKey?: string;
   requestFingerprint?: string;
@@ -154,6 +164,7 @@ export interface CustomerGroupProjection {
   lastRemindedAt?: string;
   lastRemindedBy?: { id: string; displayName: string };
   executionNote?: string;
+  automationFailureReason?: AutomationFailureReason;
 }
 
 export interface ManagerGroupProjection extends CustomerGroupProjection {
@@ -176,5 +187,7 @@ export interface Activity {
   name: string;
   description: string;
   rewards: ActivityReward[];
+  /** Defaults to true for activities created before visibility was introduced. */
+  visible?: boolean;
   updatedAt: string;
 }

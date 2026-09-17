@@ -31,12 +31,16 @@ describe('SQLite deployment persistence', () => {
     const users = await first.inject({ method: 'GET', url: '/api/v1/auth/users', headers: { cookie } });
     expect(users.json().users).toHaveLength(1);
     expect(users.json().users[0].role).toBe('super_admin');
+    expect((await first.inject({ method: 'POST', url: '/api/v1/player-integration/connection', headers: { cookie }, payload: { enabled: false, confirmation: 'CHANGE PLAYER CONNECTION' } })).statusCode).toBe(200);
+    expect((await first.inject({ method: 'POST', url: '/api/v1/auto/connection', headers: { cookie }, payload: { enabled: false, confirmation: 'CHANGE AUTO CONNECTION' } })).statusCode).toBe(200);
     await first.close();
 
     const second = await createApp({ databasePath, catalogPath });
     const me = await second.inject({ method: 'GET', url: '/api/v1/auth/me', headers: { cookie } });
     expect(me.statusCode).toBe(200);
     expect(me.json().username).toBe('owner');
+    expect((await second.inject({ method: 'GET', url: '/api/v1/player-integration/status', headers: { cookie } })).json().enabled).toBe(false);
+    expect((await second.inject({ method: 'GET', url: '/api/v1/auto/status', headers: { cookie } })).json().enabled).toBe(false);
     await second.close();
   });
 
@@ -93,14 +97,36 @@ describe('SQLite deployment persistence', () => {
 
   it('migrates reminder columns on an existing operation group table', () => {
     const legacy = new Database(legacyDatabasePath);
-    legacy.exec('CREATE TABLE operation_groups (id TEXT PRIMARY KEY, submitted_by_id TEXT NOT NULL, status TEXT NOT NULL, server_id TEXT NOT NULL, submitted_at TEXT NOT NULL, idempotency_key TEXT, request_fingerprint TEXT, payload_json TEXT NOT NULL)');
+    legacy.exec(`
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        display_name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        tab_permissions_json TEXT,
+        password_hash TEXT NOT NULL,
+        active INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        created_by_json TEXT
+      );
+      CREATE TABLE operation_groups (id TEXT PRIMARY KEY, submitted_by_id TEXT NOT NULL, status TEXT NOT NULL, server_id TEXT NOT NULL, submitted_at TEXT NOT NULL, idempotency_key TEXT, request_fingerprint TEXT, payload_json TEXT NOT NULL);
+      CREATE TABLE player_integration_state (id INTEGER PRIMARY KEY, mode TEXT NOT NULL, updated_at TEXT NOT NULL, updated_by_id TEXT, updated_by_name TEXT)
+    `);
+    legacy.prepare('INSERT INTO users (id, username, display_name, role, tab_permissions_json, password_hash, active, created_at, created_by_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run('legacy-user', 'legacy-user', 'Legacy User', 'customer', JSON.stringify({ ready: true }), 'scrypt$legacy', 1, '2026-01-01T00:00:00Z', null);
     legacy.close();
     const db = openDatabase(legacyDatabasePath);
     try {
+      const userColumns = (db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>).map((column) => column.name);
       const columns = (db.prepare('PRAGMA table_info(operation_groups)').all() as Array<{ name: string }>).map((column) => column.name);
       const reminderIndex = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'groups_reminders'").get();
+      const playerIntegrationColumns = (db.prepare('PRAGMA table_info(player_integration_state)').all() as Array<{ name: string }>).map((column) => column.name);
+      expect(userColumns).toContain('workspace_permissions_json');
+      expect(userColumns).not.toContain('tab_permissions_json');
+      expect(db.prepare('SELECT workspace_permissions_json FROM users WHERE id = ?').get('legacy-user')).toEqual({ workspace_permissions_json: JSON.stringify({ ready: true }) });
       expect(columns).toEqual(expect.arrayContaining(['reminder_count', 'last_reminded_at', 'last_reminded_by_json']));
       expect(reminderIndex).toBeTruthy();
+      expect(playerIntegrationColumns).toContain('enabled');
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'auto_integration_state'").get()).toBeTruthy();
     } finally {
       db.close();
     }

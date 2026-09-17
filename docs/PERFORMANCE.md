@@ -51,8 +51,9 @@ active workspace. Navigation counts refresh only on membership changes, and
 hidden tabs defer requests until visible, with no interval polling. Reminder
 lists are filtered and paginated in SQLite.
 
-Frontend GET requests use a short-lived in-memory cache keyed by role and full
-request URL, and concurrent reads for the same key share one promise. Mutations
+Frontend GET requests use a short-lived in-memory cache keyed by authenticated
+user scope and full request URL, and concurrent reads for the same key share one
+promise. Mutations
 and SSE changes invalidate the cache; login/logout also closes the shared SSE
 connection so credentials are never reused across sessions.
 
@@ -83,6 +84,16 @@ support directory. The player endpoint parses and upserts rows in one SQLite
 transaction, with a 1,000,000-character file limit and no filesystem copy.
 Health checks and the super-admin switch are explicit requests; they do not
 poll or fall back silently during an account write.
+
+Player and auto integration connection gates are persisted locally. Disabled
+status reads do not issue remote health checks, and all other adapter operations
+fail before network I/O. The team-view scheduler aborts an in-flight player
+snapshot and performs no remote retry while disabled. The game-server frontend
+stops its two-second auto overview polling until the connection is re-enabled;
+existing auto processes and game sessions are not stopped. Approvals short-circuit
+to the persisted manual `approved` workflow while auto is disabled, so they add
+no execution request, retry traffic, or failure-reminder write. Re-enabling does
+not scan or dispatch the existing manual backlog.
 ## Current deployment baseline
 
 For up to 10 internal users, SQLite in WAL mode with `synchronous=NORMAL`,

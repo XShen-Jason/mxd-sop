@@ -81,7 +81,11 @@ it('enforces HTTP authorization, validates inputs and persists imports for reade
     const url = '/api/v1/team-view/clears/import';
     const payload = { serverId: 'mushroom', file: csv([row('17')]) };
     expect((await app.inject({ method: 'POST', url, payload })).statusCode).toBe(401);
-    for (const role of ['customer', 'manager']) expect((await app.inject({ method: 'POST', url, payload, headers: { 'x-user-id': role === 'customer' ? 'customer-a' : 'manager-b', 'x-user-role': role } })).statusCode).toBe(403);
+    const noTeam = await app.inject({ method: 'POST', url: '/api/v1/auth/users', headers: { 'x-user-id': 'super-admin', 'x-user-role': 'super_admin' }, payload: { username: 'no-team-view', displayName: 'No Team View', password: 'Customer123', role: 'customer', workspacePermissions: { 'team-view': false } } });
+    expect(noTeam.statusCode).toBe(201);
+    const noTeamLogin = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'no-team-view', password: 'Customer123' } });
+    expect((await app.inject({ method: 'POST', url, payload, headers: { authorization: `Bearer ${noTeamLogin.json().token}` } })).statusCode).toBe(403);
+    for (const role of ['customer', 'manager']) expect((await app.inject({ method: 'POST', url, payload, headers: { 'x-user-id': role === 'customer' ? 'customer-a' : 'manager-b', 'x-user-role': role } })).statusCode).toBe(201);
     const headers = { 'x-user-id': 'super-admin', 'x-user-role': 'super_admin' };
     expect((await app.inject({ method: 'POST', url, headers, payload: { ...payload, serverId: '' } })).statusCode).toBe(400);
     const response = await app.inject({ method: 'POST', url, headers, payload });

@@ -33,6 +33,20 @@ describe('command-generation.generate', () => {
     expect(generate({ characterId: '7', operations: [{ type: 'cash', quantity: 1 }] }).commands[0].text).toBe('cashid@7@1');
   });
 
+  it('keeps one generated command per submitted item operation', () => {
+    const operations = Array.from({ length: 20 }, (_, index) => ({
+      type: 'item' as const,
+      itemCode: `020000${String(index).padStart(2, '0')}`,
+      itemName: `Test item ${index}`,
+      quantity: 1,
+    }));
+    const commands = generateCommands('7', operations);
+    expect(commands).toHaveLength(20);
+    expect(commands.map((command) => command.text)).toEqual(
+      operations.map((operation) => `drop@7@${operation.itemCode}@1`),
+    );
+  });
+
   it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])('rejects invalid quantity %s', (quantity) => {
     expect(() => generateCommands('1', [{ type: 'cash', quantity }])).toThrowError(CommandGenerationError);
   });

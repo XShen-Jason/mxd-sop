@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
-import { CatalogError, ItemCatalog, loadCatalogFromCsv, loadCatalogFromJson, loadCatalogImageMap } from '../src/modules/item-catalog/public/index.js';
+import os from 'node:os';
+import { CatalogError, ItemCatalog, loadCatalogFromCsv, loadCatalogFromCsvContent, loadCatalogFromJson, loadCatalogImageMap, replaceCatalogCsv } from '../src/modules/item-catalog/public/index.js';
 
 const requestedMedals = [
   ['01142392', '人级勋章'], ['01142977', '地级勋章'], ['01142504', '天级勋章'],
@@ -77,5 +78,29 @@ describe('item-catalog.search', () => {
     expect(loaded.size).toBe(5830);
     expect(loaded.lookup('02000000')).toMatchObject({ image: '/item-images/02000000.png' });
     expect(loaded.lookup('0')?.image).toBeUndefined();
+  });
+
+  it('rejects uploaded CSV files whose header or rows do not match the catalog format', () => {
+    const valid = 'Id,item_id,class,name\n1,00000001,consume,Test item\n';
+    expect(loadCatalogFromCsvContent(valid, { strict: true }).size).toBe(1);
+    expect(() => loadCatalogFromCsvContent('Id,item_id,name\n1,00000001,Test item\n', { strict: true })).toThrowError(CatalogError);
+    expect(() => loadCatalogFromCsvContent('Id,item_id,class,name\n1,00000001,consume\n', { strict: true })).toThrowError(CatalogError);
+  });
+
+  it('accepts the startup CSV through the replacement path with the same row policy', () => {
+    const sourcePath = fs.existsSync(path.resolve(process.cwd(), 'data/item-catalog/source/道具表-9-5.csv'))
+      ? path.resolve(process.cwd(), 'data/item-catalog/source/道具表-9-5.csv')
+      : path.resolve(process.cwd(), '..', 'data/item-catalog/source/道具表-9-5.csv');
+    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'mxdcmd-catalog-'));
+    const targetPath = path.join(temporaryDirectory, 'catalog.csv');
+    const source = fs.readFileSync(sourcePath, 'utf8');
+    try {
+      const startup = loadCatalogFromCsv(sourcePath, { skipInvalidRows: true });
+      const replaced = replaceCatalogCsv(targetPath, source, { skipInvalidRows: true });
+      expect(replaced.size).toBe(startup.size);
+      expect(fs.readFileSync(targetPath, 'utf8')).toBe(source);
+    } finally {
+      fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
   });
 });

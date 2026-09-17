@@ -13,13 +13,26 @@ async function main() {
       let imported = false;
       let applications = 0;
       let role = 'super_admin';
+      let customerTeamAccess = true;
+      const allWorkspacePermissions = {
+        request: true, records: true, reminders: true, queue: true, ready: true, reissue: true,
+        archive: true, activities: true, 'player-directory': true, 'team-view': true, accounts: true,
+        'server-operations': true,
+      };
       const servers = [{ id: 'mushroom', displayName: '蘑菇仔' }, { id: 'yeti', displayName: '雪吉拉' }];
       await page.route('**/api/v1/**', async route => {
         const request = route.request();
         const url = new URL(request.url());
         let body = {};
-        if (url.pathname.endsWith('/auth/me')) body = { id: 'test', role, displayName: '测试账号' };
-        else if (url.pathname.endsWith('/options')) body = { servers, reasons: [], operationTypes: [] };
+        if (url.pathname.endsWith('/auth/me')) body = {
+          id: 'test', role, displayName: '测试账号',
+          workspacePermissions: role === 'super_admin' ? allWorkspacePermissions : {
+            request: true, records: true, reminders: true, 'player-directory': true,
+            'team-view': customerTeamAccess,
+          },
+        };
+        else if (url.pathname.endsWith('/options')) body = { servers, reasons: [], operations: [], commandRuleVersion: 'test' };
+        else if (url.pathname.endsWith('/activities')) body = { activities: [] };
         else if (url.pathname.endsWith('/clears/import')) {
           const payload = request.postDataJSON();
           assert.equal(payload.serverId, 'mushroom');
@@ -72,9 +85,23 @@ async function main() {
       await page.locator('input[type=date]').fill('2026-09-08');
       await page.locator('.team-cleared').first().waitFor();
       role = 'customer';
+      customerTeamAccess = true;
       await page.reload();
       await page.locator('.team-server-filter-row').waitFor();
-      assert.equal(await page.getByLabel('通关服务器').count(), 0);
+      const customerFileInput = page.getByLabel('通关 CSV');
+      assert.equal(await customerFileInput.count(), 1);
+      await page.getByLabel('通关服务器').selectOption('mushroom');
+      assert.equal(await customerFileInput.isDisabled(), false);
+      await customerFileInput.setInputFiles({ name: '9-8-customer.csv', mimeType: 'text/csv', buffer: Buffer.from('char_id,reason,created_at\n17,副本赞助点:黑龙,8/9/2026 20:00:00\n193,副本赞助点:黑龙,8/9/2026 20:00:00\n233,副本赞助点:黑龙,8/9/2026 20:00:00\n17,副本赞助点:进阶扎昆,8/9/2026 20:00:00') });
+      await page.getByRole('button', { name: '上传通关列表', exact: true }).click();
+      await page.getByText('已导入 4 条通关记录，1 个日期', { exact: true }).waitFor();
+      await page.getByRole('button', { name: '批量申请', exact: true }).first().click();
+      await page.getByText('已申请并自动过审 0 人，已申请跳过 3 人', { exact: true }).waitFor();
+      assert.equal(applications, 2);
+      customerTeamAccess = false;
+      await page.reload();
+      await page.waitForFunction(() => window.location.pathname === '/request');
+      assert.equal(await page.getByLabel('通关 CSV').count(), 0);
       assert.deepEqual(errors, []);
       await page.close();
       console.log(`PASS ${width}px: upload gating, date navigation, partial/full highlights, reload, role access, no overflow or browser errors`);

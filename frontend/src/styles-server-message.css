@@ -1,0 +1,46 @@
+.message-result-panel { margin-top: 16px; padding: 14px; border: 1px solid #d5e4dd; border-radius: 7px; background: #fbfdfc; }
+.message-result-panel.delivery-success { border-color: #a9d8c5; background: #f7fcf9; }
+.message-result-panel.delivery-failure { border-color: #edbcb3; background: #fffaf8; }
+.message-result-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+.message-result-heading h4 { color: var(--ink); font-size: 13px; }
+.message-result-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(90px, .72fr); gap: 8px; }
+.message-result-card { min-width: 0; padding: 10px; border: 1px solid #e0e9e4; border-radius: 5px; background: #fff; }
+.message-result-card-wide { grid-column: 1 / -1; }
+.message-result-label { display: block; color: #596864; font-size: 10px; font-weight: 700; }
+.message-result-value { min-width: 0; min-height: 25px; display: flex; align-items: center; margin-top: 7px; }
+.message-result-value-text { color: var(--ink); font-size: 11px; font-weight: 700; }
+.message-result-code, .message-result-full-content, .message-result-raw-content { min-width: 0; margin: 7px 0 0; overflow: auto; color: var(--ink); font: 11px/1.5 "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.message-result-code { display: block; margin-top: 7px; }
+.message-result-status-row { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.message-result-message-card { grid-column: span 1; }
+.message-result-raw-card { grid-column: span 2; }
+.message-result-raw-content { max-height: 112px; margin-top: 7px; }
+.message-delivery-badge, .message-command-label { display: inline-flex; align-items: center; min-height: 25px; padding: 4px 7px; border-radius: 4px; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.message-delivery-badge.delivery-success { color: #176f5d; background: #e1f3ec; }
+.message-delivery-badge.delivery-failure { color: #a54136; background: #fff0ed; }
+.message-delivery-badge.delivery-unknown { color: #8e671e; background: #fff1d2; }
+.message-command-label { border: 1px solid; letter-spacing: .03em; }
+.message-command-label.command-drop { color: #98601b; border-color: #e8c889; background: #fff6df; }
+.message-command-label.command-cashid { color: #356b92; border-color: #b9d5e7; background: #eef8ff; }
+.message-command-label.command-herwarp { color: #70588f; border-color: #d1c1e2; background: #f7f1fc; }
+.message-command-label.command-ban { color: #a54136; border-color: #edbcb3; background: #fff0ed; }
+.message-command-label.command-message { color: #536860; border-color: #d5e1db; background: #f1f6f3; }
+.message-result-full-content { max-height: 190px; margin-bottom: 0; }
+.message-result-metric { min-height: 42px; height: 42px; box-sizing: border-box; padding: 8px 10px; }
+.message-result-metric-value { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.message-result-metric .message-result-metric-value { height: 100%; margin-top: 0; }
+.message-result-metric-value strong { color: var(--ink); font: 700 14px/1.2 "SFMono-Regular", Consolas, monospace; }
+.message-service-status { padding: 3px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.message-service-status.delivery-success { color: #176f5d; background: #e1f3ec; }
+.message-service-status.delivery-failure { color: #a54136; background: #fff0ed; }
+.message-service-status.delivery-unknown { color: #8e671e; background: #fff1d2; }
+
+@media (max-width: 680px) {
+  .message-result-panel { padding: 12px; }
+  .message-account-row { grid-template-columns: minmax(0, 1.25fr) repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .message-result-metric { padding: 8px 7px; }
+  .message-result-grid { grid-template-columns: 1fr; }
+  .message-result-card-wide { grid-column: auto; }
+  .message-result-message-card, .message-result-raw-card { grid-column: auto; }
+  .message-result-raw-content { max-height: 150px; margin-top: 9px; }
+}

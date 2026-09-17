@@ -2,7 +2,8 @@
 
 ## team-view.import-clears (v1)
 
-`POST /api/v1/team-view/clears/import` requires `super_admin`, like player-directory imports.
+`POST /api/v1/team-view/clears/import` requires both the `team-view` workspace
+and the independent `team-view` upload permission.
 Body: `{ "serverId": "mushroom", "file": { "name": "9-8.csv", "content": "..." } }`.
 One CSV, at most 1,000,000 characters, 20,000 rows, 2 MiB JSON request.
 Required case-insensitive headers: `char_id`, `reason`, `created_at`.
@@ -17,7 +18,7 @@ Records are atomically merged by (date, server, boss, char_id), so repeat upload
 are idempotent and partial uploads preserve earlier clears. Multiple dates are
 stored separately. Response: `{ serverId, dates: ["2026-09-08"], rowCount,
 skippedRows, importedAt }`; rowCount counts unique recognized rows in the file.
-Errors: unauthorized (401), forbidden (403), unknown-server/invalid-file (400).
+Errors: unauthorized (401), forbidden (403, including either missing permission), unknown-server/invalid-file (400).
 
 The read projection adds `clearedMembers: string[]` and `cleared: boolean` to
 each team. All four matching dimensions must agree. `cleared` requires a
@@ -32,7 +33,8 @@ Clears persist independently of snapshot syncs, including uploads before a snaps
 `GET /api/v1/team-view`
 
 Authentication is required. `customer`, `manager`, and `super_admin` may read
-the endpoint. The optional `date` query parameter is the usage date in
+the endpoint when they have the `team-view` workspace. The optional `date`
+query parameter is the usage date in
 `YYYY-MM-DD` (Beijing calendar). When omitted, the current Beijing lock date
 is used.
 
@@ -68,6 +70,8 @@ teams returns `sourceStatus: "ready"` and a non-null `fetchedAt`.
 The daily pull runs at 00:05 Beijing for that same date. Startup after 00:05
 re-fetches today's snapshot; failures retry at one-minute intervals. Older
 dates require the deployment repair command. GET only reads the saved snapshot.
+An intentionally disabled player integration pauses the scheduler without a
+remote request or failure log; re-enabling resumes a due run immediately.
 
 The source adapter consumes the player service internal full-snapshot response
 shaped as `{ "date", "teams": [{ "id", "serverId", "bossType", "createdAt",
@@ -80,8 +84,8 @@ Stable errors include `unauthorized`, `invalid-date`, and
 
 ## team-view.apply-rewards (v1)
 
-`POST /api/v1/team-view/apply` accepts authenticated customer, manager and
-super_admin identities. Body: `{ "date": "2026-09-08", "serverId": "mushroom",
+`POST /api/v1/team-view/apply` accepts any authenticated identity with the
+`team-view` workspace. Body: `{ "date": "2026-09-08", "serverId": "mushroom",
 "type": "black-dragon" }`. Date is required and is the displayed lock date;
 type is black-dragon or zakum. The server reads the saved snapshot and clears;
 clients cannot supply members, quantities, account data or approval identities.

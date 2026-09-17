@@ -1,0 +1,703 @@
+openapi: 3.0.3
+info:
+  title: MXD Auto Process Operator API
+  version: 1.0.0
+  description: >-
+    The v1 boundary for mxd-auto-process. Monitoring projections and control
+    routes require the operator session cookie or the configured service token;
+    only health and operator login are public.
+security:
+  - operatorCookie: []
+  - serviceToken: []
+paths:
+  /api/v1/healthz:
+    get:
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: Service is running
+  /api/v1/overview:
+    get:
+      operationId: readOverview
+      parameters:
+        - name: include_logs
+          in: query
+          required: false
+          schema: {type: boolean, default: true}
+      responses:
+        '200':
+          description: Current server, account, session, and bounded audit projection
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Overview'}
+  /api/v1/logs:
+    get:
+      operationId: readLogs
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 200, default: 100}
+        - name: server_id
+          in: query
+          required: true
+          schema: {type: string}
+        - name: account_id
+          in: query
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: Latest redacted request audit entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [logs]
+                properties:
+                  logs: {type: array, items: {$ref: '#/components/schemas/AuditEntry'}}
+  /api/v1/events:
+    get:
+      operationId: readEvents
+      responses:
+        '200':
+          description: Server-sent overview snapshots, emitted every two seconds
+          content:
+            text/event-stream:
+              schema: {type: string}
+  /api/v1/operator/login:
+    post:
+      operationId: operatorLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OperatorLoginRequest'}
+      responses:
+        '200':
+          description: Operator session created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OperatorSession'}
+        '401': {description: Invalid credentials}
+        '429': {description: Login throttled}
+  /api/v1/operator/me:
+    get:
+      operationId: operatorMe
+      security:
+        - operatorCookie: []
+      responses:
+        '200':
+          description: Current operator session
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OperatorSession'}
+        '401': {description: Missing or expired operator session}
+  /api/v1/operator/password:
+    post:
+      operationId: changeOperatorPassword
+      security:
+        - operatorCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChangePasswordRequest'}
+      responses:
+        '200':
+          description: Password changed and first-login requirement cleared
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OperatorSession'}
+        '400': {description: Invalid current or new password}
+        '401': {description: Missing or expired operator session}
+  /api/v1/operator/logout:
+    post:
+      operationId: operatorLogout
+      security:
+        - operatorCookie: []
+      responses:
+        '204': {description: Operator session cleared}
+  /api/v1/servers:
+    get:
+      operationId: listServers
+      responses:
+        '200':
+          description: Configured server catalog without account credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [servers]
+                properties:
+                  servers: {type: array, items: {$ref: '#/components/schemas/Server'}}
+    post:
+      operationId: createServer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateServerRequest'}
+      responses:
+        '201':
+          description: Persisted server and current account projection
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ServerRecord'}
+        '400': {description: Invalid server definition}
+        '409': {description: Server already exists}
+        '401': {description: Operator or service authentication required}
+  /api/v1/servers/{serverId}:
+    parameters:
+      - {$ref: '#/components/parameters/ServerId'}
+    patch:
+      operationId: updateServer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UpdateServerRequest'}
+      responses:
+        '200':
+          description: Updated server and current account projection
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ServerRecord'}
+        '404': {description: Server not found}
+    delete:
+      operationId: deleteServer
+      responses:
+        '204': {description: Server, dependent accounts, and sessions removed}
+        '404': {description: Server not found}
+  /api/v1/servers/{serverId}/accounts:
+    parameters:
+      - {$ref: '#/components/parameters/ServerId'}
+    get:
+      operationId: listAccounts
+      responses:
+        '200':
+          description: Accounts without password fields
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accounts]
+                properties:
+                  accounts: {type: array, items: {$ref: '#/components/schemas/AccountSnapshot'}}
+    post:
+      operationId: createAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateAccountRequest'}
+      responses:
+        '201':
+          description: Account persisted; enabled accounts begin asynchronous login
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccountSnapshot'}
+        '409': {description: Duplicate account}
+  /api/v1/servers/{serverId}/executions:
+    parameters:
+      - {$ref: '#/components/parameters/ServerId'}
+    post:
+      operationId: executeSupportCommands
+      description: Execute one idempotent private-chat command batch. Auto selects an online account in round-robin order and persists per-command results. If the game server returns `请输入正确的玩家姓名。`, the current account is excluded for this execution and the same command is retried on the next online account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExecutionRequest'}
+      responses:
+        '200':
+          description: Persisted execution status; repeated execution_id requests do not duplicate completed commands. When no enabled online account exists, failure_reason is `no_online_accounts`.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExecutionResponse'}
+        '409': {description: Execution ID conflicts with another command batch}
+  /api/v1/servers/{serverId}/accounts/{accountId}:
+    parameters:
+      - {$ref: '#/components/parameters/ServerId'}
+      - {$ref: '#/components/parameters/AccountId'}
+    get:
+      operationId: getAccount
+      responses:
+        '200':
+          description: Account status without password fields
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccountSnapshot'}
+        '404': {description: Account not found}
+    patch:
+      operationId: updateAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UpdateAccountRequest'}
+      responses:
+        '200':
+          description: Updated account; enabled accounts restart asynchronously
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccountSnapshot'}
+        '404': {description: Account not found}
+    delete:
+      operationId: deleteAccount
+      responses:
+        '204': {description: Account credentials and session removed}
+        '404': {description: Account not found}
+  /api/v1/servers/{serverId}/accounts/{accountId}/start:
+    post:
+      operationId: startAccount
+      parameters:
+        - {$ref: '#/components/parameters/ServerId'}
+        - {$ref: '#/components/parameters/AccountId'}
+      responses:
+        '200':
+          description: Account enabled and login flow scheduled; status may be connecting
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccountSnapshot'}
+  /api/v1/servers/{serverId}/accounts/{accountId}/stop:
+    post:
+      operationId: stopAccount
+      parameters:
+        - {$ref: '#/components/parameters/ServerId'}
+        - {$ref: '#/components/parameters/AccountId'}
+      responses:
+        '200':
+          description: Account disabled and its TCP session closed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccountSnapshot'}
+  /api/v1/servers/{serverId}/accounts/{accountId}/reconnect:
+    post:
+      operationId: reconnectAccount
+      parameters:
+        - {$ref: '#/components/parameters/ServerId'}
+        - {$ref: '#/components/parameters/AccountId'}
+      responses:
+        '200':
+          description: Reconnect requested; status may be reconnecting or connecting
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccountSnapshot'}
+  /api/v1/servers/{serverId}/accounts/{accountId}/message:
+    post:
+      operationId: sendAccountMessage
+      parameters:
+        - {$ref: '#/components/parameters/ServerId'}
+        - {$ref: '#/components/parameters/AccountId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChatRequest'}
+      responses:
+        '200':
+          description: Chat delivery result and updated account projection
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccountMessageResponse'}
+        '409': {description: Account is disabled or offline}
+  /api/v1/servers/{serverId}/sessions:
+    post:
+      operationId: startSession
+      parameters:
+        - {$ref: '#/components/parameters/ServerId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '201':
+          description: Authenticated session with the server-returned role list; the session remains available for role selection
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+  /api/v1/servers/{serverId}/diagnostics/chat-without-login:
+    post:
+      operationId: keylessChatProbe
+      parameters:
+        - {$ref: '#/components/parameters/ServerId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChatRequest'}
+      responses:
+        '200':
+          description: Frame written; server acceptance is unconfirmed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KeylessChatResponse'}
+        '403': {description: Disabled by server configuration}
+  /api/v1/sessions:
+    get:
+      operationId: listSessions
+      responses:
+        '200':
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties:
+                  sessions: {type: array, items: {$ref: '#/components/schemas/Session'}}
+  /api/v1/sessions/{sessionId}:
+    parameters:
+      - {$ref: '#/components/parameters/SessionId'}
+    get:
+      operationId: getSession
+      responses:
+        '200': {description: Session snapshot}
+    delete:
+      operationId: stopSession
+      responses:
+        '204': {description: Session stopped}
+  /api/v1/sessions/{sessionId}/select:
+    post:
+      operationId: selectCharacter
+      parameters:
+        - {$ref: '#/components/parameters/SessionId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SelectRequest'}
+      responses: {'200': {description: Role selected}}
+  /api/v1/sessions/{sessionId}/select-and-enter:
+    post:
+      operationId: selectAndEnter
+      parameters:
+        - {$ref: '#/components/parameters/SessionId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SelectRequest'}
+      responses:
+        '200': {description: Role selected and map entered; safe to bind the session to a persisted account}
+  /api/v1/sessions/{sessionId}/enter:
+    post:
+      operationId: enterMap
+      parameters:
+        - {$ref: '#/components/parameters/SessionId'}
+      responses: {'200': {description: Map entered and initialized}}
+  /api/v1/sessions/{sessionId}/chat:
+    post:
+      operationId: sendSessionChat
+      parameters:
+        - {$ref: '#/components/parameters/SessionId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChatRequest'}
+      responses:
+        '200':
+          description: Chat result with bounded delivery classification
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ChatResponse'}
+  /api/v1/sessions/{sessionId}/diagnostics/protocol-state:
+    get:
+      operationId: readProtocolState
+      parameters:
+        - {$ref: '#/components/parameters/SessionId'}
+      responses:
+        '200':
+          description: Protected in-memory diagnostic state
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProtocolState'}
+  /api/v1/sessions/{sessionId}/diagnostics/chat-without-stored-key:
+    post:
+      operationId: keylessChatOnSession
+      parameters:
+        - {$ref: '#/components/parameters/SessionId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChatRequest'}
+      responses:
+        '200':
+          description: Chat result on the live connection without including the stored key
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KeylessChatResponseWithSession'}
+components:
+  securitySchemes:
+    operatorCookie:
+      type: apiKey
+      in: cookie
+      name: mxd_auto_operator
+      description: HttpOnly operator session issued by operator login
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: service-token
+      description: AUTO_SERVICE_TOKEN used by the separated operations backend
+  parameters:
+    ServerId: {name: serverId, in: path, required: true, schema: {type: string}}
+    AccountId: {name: accountId, in: path, required: true, schema: {type: string}}
+    SessionId: {name: sessionId, in: path, required: true, schema: {type: string}}
+  schemas:
+    Server:
+      type: object
+      required: [id, name, address, version, map_id, enabled]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        address: {type: string}
+        version: {type: string}
+        map_id: {type: string}
+        enabled: {type: boolean}
+        keyless_probe_enabled: {type: boolean}
+    ServerRecord:
+      allOf:
+        - {$ref: '#/components/schemas/Server'}
+        - type: object
+          required: [accounts]
+          properties:
+            accounts: {type: array, items: {$ref: '#/components/schemas/AccountSnapshot'}}
+    CreateServerRequest:
+      type: object
+      required: [name, address, version, map_id]
+      properties:
+        id: {type: string}
+        name: {type: string, minLength: 1}
+        address: {type: string, minLength: 1}
+        version: {type: string, minLength: 1}
+        map_id: {type: string, minLength: 1}
+        enabled: {type: boolean, default: true}
+    UpdateServerRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name: {type: string, minLength: 1}
+        address: {type: string, minLength: 1}
+        version: {type: string, minLength: 1}
+        map_id: {type: string, minLength: 1}
+        enabled: {type: boolean}
+    AccountSnapshot:
+      type: object
+      required: [id, server_id, username, character_id, enabled, status, updated_at]
+      properties:
+        id: {type: string}
+        server_id: {type: string}
+        username: {type: string}
+        character_id: {type: string}
+        character_name: {type: string}
+        enabled: {type: boolean}
+        status: {type: string, enum: [disabled, offline, connecting, online, reconnecting, failed]}
+        session_id: {type: string}
+        session: {$ref: '#/components/schemas/Session'}
+        last_error: {type: string}
+        updated_at: {type: string, format: date-time}
+      description: Password is deliberately absent from every response schema.
+    CreateAccountRequest:
+      type: object
+      required: [username, password, character_id]
+      properties:
+        username: {type: string, minLength: 1}
+        password: {type: string, minLength: 1, writeOnly: true}
+        character_id: {type: string, minLength: 1}
+        character_name: {type: string}
+        enabled: {type: boolean, default: true}
+        session_id: {type: string, description: Bind this account to an already authenticated and game-ready setup session}
+    UpdateAccountRequest:
+      type: object
+      minProperties: 1
+      properties:
+        username: {type: string, minLength: 1}
+        password: {type: string, minLength: 1, writeOnly: true, description: Omit to retain the encrypted password}
+        character_id: {type: string, minLength: 1}
+        character_name: {type: string}
+        enabled: {type: boolean}
+    OperatorLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: {type: string, minLength: 1}
+        password: {type: string, minLength: 1, writeOnly: true}
+    ChangePasswordRequest:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password: {type: string, minLength: 1, writeOnly: true}
+        new_password: {type: string, minLength: 6, writeOnly: true}
+    OperatorSession:
+      type: object
+      required: [user, must_change, expires_at]
+      properties:
+        user:
+          type: object
+          required: [username]
+          properties: {username: {type: string}}
+        must_change: {type: boolean}
+        expires_at: {type: string, format: date-time}
+    Overview:
+      type: object
+      required: [fetched_at, servers, sessions, logs]
+      properties:
+        fetched_at: {type: string, format: date-time}
+        servers: {type: array, items: {$ref: '#/components/schemas/ServerRecord'}}
+        sessions: {type: array, items: {$ref: '#/components/schemas/Session'}}
+        logs: {type: array, items: {$ref: '#/components/schemas/AuditEntry'}}
+    AuditEntry:
+      type: object
+      required: [id, created_at, method, path, status, duration_ms]
+      properties:
+        id: {type: string}
+        created_at: {type: string, format: date-time}
+        request_id: {type: string}
+        method: {type: string}
+        path: {type: string}
+        actor: {type: string}
+        action: {type: string}
+        status: {type: integer}
+        duration_ms: {type: integer, minimum: 0}
+        detail: {type: object, additionalProperties: true}
+    LoginRequest:
+      type: object
+      required: [account]
+      oneOf:
+        - required: [password]
+        - required: [token]
+      properties:
+        account: {type: string, minLength: 1}
+        password: {type: string, minLength: 1, writeOnly: true, description: Runtime password}
+        token: {type: string, minLength: 1, writeOnly: true, deprecated: true, description: Compatibility input for an already-derived protocol token}
+    SelectRequest:
+      type: object
+      required: [character_id]
+      properties:
+        character_id: {type: string, minLength: 1}
+        opaque: {type: string, writeOnly: true, description: Optional protected compatibility override for TCP operation 6 field 81}
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message: {type: string, minLength: 1, maxLength: 512}
+        mode:
+          type: string
+          enum: [scene, guild, team, world, privateChat]
+          default: privateChat
+          description: scene all-players, guild guild, team team, world world, privateChat private channel
+    ExecutionRequest:
+      type: object
+      required: [execution_id, commands]
+      properties:
+        execution_id: {type: string, minLength: 1}
+        retry: {type: boolean, default: false}
+        commands:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items:
+            type: object
+            required: [id, text]
+            properties:
+              id: {type: string, minLength: 1}
+              text: {type: string, minLength: 1, maxLength: 512}
+    ExecutionResponse:
+      type: object
+      required: [execution_id, status, attempts, commands]
+      properties:
+        execution_id: {type: string}
+        status: {type: string, enum: [running, success, failure]}
+        attempts: {type: integer, minimum: 1}
+        selected_account_id: {type: string}
+        failure_reason: {type: string, enum: [no_online_accounts, execution_failed]}
+        commands: {type: array, items: {type: object, additionalProperties: true}}
+    ChatResult:
+      type: object
+      required: [status, message, delivery_status, connection_mode, game_server_response_latency_ms, game_server_status]
+      properties:
+        status: {type: string, enum: [written_unconfirmed, server_response_received]}
+        message: {type: string}
+        server_response: {type: string}
+        server_response_type: {type: string, enum: [operation_response, system_event, chat_echo]}
+        server_response_observed: {type: boolean}
+        server_response_code: {type: integer}
+        server_event: {type: integer}
+        delivery_status: {type: string, enum: [success, failure, unknown]}
+        server_key_included: {type: boolean}
+        connection_mode: {type: string}
+        game_server_response_latency_ms:
+          type: integer
+          minimum: 0
+          description: Milliseconds from the auto process chat write until the matching game-server response or the bounded response timeout.
+        game_server_status:
+          type: string
+          enum: [success, failure, unknown]
+          description: Delivery classification produced from the game-server response; unknown means no terminal response was observed.
+    AccountMessageResponse:
+      type: object
+      required: [result, account]
+      properties:
+        result: {$ref: '#/components/schemas/ChatResult'}
+        account: {$ref: '#/components/schemas/AccountSnapshot'}
+    ChatResponse:
+      allOf:
+        - {$ref: '#/components/schemas/ChatResult'}
+        - type: object
+          required: [session]
+          properties:
+            session: {$ref: '#/components/schemas/Session'}
+    ProtocolState:
+      type: object
+      required: [server_key_stored, selected_role_opaque_stored, server_key_included_in_select, server_key_included_in_private_chat, role_opaque_included_in_select]
+      properties:
+        server_key: {type: string, description: Diagnostic-only raw login response key}
+        selected_role_opaque: {type: string, description: Diagnostic-only raw role opaque}
+        server_key_stored: {type: boolean}
+        selected_role_opaque_stored: {type: boolean}
+        server_key_included_in_select: {type: boolean}
+        server_key_included_in_private_chat: {type: boolean}
+        role_opaque_included_in_select: {type: boolean}
+    KeylessChatResponse:
+      description: Keyless responses always report server_key_included=false
+      allOf:
+        - {$ref: '#/components/schemas/ChatResult'}
+    KeylessChatResponseWithSession:
+      allOf:
+        - {$ref: '#/components/schemas/KeylessChatResponse'}
+        - type: object
+          required: [session]
+          properties:
+            session: {$ref: '#/components/schemas/Session'}
+    Session:
+      type: object
+      required: [id, server_id, state, created_at, updated_at, roles, chat_success_count, chat_failure_count, chat_unknown_count]
+      properties:
+        id: {type: string}
+        server_id: {type: string}
+        state: {type: string}
+        character_id: {type: string}
+        map_id: {type: string}
+        roles: {type: array, items: {$ref: '#/components/schemas/Role'}}
+        server_key_stored: {type: boolean}
+        selected_opaque_stored: {type: boolean}
+        chat_success_count: {type: integer, minimum: 0}
+        chat_failure_count: {type: integer, minimum: 0}
+        chat_unknown_count: {type: integer, minimum: 0}
+        last_error: {type: string}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    Role:
+      type: object
+      required: [id, opaque_available]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        map_id: {type: string}
+        opaque_available: {type: boolean}

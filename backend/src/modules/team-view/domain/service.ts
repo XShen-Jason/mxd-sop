@@ -1,3 +1,4 @@
+import { hasUploadAccess, hasWorkspaceAccess } from '../../auth/public/index.js';
 import type { Identity, ServerOption } from '../../../shared/types.js';
 import { TeamViewError } from './errors.js';
 import { teamRewards } from './rewards.js';
@@ -12,7 +13,7 @@ export class TeamViewService {
 
   importClears(actor: Identity, serverId: unknown, file: unknown) {
     this.requireAuthenticated(actor);
-    if (actor.role !== 'super_admin') throw new TeamViewError('forbidden');
+    if (!hasWorkspaceAccess(actor, 'team-view') || !hasUploadAccess(actor, 'team-view')) throw new TeamViewError('forbidden');
     if (typeof serverId !== 'string' || !this.servers.some(server => server.id === serverId)) throw new TeamViewError('unknown-server');
     const parsed = parseClearFile(file, serverId);
     const importedAt = new Date().toISOString();
@@ -23,6 +24,7 @@ export class TeamViewService {
 
   view(actor: Identity, date?: string): TeamViewResult {
     this.requireAuthenticated(actor);
+    if (!hasWorkspaceAccess(actor, 'team-view')) throw new TeamViewError('forbidden');
     const targetDate = normalizeDate(date) ?? businessDay(new Date());
     const snapshot = this.repository.get(targetDate);
     return this.project(targetDate, snapshot);

@@ -1,4 +1,5 @@
 import type { Identity, ServerOption } from '../../../shared/types.js';
+import { hasUploadAccess, hasWorkspaceAccess } from '../../auth/public/index.js';
 import { DirectoryError } from './errors.js';
 import { groupRows } from './search.js';
 import type { DirectoryPage, DirectoryRepository, DirectorySearchInput, PlayerAccountSync } from './types.js';
@@ -13,6 +14,7 @@ export class PlayerDirectoryService {
 
   search(actor: Identity, input: DirectorySearchInput = {}): DirectoryPage {
     this.requireAuthenticated(actor);
+    if (!hasWorkspaceAccess(actor, 'player-directory')) throw new DirectoryError('forbidden');
     const query = normalizeQuery(input.query);
     const serverId = normalizeServer(input.serverId, this.servers);
     const limit = normalizeLimit(input.limit);
@@ -24,12 +26,14 @@ export class PlayerDirectoryService {
 
   findCharacters(actor: Identity, serverId: string, characterIds: string[]) {
     this.requireAuthenticated(actor);
+    if (!hasWorkspaceAccess(actor, 'player-directory') && !hasWorkspaceAccess(actor, 'team-view')) throw new DirectoryError('forbidden');
     if (!normalizeServer(serverId, this.servers) || characterIds.length > 2000 || characterIds.some(id => !/^[0-9]+$/u.test(id))) throw new DirectoryError('invalid-query');
     return this.repository.findCharacters(serverId, [...new Set(characterIds)]);
   }
 
   async importFile(actor: Identity, serverId: string, file: UploadFile) {
-    if (actor.role !== 'super_admin') throw new DirectoryError('forbidden');
+    this.requireAuthenticated(actor);
+    if (!hasWorkspaceAccess(actor, 'player-directory') || !hasUploadAccess(actor, 'player-directory')) throw new DirectoryError('forbidden');
     const targetServer = normalizeServer(serverId, this.servers);
     if (!targetServer) throw new DirectoryError('invalid-file', 'a server is required');
     const imported = importCsvFile(file, targetServer);

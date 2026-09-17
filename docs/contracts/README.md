@@ -7,5 +7,7 @@
 - item-catalog.md：物品模糊搜索和固定分类读取。
 - activities.md：活动配置的跨角色读取和管理替换。
 - command-generation.md：后端内部的确定性指令生成接口。
+- player-integration.md：玩家服务连接门禁、运行位置与健康状态。
+- auto-integration.md：自动处理服务连接门禁与 HTTP 适配器。
 
 前端类型、OpenAPI 文档和 SDK（未来生成）只能由这些定义派生；不要手工维护第二份字段或业务规则。

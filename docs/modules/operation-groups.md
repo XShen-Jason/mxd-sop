@@ -17,7 +17,7 @@ In scope:
 - 校验服务器、账号、角色 ID、玩家 QQ、理由和 operation 列表。
 - 以提交者和 group 为边界保存文字信息、操作顺序、时间和审计字段。
 - 提交客服自己的列表、取消自己的未处理 group。
-- 为管理提供按服务器分组、按提交时间排序的待处理队列和全量归档查询。
+- 为拥有对应工作区的角色提供按服务器分组、按提交时间排序的待处理队列和全量归档查询；队列、待完成和两类记录统一返回管理投影，并提供该工作区对应的业务操作。
 - 在提交时解析物品目录并保存物品代码/名称快照。
 
 Out of scope:
@@ -74,13 +74,15 @@ Out of scope:
 - 只有提交者可以取消自己的 pending 物资 group 或 approved 常规 group；管理可审核 pending，管理可完成 approved 常规 group，超级管理可将 approved 物资确认发放。竞争请求以先成功的状态转换为准，另一方得到稳定冲突错误。
 - submittedAt、completedAt、cancelledAt 使用 UTC RFC 3339；历史 group 的物品代码和名称是提交时快照。
 - group 记录所用的 command rule version，或保证指令映射版本不可变，确保归档可重现历史指令。
-- 客服投影绝不包含 commands；管理投影才可组合 command-generation 的结果。
+- 自有申请和待提醒始终使用客服投影且绝不包含 commands；queue、ready、reissue、archive 工作区始终使用统一管理投影并包含 commands，获授权客服与管理端的展示数据一致。
 
 ## Public surface
 
-`operation-groups.mark-online` clears the owning submitter's active reminder
-while keeping the request approved. Reminder state changes are owned by
-`domain/reminders.ts`. The reminders UI offers a UserCheck action beside edit
+auto 连接开启时，审核通过和“用户已上线”通过 auto-integration 执行工单指令；本模块只拥有工单状态和提醒状态，auto-process 执行记录以 group ID 去重。成功由系统写入终态，失败保持 approved/待提醒。auto 连接关闭时不调用外部执行、不记录自动化失败，工单保持 approved 并回到原有的命令复制与人工确认流程；重新连接不会自动补跑已有手动工单。
+
+`operation-groups.mark-online` clears the owning submitter's active reminder,
+invokes one auto-process retry, and restores the reminder when delivery fails.
+Reminder state changes are owned by `domain/reminders.ts`. The reminders UI offers a UserCheck action beside edit
 and cancel, with a wider action column and a separate action row on mobile.
 `frontend/tests/reminder-online.browser.cjs` covers removal, repeat reminders,
 cross-page reset, failure, and action spacing.
@@ -92,7 +94,7 @@ groups atomically, preserves the authenticated applicant and records the system
 reviewer. Repository insertMany must be available; no partial-write fallback.
 See team-view.apply-rewards for reward-specific semantics.
 
-提醒上线由超级管理员在待完成记录上触发，所有角色通过独立的待提醒工作区查看本人被提醒且仍待处理的记录；发物资和常规操作均支持提醒，提醒不新增状态。所有申请在完成前可由提交者修改或取消，修改会清除旧审核及提醒信息并重新进入审核。
+提醒上线由拥有 `ready` 工作区的账号在待完成记录上触发，所有角色通过独立的待提醒工作区查看本人被提醒且仍待处理的记录；发物资和常规操作均支持提醒，提醒不新增状态。所有申请在完成前可由提交者修改或取消，修改会清除旧审核及提醒信息并重新进入审核。
 
 | Contract | 用途 |
 | --- | --- |
@@ -145,4 +147,13 @@ Browser coverage: `frontend/tests/ready-reminders.browser.cjs`.
 
 模块 ID 和 group/operation 字段语义必须保持稳定。更换数据库或 API 框架时只替换适配器和接口层；若增加 processing 等状态，先升级契约并记录迁移。
 
-工作流扩展使用 `pending`、`approved`、`rejected`、`issued` 和 `cancelled`；旧 `completed` 记录继续可读。客服可编辑/取消 pending 物资或 approved 常规操作记录，管理或超级管理可审核物资，管理角色可完成常规操作记录，只有超级管理可确认发放物资。
+工作流扩展使用 `pending`、`approved`、`rejected`、`issued` 和 `cancelled`；旧 `completed` 记录继续可读。提交者可编辑/取消 pending 物资或 approved 常规操作记录；拥有 `queue` 工作区可审核物资，拥有 `ready` 工作区可发放物资、完成常规操作并提醒，拥有 `archive` 工作区也可完成常规操作。
+
+## File budget exception
+
+`domain/service.ts` remains in the 301-400 line range because it keeps the
+operation-group lifecycle transitions and their transaction ordering in one
+cohesive service. The workspace checks are intentionally at those public
+operation boundaries; splitting them into a generic authorization layer would
+duplicate the state-specific access rules. Revisit the split if another
+cross-cutting capability is added.

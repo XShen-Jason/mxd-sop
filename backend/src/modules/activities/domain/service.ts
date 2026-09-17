@@ -1,4 +1,4 @@
-import { isManager } from '../../auth/public/index.js';
+import { hasWorkspaceAccess } from '../../auth/public/index.js';
 import type { Identity, Activity, ActivityReward } from '../../../shared/types.js';
 import type { ActivityRepository } from '../infrastructure/json-store.js';
 import { ActivityError } from './errors.js';
@@ -8,19 +8,19 @@ export class ActivitiesService {
 
   list(identity: Identity) {
     this.requireAuthenticated(identity);
-    return this.repository.all();
+    // The request form consumes the same read-only activity catalogue for
+    // quick filling, so either workspace grants this shared read.
+    if (!hasWorkspaceAccess(identity, 'activities') && !hasWorkspaceAccess(identity, 'request')) throw new ActivityError('forbidden');
+    const activities = this.repository.all();
+    return hasWorkspaceAccess(identity, 'activities') ? activities : activities.filter((activity) => activity.visible !== false);
   }
 
   replaceAll(identity: Identity, value: unknown) {
-    this.requireManager(identity);
+    this.requireAuthenticated(identity);
+    if (!hasWorkspaceAccess(identity, 'activities')) throw new ActivityError('forbidden');
     const activities = normalizeActivities(value, this.now().toISOString());
     this.repository.replaceAll(activities);
     return activities;
-  }
-
-  private requireManager(identity: Identity) {
-    this.requireAuthenticated(identity);
-    if (!isManager(identity)) throw new ActivityError('forbidden');
   }
 
   private requireAuthenticated(identity: Identity) {
@@ -43,7 +43,8 @@ function normalizeActivities(value: unknown, updatedAt: string): Activity[] {
     const rewards = input.rewards.map((reward) => normalizeReward(reward));
     const itemKeys = rewards.filter((reward) => reward.kind === 'item').map((reward) => `${reward.itemCode}:${reward.itemClass ?? ''}:${reward.itemLevel ?? 1}`);
     if (new Set(itemKeys).size !== itemKeys.length) throw new ActivityError('invalid-input', 'duplicate item reward');
-    return { id, name, description, rewards, updatedAt: optionalText(input.updatedAt, 64) ?? updatedAt };
+    const visible = input.visible === undefined ? undefined : booleanValue(input.visible);
+    return { id, name, description, rewards, ...(visible === undefined ? {} : { visible }), updatedAt: optionalText(input.updatedAt, 64) ?? updatedAt };
   });
 }
 
@@ -75,4 +76,9 @@ function optionalText(value: unknown, maxLength: number) {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'string' || value.length > maxLength) throw new ActivityError('invalid-input', 'invalid text');
   return value.trim();
+}
+
+function booleanValue(value: unknown) {
+  if (typeof value !== 'boolean') throw new ActivityError('invalid-input', 'invalid activity visibility');
+  return value;
 }

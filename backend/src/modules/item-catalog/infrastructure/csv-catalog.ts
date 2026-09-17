@@ -47,14 +47,35 @@ function parseCsv(source: string): string[][] {
   return rows;
 }
 
-export function loadCatalogFromCsv(filePath: string, options: TabularImportOptions = {}): ItemCatalog {
-  if (!fs.existsSync(filePath)) throw new CatalogError('catalog-unavailable', `catalog file not found: ${filePath}`);
+export function loadCatalogFromCsvContent(source: string, options: TabularImportOptions = {}): ItemCatalog {
   let rows: string[][];
   try {
-    rows = parseCsv(fs.readFileSync(filePath, 'utf8'));
+    rows = parseCsv(source);
   } catch (error) {
     if (error instanceof CatalogError) throw error;
     throw new CatalogError('catalog-unavailable', 'catalog file could not be parsed');
   }
   return catalogFromRows(rows, options);
+}
+
+export function loadCatalogFromCsv(filePath: string, options: TabularImportOptions = {}): ItemCatalog {
+  if (!fs.existsSync(filePath)) throw new CatalogError('catalog-unavailable', `catalog file not found: ${filePath}`);
+  return loadCatalogFromCsvContent(fs.readFileSync(filePath, 'utf8'), options);
+}
+
+export function replaceCatalogCsv(filePath: string, source: string, options: TabularImportOptions = {}) {
+  const next = loadCatalogFromCsvContent(source, { ...options, strict: true });
+  const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    fs.writeFileSync(temporaryPath, source, 'utf8');
+    try {
+      fs.renameSync(temporaryPath, filePath);
+    } catch {
+      fs.copyFileSync(temporaryPath, filePath);
+      fs.unlinkSync(temporaryPath);
+    }
+  } finally {
+    if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
+  }
+  return next;
 }

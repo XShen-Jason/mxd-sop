@@ -6,13 +6,12 @@ function body(request: FastifyRequest) {
   const value = request.body;
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PlayerIntegrationError('invalid-input');
   const result = value as Record<string, unknown>;
-  if (Object.keys(result).some((key) => !['mode', 'confirmation'].includes(key))) throw new PlayerIntegrationError('invalid-input');
   return result;
 }
 
 function sendError(reply: FastifyReply, error: unknown) {
   if (error instanceof PlayerIntegrationError) {
-    const status = error.code === 'forbidden' ? 403 : error.code === 'endpoint-unavailable' ? 503 : error.code === 'endpoint-not-configured' ? 503 : 400;
+    const status = error.code === 'forbidden' ? 403 : ['connection-disabled', 'endpoint-unavailable', 'endpoint-not-configured'].includes(error.code) ? 503 : 400;
     return reply.code(status).send({ error: { code: error.code, message: error.message } });
   }
   if (error instanceof AuthError) return reply.code(error.code === 'unauthorized' ? 401 : 403).send({ error: { code: error.code, message: error.message } });
@@ -25,6 +24,9 @@ export function registerPlayerIntegrationRoutes(app: FastifyInstance, service: P
     try { return reply.send(await service.status(identity(request))); } catch (error) { return sendError(reply, error); }
   });
   app.post('/api/v1/player-integration/switch', async (request, reply) => {
-    try { const value = body(request); return reply.send(await service.switchMode(identity(request), value.mode, value.confirmation)); } catch (error) { return sendError(reply, error); }
+    try { const value = body(request); if (Object.keys(value).some((key) => !['mode', 'confirmation'].includes(key))) throw new PlayerIntegrationError('invalid-input'); return reply.send(await service.switchMode(identity(request), value.mode, value.confirmation)); } catch (error) { return sendError(reply, error); }
+  });
+  app.post('/api/v1/player-integration/connection', async (request, reply) => {
+    try { const value = body(request); if (Object.keys(value).some((key) => !['enabled', 'confirmation'].includes(key))) throw new PlayerIntegrationError('invalid-input'); return reply.send(await service.setConnection(identity(request), value.enabled, value.confirmation)); } catch (error) { return sendError(reply, error); }
   });
 }

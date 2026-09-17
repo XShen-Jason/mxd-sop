@@ -8,15 +8,16 @@ owned by the separately deployed `mxd-player` service.
 ## Scope
 
 Also owns persisted CSV clear imports (`team-view.import-clears`), exact
-server/date/boss/character matching and per-member/whole-team status. Upload
-permissions and parsing semantics are defined in the contract. This data does
+server/date/boss/character matching and per-member/whole-team status. Imports
+require both the `team-view` workspace and its independent upload permission;
+parsing semantics are defined in the contract. This data does
 not mutate the player service and is independent of snapshot replacement.
 
 In scope:
 
 - Persisting one operations-desk snapshot per lock date, replaceable by a sync.
-- Reading a bounded, read-only projection for customer, manager, and
-  super-admin users.
+- Reading a bounded projection and applying eligible rewards for every
+  authenticated user with the `team-view` workspace.
 - Grouping the five configured servers, then `black-dragon` and `zakum`.
 - Sorting teams within a type by member count descending, first join time
   ascending, and stable team ID; assigning the displayed sequence after that
@@ -41,6 +42,9 @@ Out of scope:
 - Failures retry after 60 seconds, with one request in flight. Success resumes
   daily scheduling. A retry crossing midnight waits for the new day's 00:05;
   older missed dates can be repaired with `backend/dist/src/sync-team-view.js`.
+- When the player-integration connection is disabled, the scheduler aborts an
+  in-flight fetch and performs only a local gate check while paused. It emits no
+  failure log and sends no remote retry. Re-enabling wakes the due run immediately.
 - Character IDs are transported as digit-only strings.
 - A projection always contains every configured server and both boss types,
   including empty groups.

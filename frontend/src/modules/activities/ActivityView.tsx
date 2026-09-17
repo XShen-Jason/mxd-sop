@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
-import { CirclePlus, Pencil, Plus, Save, Search, Ticket, Trash2, X } from 'lucide-react';
+import { CirclePlus, Eye, EyeOff, FileUp, LoaderCircle, Pencil, Plus, Save, Search, Ticket, Trash2, Upload, X } from 'lucide-react';
 import { ApiClient, ApiError } from '../../api/client';
+import { CopyButton } from '../../components/CopyButton';
 import { ConfirmDialog } from '../../components/Dialog';
 import { FloatingNotice } from '../../components/FloatingNotice';
 import { ItemThumbnail } from '../../components/ItemThumbnail';
-import type { CatalogItem, Role } from '../../types';
+import type { CatalogItem } from '../../types';
 import { CatalogPager } from './CatalogPager';
 import { activityRewardLabel, catalogToReward, readActivities, writeActivities, type Activity, type ActivityReward } from './store';
 import { codeForLevel, isEquipment, MAX_EQUIPMENT_LEVEL, normalizeEquipmentLevel } from '../../shared/item-level';
@@ -25,9 +26,8 @@ function readRecentItems() {
   try { const value = JSON.parse(localStorage.getItem(RECENT_ITEMS_KEY) ?? '[]') as CatalogItem[]; return Array.isArray(value) ? value.slice(0, 12) : []; } catch { return []; }
 }
 
-export function ActivityView({ role = 'manager', token }: { role?: Role; token?: string }) {
-  const client = useMemo(() => new ApiClient(role, token), [role, token]);
-  const canEdit = role === 'manager' || role === 'super_admin';
+export function ActivityView({ userId, token, uploadEnabled = true }: { userId?: string; token?: string; uploadEnabled?: boolean }) {
+  const client = useMemo(() => new ApiClient(userId ?? 'anonymous', token), [userId, token]);
   const [activities, setActivities] = useState<Activity[]>(readActivities);
   const [editing, setEditing] = useState<Activity | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -38,13 +38,16 @@ export function ActivityView({ role = 'manager', token }: { role?: Role; token?:
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [catalogPage, setCatalogPage] = useState<CatalogPage>(emptyCatalogPage);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogFile, setCatalogFile] = useState<File | null>(null);
+  const [catalogUploading, setCatalogUploading] = useState(false);
+  const [catalogReloadKey, setCatalogReloadKey] = useState(0);
+  const [visibilitySavingId, setVisibilitySavingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Activity | null>(null);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const catalogCursor = catalogPage.cursors[catalogPage.index];
 
-  useEffect(() => { if (canEdit) writeActivities(activities); }, [activities, canEdit]);
+  useEffect(() => { writeActivities(activities); }, [activities]);
   useEffect(() => {
-    if (!canEdit) return;
     let active = true;
     void client.activities().then(({ activities: remote }) => {
       if (!active) return;
@@ -66,8 +69,8 @@ export function ActivityView({ role = 'manager', token }: { role?: Role; token?:
       if (active && error instanceof ApiError) setNotice({ kind: 'error', text: error.message });
     });
     return () => { active = false; };
-  }, [canEdit, client]);
-  useEffect(() => { if (!canEdit) return; try { localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(recentItems)); } catch { /* storage may be unavailable */ } }, [canEdit, recentItems]);
+  }, [client]);
+  useEffect(() => { try { localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(recentItems)); } catch { /* storage may be unavailable */ } }, [recentItems]);
   useEffect(() => {
     const text = query.trim();
     const source = typeFilter ? `class:${typeFilter}` : text ? `search:${text}` : '';
@@ -103,15 +106,14 @@ export function ActivityView({ role = 'manager', token }: { role?: Role; token?:
       if (timer !== undefined) window.clearTimeout(timer);
       controller.abort();
     };
-  }, [catalogCursor, catalogPage.index, catalogPage.source, client, query, typeFilter]);
+  }, [catalogCursor, catalogPage.index, catalogPage.source, catalogReloadKey, client, query, typeFilter]);
 
   const hasCatalogQuery = Boolean(typeFilter || query.trim());
   const visibleItems = useMemo(() => hasCatalogQuery ? catalogItems : recentItems, [catalogItems, hasCatalogQuery, recentItems]);
-  const startAdd = () => { if (!canEdit) return; setEditing(null); setDraft(emptyActivity()); setEditorOpen(true); };
-  const startEdit = (activity: Activity) => { if (!canEdit) return; const cash = activity.rewards.find((reward) => reward.kind === 'cash'); const itemRewards = activity.rewards.filter((reward) => reward.kind === 'item'); setEditing(activity); setDraft({ ...activity, rewards: [cash ?? { kind: 'cash', quantity: 0 }, ...itemRewards].map((reward) => ({ ...reward })) }); setEditorOpen(true); };
+  const startAdd = () => { setEditing(null); setDraft(emptyActivity()); setEditorOpen(true); };
+  const startEdit = (activity: Activity) => { const cash = activity.rewards.find((reward) => reward.kind === 'cash'); const itemRewards = activity.rewards.filter((reward) => reward.kind === 'item'); setEditing(activity); setDraft({ ...activity, rewards: [cash ?? { kind: 'cash', quantity: 0 }, ...itemRewards].map((reward) => ({ ...reward })) }); setEditorOpen(true); };
   const setReward = (index: number, next: Partial<ActivityReward>) => setDraft((current) => ({ ...current, rewards: current.rewards.map((reward, i) => i === index ? { ...reward, ...next } : reward) }));
   const save = async () => {
-    if (!canEdit) return;
     const cleanName = draft.name.trim();
     const rewards = draft.rewards.filter((reward) => reward.quantity > 0 && (reward.kind === 'cash' || reward.itemCode));
     if (!cleanName) { setNotice({ kind: 'error', text: '请输入活动名称' }); return; }
@@ -137,10 +139,10 @@ export function ActivityView({ role = 'manager', token }: { role?: Role; token?:
       return;
     }
   };
-  const remove = (activity: Activity) => { if (canEdit) setDeleteTarget(activity); };
+  const remove = (activity: Activity) => setDeleteTarget(activity);
   const selectType = (next: string) => { setTypeFilter(next); setQuery(''); };
   const confirmRemove = async () => {
-    if (!canEdit || !deleteTarget) return;
+    if (!deleteTarget) return;
     try {
       const result = await client.saveActivities(activities.filter((activity) => activity.id !== deleteTarget.id));
       setActivities(result.activities);
@@ -155,11 +157,46 @@ export function ActivityView({ role = 'manager', token }: { role?: Role; token?:
     return;
   };
   const chooseItem = (item: CatalogItem) => {
-    if (!canEdit || !editorOpen) return;
+    if (!editorOpen) return;
     if (!isEquipment(item.itemClass) && draft.rewards.some((reward) => reward.kind === 'item' && reward.itemCode === item.code)) { setNotice({ kind: 'error', text: '同一物品不能重复添加' }); return; }
     const index = draft.rewards.findIndex((reward) => reward.kind === 'item' && !reward.itemCode);
     setDraft((current) => index >= 0 ? { ...current, rewards: current.rewards.map((reward, i) => i === index ? catalogToReward(item, reward.quantity || 1) : reward) } : { ...current, rewards: [...current.rewards, catalogToReward(item)] });
     setRecentItems((current) => [item, ...current.filter((entry) => entry.code !== item.code)].slice(0, 12));
+  };
+
+  const selectCatalogFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const selected = [...(event.target.files ?? [])].find((entry) => entry.name.toLowerCase().endsWith('.csv')) ?? null;
+    setCatalogFile(selected);
+    event.target.value = '';
+  };
+  const uploadCatalog = async () => {
+    if (!uploadEnabled || !catalogFile || catalogUploading) return;
+    setCatalogUploading(true);
+    try {
+      const result = await client.importItemCatalog({ name: catalogFile.name, content: await catalogFile.text() });
+      setCatalogFile(null);
+      setCatalogReloadKey((value) => value + 1);
+      setNotice({ kind: 'success', text: `道具目录已替换，共 ${result.itemCount} 项` });
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof ApiError ? error.message : '上传失败，请检查 CSV 字段和格式' });
+    } finally {
+      setCatalogUploading(false);
+    }
+  };
+  const toggleVisibility = async (activity: Activity) => {
+    if (visibilitySavingId) return;
+    setVisibilitySavingId(activity.id);
+    const nextActivities = activities.map((entry) => entry.id === activity.id ? { ...entry, visible: entry.visible === false } : entry);
+    try {
+      const result = await client.saveActivities(nextActivities);
+      setActivities(result.activities);
+      setNotice({ kind: 'success', text: activity.visible === false ? '活动已显示' : '活动已隐藏' });
+      window.dispatchEvent(new Event('activities-updated'));
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof ApiError ? error.message : '活动可见性更新失败' });
+    } finally {
+      setVisibilitySavingId(null);
+    }
   };
 
   const cancelEditor = () => { setEditing(null); setDraft(emptyActivity()); setEditorOpen(false); };
@@ -168,11 +205,9 @@ export function ActivityView({ role = 'manager', token }: { role?: Role; token?:
   const nextPage = () => setCatalogPage((current) => current.nextCursor ? { ...current, index: current.index + 1, cursors: [...current.cursors.slice(0, current.index + 1), current.nextCursor], nextCursor: null } : current);
   const totalPages = catalogPage.totalCount === null ? 0 : Math.ceil(catalogPage.totalCount / ITEMS_PER_PAGE);
 
-  if (!canEdit) return null;
-
   return <section className="workspace activity-workspace"><div className="page-heading manager-heading"><div><p className="eyebrow">活动与道具</p><h1>活动与道具</h1></div><div className="heading-stat"><span>活动数量</span><strong>{activities.length}</strong></div></div><div className="activity-layout">
-    <section className="activity-left">{editorOpen ? <ActivityEditor draft={draft} setDraft={setDraft} setReward={setReward} onSave={save} onCancel={cancelEditor} /> : <><div className="activity-list-heading"><div><p className="eyebrow">活动列表</p><h2>已配置活动</h2></div><button type="button" className="primary-button" onClick={startAdd}><Plus size={16} />添加活动</button></div><div className="activity-cards">{activities.length ? activities.map((activity) => <article className="activity-card" key={activity.id}><div className="activity-card-header"><div><h3>{activity.name}</h3>{activity.description && <p>{activity.description}</p>}</div><div className="activity-card-actions"><button type="button" className="icon-button" aria-label="编辑活动" onClick={() => startEdit(activity)}><Pencil size={15} /></button><button type="button" className="icon-button danger-button" aria-label="删除活动" onClick={() => remove(activity)}><Trash2 size={15} /></button></div></div><div className="activity-reward-list">{activity.rewards.map((reward, index) => <span className={`activity-reward-pill ${reward.kind}`} key={`${reward.kind}-${reward.itemCode ?? index}-${reward.itemLevel ?? 1}`}>{activityRewardLabel(reward)}</span>)}</div></article>) : <div className="empty-state"><h3>还没有活动</h3></div>}</div></>}</section>
-    <section className={`activity-item-board ${editorOpen ? '' : 'is-disabled'}`}><div className="activity-list-heading"><div><p className="eyebrow">道具目录</p><h2>选择道具</h2></div><span>{catalogLoading ? '加载中…' : `${visibleItems.length} 项`}</span></div><div className="activity-board-toolbar"><div className="activity-search"><Search size={15} /><input value={query} placeholder="搜索道具名称或代码" onChange={(event) => { setQuery(event.target.value); if (event.target.value.trim()) setTypeFilter(''); }} /></div><div className="activity-type-filters"><button type="button" className={!typeFilter ? 'selected' : ''} onClick={() => selectType('')}>全部</button>{ITEM_TYPES.map((type) => <button type="button" className={typeFilter === type ? 'selected' : ''} key={type} onClick={() => selectType(type)}>{ITEM_TYPE_LABELS[type]}</button>)}</div></div><div className="activity-item-grid">{visibleItems.map((item) => { const selected = selectedItemCodes.has(codeForLevel(item.code, item.itemClass, 1)); const locked = selected && !isEquipment(item.itemClass); return <button type="button" className="activity-item-tile" key={item.code} disabled={!editorOpen || locked} aria-label={locked ? `${item.name}（已添加）` : item.name} onClick={() => chooseItem(item)}><ItemThumbnail src={item.image} alt="" size="medium" /><span><strong>{item.name}</strong><small>{item.code}{item.itemClass && ITEM_TYPE_LABELS[item.itemClass] ? ` · ${ITEM_TYPE_LABELS[item.itemClass]}` : ''}{selected ? ' · 已添加' : ''}</small></span>{selected ? <span className="activity-item-added">已添加</span> : <CirclePlus size={15} />}</button>; })}{!visibleItems.length && <div className="activity-board-empty">{catalogLoading ? '正在加载物品' : query ? '未找到匹配道具' : typeFilter ? '暂无该分类物品' : '暂无最近使用道具'}</div>}</div>{hasCatalogQuery && <CatalogPager page={catalogPage.index + 1} hasNext={Boolean(catalogPage.nextCursor)} totalCount={catalogPage.totalCount ?? 0} totalPages={totalPages} disabled={catalogLoading} onPrevious={previousPage} onNext={nextPage} />}</section>
+    <section className="activity-left">{editorOpen ? <ActivityEditor draft={draft} setDraft={setDraft} setReward={setReward} onSave={save} onCancel={cancelEditor} /> : <><div className="activity-list-heading"><div><p className="eyebrow">活动列表</p><h2>已配置活动</h2></div><button type="button" className="primary-button" onClick={startAdd}><Plus size={16} />添加活动</button></div><div className="activity-cards">{activities.length ? activities.map((activity) => <article className={`activity-card ${activity.visible === false ? 'is-hidden' : ''}`} key={activity.id}><div className="activity-card-header"><div><h3>{activity.name}</h3>{activity.description && <p>{activity.description}</p>}<span className={`activity-visibility ${activity.visible === false ? 'is-hidden' : ''}`}>{activity.visible === false ? <EyeOff size={13} /> : <Eye size={13} />}{activity.visible === false ? '已隐藏' : '对客服可见'}</span></div><div className="activity-card-actions"><button type="button" className={`icon-button activity-visibility-button ${activity.visible === false ? 'is-hidden' : ''}`} aria-label={activity.visible === false ? '显示活动' : '隐藏活动'} disabled={visibilitySavingId !== null} onClick={() => void toggleVisibility(activity)}>{visibilitySavingId === activity.id ? <LoaderCircle className="spin" size={15} /> : activity.visible === false ? <EyeOff size={15} /> : <Eye size={15} />}</button><button type="button" className="icon-button" aria-label="编辑活动" onClick={() => startEdit(activity)}><Pencil size={15} /></button><button type="button" className="icon-button danger-button" aria-label="删除活动" onClick={() => remove(activity)}><Trash2 size={15} /></button></div></div><div className="activity-reward-list">{activity.rewards.map((reward, index) => <span className={`activity-reward-pill ${reward.kind}`} key={`${reward.kind}-${reward.itemCode ?? index}-${reward.itemLevel ?? 1}`}>{activityRewardLabel(reward)}</span>)}</div></article>) : <div className="empty-state"><h3>还没有活动</h3></div>}</div></>}</section>
+    <section className="activity-item-board"><div className="activity-list-heading activity-item-heading"><p className="eyebrow">道具目录</p><div className="activity-item-title-row"><h2>选择道具</h2><div className="activity-item-heading-actions"><div className="activity-catalog-upload"><label className="activity-file-picker" aria-disabled={!uploadEnabled || catalogUploading}><FileUp size={15} /><span>{catalogFile?.name ?? '选择 CSV'}</span><input type="file" accept=".csv,text/csv" disabled={!uploadEnabled || catalogUploading} onChange={selectCatalogFile} /></label><button type="button" className="secondary-button" disabled={!uploadEnabled || !catalogFile || catalogUploading} onClick={() => void uploadCatalog()}>{catalogUploading ? <LoaderCircle className="spin" size={15} /> : <Upload size={15} />}{catalogUploading ? '上传中…' : '替换目录'}</button></div></div></div></div><div className="activity-board-toolbar"><div className="activity-search"><Search size={15} /><input value={query} placeholder="搜索道具名称或代码" onChange={(event) => { setQuery(event.target.value); if (event.target.value.trim()) setTypeFilter(''); }} /></div><div className="activity-type-filters"><button type="button" className={!typeFilter ? 'selected' : ''} onClick={() => selectType('')}>全部</button>{ITEM_TYPES.map((type) => <button type="button" className={typeFilter === type ? 'selected' : ''} key={type} onClick={() => selectType(type)}>{ITEM_TYPE_LABELS[type]}</button>)}</div></div><div className="activity-item-grid">{visibleItems.map((item) => { const selected = selectedItemCodes.has(codeForLevel(item.code, item.itemClass, 1)); const locked = selected && !isEquipment(item.itemClass); const content = <><ItemThumbnail src={item.image} alt="" size="medium" /><span><strong>{item.name}</strong><small>{item.code}{item.itemClass ? ` · ${item.itemClass}` : ''}{selected ? ' · 已添加' : ''}</small></span>{selected ? <span className="activity-item-added">已添加</span> : editorOpen ? <CirclePlus size={15} /> : null}</>; return <div className="activity-item-row" key={item.code}>{editorOpen ? <button type="button" className="activity-item-tile" disabled={locked} aria-label={locked ? `${item.name}（已添加）` : item.name} onClick={() => chooseItem(item)}>{content}</button> : <div className="activity-item-tile">{content}</div>}<CopyButton text={item.code} label="复制物品代码" onCopied={() => setNotice({ kind: 'success', text: `已复制物品代码 ${item.code}` })} /></div>; })}{!visibleItems.length && <div className="activity-board-empty">{catalogLoading ? '正在加载物品' : query ? '未找到匹配道具' : typeFilter ? '暂无该分类物品' : '暂无最近使用道具'}</div>}</div>{hasCatalogQuery && <CatalogPager page={catalogPage.index + 1} hasNext={Boolean(catalogPage.nextCursor)} totalCount={catalogPage.totalCount ?? 0} totalPages={totalPages} disabled={catalogLoading} onPrevious={previousPage} onNext={nextPage} />}</section>
     </div>{notice && <FloatingNotice kind={notice.kind} text={notice.text} onDismiss={() => setNotice(null)} />}{deleteTarget && <ConfirmDialog title={`确认删除活动“${deleteTarget.name}”？`} description="删除后活动奖励配置将无法恢复。" confirmLabel="删除活动" danger onCancel={() => setDeleteTarget(null)} onConfirm={confirmRemove} />}</section>;
 }
 

@@ -69,6 +69,11 @@ async function main() {
       await customer.goto(`${base}/reminders`);
       const onlineButton = () => customer.getByRole('button', { name: '\u7528\u6237\u5df2\u4e0a\u7ebf', exact: true });
       await onlineButton().waitFor();
+      await customer.getByRole('button', { name: '\u4fee\u6539', exact: true }).first().click();
+      await customer.waitForURL('**/request');
+      await customer.getByRole('heading', { name: '\u4fee\u6539\u7533\u8bf7', exact: true }).waitFor();
+      await customer.goto(`${base}/reminders`);
+      await onlineButton().waitFor();
       await customer.screenshot({ path: path.join(os.tmpdir(), `mxdcmd-reminder-online-${width}.png`), fullPage: true });
       const spacing = await customer.locator('.reminders-table .record-operation').evaluate(el => {
         const parent = el.getBoundingClientRect();

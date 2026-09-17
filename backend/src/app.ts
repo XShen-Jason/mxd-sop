@@ -10,7 +10,7 @@ import { JsonUserRepository } from './modules/auth/public/index.js';
 import { SqliteUserRepository } from './modules/auth/infrastructure/sqlite-users.js';
 import { SqliteSessionRepository } from './modules/auth/infrastructure/sqlite-sessions.js';
 import { registerAuthRoutes } from './modules/auth/interface/http.js';
-import { loadCatalogFromCsv, loadCatalogFromExcel, loadCatalogFromJson, loadCatalogImageMap } from './modules/item-catalog/public/index.js';
+import { loadCatalogFromCsv, loadCatalogFromExcel, loadCatalogFromJson, loadCatalogImageMap, replaceCatalogCsv } from './modules/item-catalog/public/index.js';
 import { JsonDirectoryRepository, PlayerDirectoryService, SqliteDirectoryRepository } from './modules/player-directory/public/index.js';
 import { registerPlayerDirectoryRoutes } from './modules/player-directory/interface/http.js';
 import { HttpPlayerIntegrationClient, loadPlayerEndpointConfig, MemoryPlayerIntegrationRepository, PlayerIntegrationService, SqlitePlayerIntegrationRepository, type PlayerEndpointConfig, type PlayerIntegrationClient } from './modules/player-integration/public/index.js';
@@ -27,6 +27,9 @@ import { ActivitiesService, JsonActivityRepository } from './modules/activities/
 import { SqliteActivityRepository } from './modules/activities/infrastructure/sqlite-store.js';
 import { openDatabase } from './infrastructure/sqlite.js';
 import { loadEnvironment } from './config/environment.js';
+import { AutoIntegrationService, HttpAutoIntegrationClient, loadAutoEndpointConfig, MemoryAutoIntegrationRepository, SqliteAutoIntegrationRepository, type AutoEndpointConfig, type AutoIntegrationClient } from './modules/auto-integration/public/index.js';
+import { registerAutoIntegrationRoutes } from './modules/auto-integration/interface/http.js';
+import { OperationAutomationWorkflow } from './modules/operation-groups/application/automation-workflow.js';
 
 loadEnvironment();
 
@@ -42,6 +45,8 @@ export interface AppConfig {
   enableTeamScheduler?: boolean;
   playerIntegration?: PlayerEndpointConfig;
   playerIntegrationClient?: PlayerIntegrationClient;
+  autoIntegration?: AutoEndpointConfig;
+  autoIntegrationClient?: AutoIntegrationClient;
   databasePath?: string;
   initialAdmin?: { username: string; displayName: string; password: string };
 }
@@ -73,6 +78,13 @@ export async function createApp(config: AppConfig = {}) {
     : catalogExtension === '.csv'
       ? loadCatalogFromCsv(catalogPath, tabularOptions())
       : loadCatalogFromExcel(catalogPath, tabularOptions());
+  const replaceUploadedCatalog = catalogExtension === '.csv'
+    ? (content: string) => {
+      const next = replaceCatalogCsv(catalogPath, content, tabularOptions());
+      catalog.replaceFrom(next);
+      return { size: catalog.size };
+    }
+    : undefined;
   const testPersistence = Boolean(config.dataPath || config.usersPath);
   const databasePath = projectPath(config.databasePath ?? process.env.DATABASE_PATH ?? 'data/ops.sqlite');
   const databaseExisted = !testPersistence && fs.existsSync(databasePath);
@@ -90,6 +102,9 @@ export async function createApp(config: AppConfig = {}) {
   const integrationConfig = { ...loadPlayerEndpointConfig(), ...config.playerIntegration };
   const integrationRepository = testPersistence ? new MemoryPlayerIntegrationRepository() : new SqlitePlayerIntegrationRepository(db!);
   const integration = new PlayerIntegrationService(integrationRepository, integrationConfig, config.playerIntegrationClient ?? new HttpPlayerIntegrationClient(integrationConfig.timeoutMs));
+  const autoConfig = { ...loadAutoEndpointConfig(), ...config.autoIntegration };
+  const autoIntegrationRepository = testPersistence ? new MemoryAutoIntegrationRepository() : new SqliteAutoIntegrationRepository(db!);
+  const autoIntegration = new AutoIntegrationService(autoConfig, config.autoIntegrationClient ?? new HttpAutoIntegrationClient(autoConfig), autoIntegrationRepository);
   const sourceUrl = process.env.MXD_PLAYER_TEAM_SNAPSHOT_URL;
   const teamSource = config.teamSource ?? (sourceUrl ? new HttpLockedTeamSource(sourceUrl, process.env.MXD_PLAYER_TEAM_SNAPSHOT_TOKEN) : new HttpLockedTeamSource(() => integration.teamSnapshotEndpoint(), () => integration.serviceToken()));
   const sourceConfigured = Boolean(config.teamSource || sourceUrl || integration.hasConfiguredEndpoint());
@@ -109,19 +124,22 @@ export async function createApp(config: AppConfig = {}) {
     throw error;
   }
   const service = new OperationGroupsService({ repository, catalog, options: appOptions, resolveDisplayName: (id) => auth.resolveDisplayName(id) });
+  const automation = (process.env.NODE_ENV !== 'test' || config.autoIntegrationClient) ? new OperationAutomationWorkflow(service, autoIntegration) : undefined;
   registerAuthRoutes(app, auth);
-  registerOperationRoutes(app, service, catalog, auth);
+  registerOperationRoutes(app, service, catalog, auth, automation, replaceUploadedCatalog);
   registerActivityRoutes(app, new ActivitiesService(activitiesRepository), auth);
   const playerSync = config.playerIntegrationClient || process.env.NODE_ENV !== 'test' ? integration : undefined;
   const playerDirectory = new PlayerDirectoryService(directoryRepository, appOptions.servers, playerSync);
   registerPlayerDirectoryRoutes(app, playerDirectory, auth);
   registerPlayerIntegrationRoutes(app, integration, auth);
+  registerAutoIntegrationRoutes(app, autoIntegration, auth);
   const teamClears = testPersistence
     ? new JsonTeamClearRepository(`${config.teamViewPath ?? config.dataPath ?? projectPath('data/generated/operation-groups.json')}.clears.json`)
     : new SqliteTeamClearRepository(db!);
   const teamViewService = new TeamViewService(teamRepository, teamSource, appOptions.servers, teamClears);
   registerTeamViewRoutes(app, teamViewService, auth, service, playerDirectory);
-  const scheduler = new TeamViewScheduler(teamViewService);
+  const scheduler = new TeamViewScheduler(teamViewService, undefined, () => integration.isEnabled());
+  integration.onConnectionChange((enabled) => scheduler.connectionChanged(enabled));
   const enableTeamScheduler = config.enableTeamScheduler ?? process.env.NODE_ENV !== 'test';
   if (enableTeamScheduler && sourceConfigured) scheduler.start();
   app.get('/health', async () => ({ status: 'ok', catalogItems: catalog.size }));

@@ -1,3 +1,4 @@
+import { hasWorkspaceAccess } from '../../auth/public/index.js';
 import type { GroupStatus, Identity, OperationGroup } from '../../../shared/types.js';
 import { isIssuanceGroup } from './workflow-rules.js';
 
@@ -16,14 +17,13 @@ export function groupChangeState(group: OperationGroup): GroupChangeState {
 
 function scopesFor(state: GroupChangeState, identity: Identity): Scope[] {
   const views: Scope['view'][] = [];
-  if (identity.role !== 'customer') {
-    views.push(state.kind === 'issuance' ? 'reissue' : 'archive');
-    if (state.status === 'pending') views.push('queue');
-    if (state.status === 'approved' && identity.role === 'super_admin') views.push('ready');
-  }
+  const recordView = state.kind === 'issuance' ? 'reissue' : 'archive';
+  if (hasWorkspaceAccess(identity, recordView)) views.push(recordView);
+  if (hasWorkspaceAccess(identity, 'queue') && state.status === 'pending') views.push('queue');
+  if (hasWorkspaceAccess(identity, 'ready') && state.status === 'approved') views.push('ready');
   if (state.ownerId === identity.id) {
-    views.push('records');
-    if (state.status === 'approved' && state.reminded) views.push('reminders');
+    if (hasWorkspaceAccess(identity, 'records')) views.push('records');
+    if (state.status === 'approved' && state.reminded && hasWorkspaceAccess(identity, 'reminders')) views.push('reminders');
   }
   return views.map(view => ({ view, serverId: state.serverId, kind: state.kind, status: state.status }));
 }

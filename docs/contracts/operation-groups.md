@@ -72,7 +72,7 @@ Consumers: frontend 客服
 
 ### Request/event
 
-POST /api/v1/operation-groups；认证角色必须为 customer。幂等键由 Idempotency-Key 请求头提供。
+POST /api/v1/operation-groups；需要有效会话和 `request` 工作区权限。customer、manager、super_admin 均可提交自己的申请；幂等键由 Idempotency-Key 请求头提供。
 
 ~~~json
 {
@@ -126,7 +126,7 @@ Consumers: frontend 客服
 
 ### Request/event
 
-GET /api/v1/operation-groups/mine?cursor={opaque-cursor}&limit={n}；认证角色必须为 customer。服务端只使用认证 userId 过滤。
+GET /api/v1/operation-groups/mine?cursor={opaque-cursor}&limit={n}；需要 `records` 工作区权限。服务端只使用认证 userId 过滤，customer、manager、super_admin 均可读取自己的记录。
 
 ### Response/handling
 
@@ -158,7 +158,7 @@ Consumers: frontend 客服
 
 ### Request/event
 
-POST /api/v1/operation-groups/{groupId}/cancel；认证角色必须为 customer。groupId 为不透明字符串，提交者必须是当前认证 userId。
+POST /api/v1/operation-groups/{groupId}/cancel；需要 `records` 工作区权限。groupId 为不透明字符串，提交者必须是当前认证 userId；customer、manager、super_admin 均可取消自己的可操作申请。
 
 ### Response/handling
 
@@ -184,11 +184,11 @@ unauthorized（401）、forbidden（403）、group-not-found（404）、invalid-
 
 Owner: operation-groups  
 Version: v1  
-Consumers: frontend 管理
+Consumers: frontend with the `queue` workspace
 
 ### Request/event
 
-GET /api/v1/manager/operation-groups/queue?cursor={opaque-cursor}&serverId={optional}&limit={n}；认证角色必须为 manager。
+GET /api/v1/manager/operation-groups/queue?cursor={opaque-cursor}&serverId={optional}&limit={n}；需要有效会话和 `queue` 工作区权限。工作区授权的任意角色都可以读取统一管理投影并执行 approve/reject。
 
 ### Response/handling
 
@@ -212,7 +212,7 @@ unauthorized（401）、forbidden（403）、invalid-cursor（400）、unknown-s
 
 Owner: operation-groups
 Version: v1
-Consumers: frontend 绠＄悊/瓒呯骇绠＄悊
+Consumers: frontend with the `queue` workspace
 
 ### Request/event
 
@@ -220,13 +220,13 @@ GET `/api/v1/manager/operation-groups/reviews?cursor={opaque-cursor}&serverId={o
 
 ### Response/handling
 
-返回所有状态的审核记录（包括 pending、approved、rejected、issued、completed、cancelled），按服务器配置顺序及提交时间升序稳定分页。仅 pending 记录允许执行 approve/reject；该读取契约对 manager 与 super_admin 一致开放。
+返回所有状态的审核记录（包括 pending、approved、rejected、issued、completed、cancelled），按服务器配置顺序及提交时间升序稳定分页。仅 pending 记录允许执行 approve/reject；拥有 `queue` 工作区的任意角色读取结果和可执行操作一致。
 
 ### Limits and side effects
 
 只读；limit 最大 100；游标为不透明 keyset 游标，服务端不会一次性加载全部记录。
 
-正常：蘑菇组先显示最早 submittedAt 的 pending group；同一 group 的 2888 物品对应三条 drop 指令。客服 token 调用同一路径必须得到 forbidden。
+正常：蘑菇组先显示最早 submittedAt 的 pending group；同一 group 的 2888 物品对应三条 drop 指令。获得 `queue` 工作区的客服与管理端返回相同的 group 字段、commands 和审批按钮。
 
 ## operation-groups.complete-group
 
@@ -236,7 +236,7 @@ Consumers: frontend 管理
 
 ### Request/event
 
-POST /api/v1/manager/operation-groups/{groupId}/complete；认证角色必须为 manager。可选请求体可携带执行备注，但不能覆盖 group 内容或指令。
+POST /api/v1/manager/operation-groups/{groupId}/complete；需要 `ready` 或 `archive` 工作区权限。可选请求体可携带执行备注，但不能覆盖 group 内容或指令。
 
 ### Response/handling
 
@@ -266,7 +266,7 @@ Consumers: frontend 管理
 
 ### Request/event
 
-GET /api/v1/manager/operation-groups/archive?cursor={opaque-cursor}&status={optional}&serverId={optional}&limit={n}；认证角色必须为 manager。
+GET /api/v1/manager/operation-groups/archive?cursor={opaque-cursor}&status={optional}&serverId={optional}&limit={n}；需要与查询范围对应的工作区权限：`kind=issuance` 使用 `reissue`，`kind=regular` 使用 `archive`，未指定类型时需要二者；仅查询 `status=approved` 的待完成集合可使用 `ready`。任何获授权角色均返回统一管理投影。
 
 ### Response/handling
 
@@ -286,7 +286,7 @@ unauthorized（401）、forbidden（403）、invalid-cursor（400）、invalid-s
 
 ### Examples
 
-正常：默认结果包含全部状态；status=pending 只显示未处理。客服调用返回 forbidden。
+正常：默认结果包含全部状态；status=pending 只显示未处理。客服只有在被授予对应工作区后才能调用，调用结果与管理端一致并包含 commands。
 
 `list-archive` accepts optional repeatable/comma-separated `status` values and `kind=issuance|regular`; filtering occurs before keyset pagination.
 
@@ -301,7 +301,7 @@ do not change historical name/code matches. Existing authorization is unchanged.
 
 ## v1 workflow extension
 
-The original `completed` state remains readable for MVP records. 物资记录使用 `pending -> approved -> issued`，常规 `kick`/`ban` 记录跳过审核并进入 `approved`（待完成）；物资记录可在 `pending` 状态修改或取消，常规操作记录可在 `approved` 完成前修改或取消。`approve` 可由 `manager` 或 `super_admin` 执行；`issue` 只能由 `super_admin` 执行；常规操作记录由管理角色调用完成接口结束。管理归档和客服投影会保留 approved、rejected、issued 的审计字段，客服投影仍绝不包含 commands。
+The original `completed` state remains readable for MVP records. 物资记录使用 `pending -> approved -> issued`，常规 `kick`/`ban` 记录跳过审核并进入 `approved`（待完成）；物资记录可在 `pending` 状态修改或取消，常规操作记录可在 `approved` 完成前修改或取消。`queue`、`ready`、`reissue`、`archive` 工作区决定读取和操作边界；获授权的任意角色使用与管理端相同的管理投影、commands 和对应操作。自己的申请、待提醒和提交/编辑/取消仍使用客服投影且绝不包含 commands。
 
 角色层级向下兼容：manager 和 super_admin 也可调用客服的 submit/list-own/update/cancel 能力，但每次仍只作用于认证 userId 自己的 group。
 
@@ -315,35 +315,37 @@ The original `completed` state remains readable for MVP records. 物资记录使
 
 `POST /api/v1/operation-groups/{groupId}/online` accepts an authenticated
 customer, manager, or super-admin only when they are the request's submitter.
-The group must remain `approved`. Success clears `reminderCount`,
-`lastRemindedAt`, and `lastRemindedBy` in one persistence write and returns the
-customer projection without commands. The group stays approved and its
-operations and approval audit remain unchanged. Already-cleared approved groups
-return success without writing or emitting another change. Other owners receive
-403, missing groups 404, and non-approved groups 409.
+The group must remain `approved`. Each click clears the old reminder. When the
+auto connection is enabled, it triggers one auto-process retry using the same
+group ID. Successful delivery moves the group to its terminal status; a failed
+retry restores the reminder so the customer can click again. When auto is
+disabled, no downstream request or automation failure is created and the group
+remains available to the manual workflow. Other owners receive 403, missing
+groups 404, and non-approved groups 409.
 
-Cleared groups leave `list-reminders` and its counts; the ready view restores
-the initial reminder button and unreminded ordering. A subsequent reminder
-starts again at count 1. The existing scoped SSE event includes both previous
-and new memberships, updating only affected active views. This operation records
-the submitter's confirmation; it does not query the game server for presence.
+Successful retries leave `list-reminders` and its counts; failed retries remain
+in that view with a fresh reminder. The existing scoped SSE event includes both
+previous and new memberships, updating only affected active views. This
+operation records the submitter's confirmation and execution result; it does
+not query the game server for presence before dispatch.
 
 ### operation-groups.remind-customer / list-reminders
 
-`POST /api/v1/super-admin/operation-groups/{groupId}/remind` 仅允许 `super_admin` 对 approved 申请调用。调用不改变 status，递增 `reminderCount` 并记录 `lastRemindedAt/lastRemindedBy`；重复调用表示再次提醒，发物资和常规操作均可提醒。
+`POST /api/v1/super-admin/operation-groups/{groupId}/remind` 需要 `ready` 工作区，对 approved 申请调用。调用不改变 status，递增 `reminderCount` 并记录 `lastRemindedAt/lastRemindedBy`；重复调用表示再次提醒，发物资和常规操作均可提醒。
 
-`GET /api/v1/operation-groups/reminders?cursor={opaque-cursor}&limit={n}&kind={issuance|regular}` 允许所有已认证角色调用；只返回当前登录用户提交者本人、仍为 approved、已被提醒的记录。`kind` 可筛选发物资或常规操作，省略时返回两类；使用与 list-own 相同的客服投影和倒序游标分页，绝不返回 commands。
+`GET /api/v1/operation-groups/reminders?cursor={opaque-cursor}&limit={n}&kind={issuance|regular}` 需要 `reminders` 工作区；customer、manager、super_admin 均可调用，但只返回当前登录用户提交者本人、仍为 approved、已被提醒的记录。`kind` 可筛选发物资或常规操作，省略时返回两类；使用与 list-own 相同的客服投影和倒序游标分页，绝不返回 commands。
 
-`GET /api/v1/operation-groups/workspace-counts` 返回当前角色可见的小标计数；所有角色均得到自己的 `reminders`，并附带 `reminderIssuance`、`reminderRegular` 分类型计数，以及当前用户全部申请的 `ownIssuance`、`ownRegular` 分类型计数；管理角色额外得到 `pending`，超级管理员额外得到 `ready`。
+`GET /api/v1/operation-groups/workspace-counts` 返回当前账号已授权工作区的小标计数：拥有 `reminders` 时返回提醒计数，拥有 `records` 时返回自己的申请计数，拥有 `queue` 时返回 pending 计数，拥有 `ready` 时返回 approved 计数；未授权的计数键省略。
 
 `GET /api/v1/operation-groups/events` is an authenticated SSE stream. Its `changed`
 event has additive v1 metadata: `{ "scopes": [{ "view": "queue", "serverId":
 "mushroom", "kind": "issuance", "status": "pending" }], "counts": true }`.
 Scopes are deduplicated from both pre-write and post-write membership. Views are
-`queue`, `ready`, `reissue`, `archive`, `records`, and `reminders`. Manager views
-respect the subscriber role; `records` and `reminders` are included only for the
-subscriber's own requests. No record IDs, owner IDs, player details, or commands
-are sent. Subscribers with no relevant scope receive no event.
+`queue`, `ready`, `reissue`, `archive`, `records`, and `reminders`. Workspace
+permissions determine the relevant management scopes; `records` and `reminders`
+are included only for the subscriber's own requests. No record IDs, owner IDs,
+player details, or commands are sent. Subscribers with no relevant scope receive
+no event.
 
 `counts` indicates a change to that subscriber's navigation-count membership;
 repeat reminders do not change counts. Batch approval emits one combined event
@@ -355,8 +357,10 @@ recover changes missed while disconnected. No interval polling is used.
 
 ### operation-groups.approve-group / reject-group / issue-group
 
-分别映射到 `/api/v1/manager/operation-groups/{groupId}/approve`、`/reject`、`/issue`。approve/reject 允许管理及超级管理；issue 仅超级管理且只能作用于 approved group。reject 可携带可选 `reason`，issue 可携带可选 `executionNote`。所有操作幂等或返回稳定冲突错误。
+通过审核后，auto 连接开启时，后端使用 group 的当前版本调用 auto-process 的私聊批量执行契约；auto 连接关闭时，审批正常完成但 group 保持 `approved`，管理投影继续返回 commands，供原有待完成工作区复制指令并手动确认发放/完成。主动关闭不写入 `automationFailureReason`、不新增失败提醒，也不向 auto 发出请求；重新开启连接不会自动补跑这些手动记录，只有之后的新审批、免审提交或显式重试才会尝试自动执行。未修改过的 group 使用 `groupId` 作为 auto 的 `execution_id`；客户修改后会生成稳定的版本化执行 ID，避免复用旧版本的失败记录或触发批次冲突。同一版本的“玩家已上线”重试继续使用同一个版本 ID，并由 auto 只重试未成功的指令。批次只用于一次请求中传递有序指令列表，不会把多条指令拼接成一条聊天内容：例如申请包含 20 个物品操作时，生成并发送 20 次独立的 `privateChat` 消息。auto-process 选择在线账号并以轮询顺序发送逐条指令；全部成功时 group 自动进入 `issued`（发物资）或 `completed`（常规操作），任一失败时保持 `approved` 并写入提醒。auto 没有任何在线且启用的 GM 账号时返回 `no_online_accounts`，工单保存 `automationFailureReason=no-online-accounts`，前端提示“无在线GM账号，无法自动完成”；其他执行失败仍提示“自动执行失败，已放入待提醒”。若游戏服返回“请输入正确的玩家姓名。”，auto-process 会在本次执行中排除当前账号，并把同一条指令切换到下一在线账号重试，账号数量决定上限，不会无限循环。重复请求不会创建第二条执行记录。
+
+分别映射到 `/api/v1/manager/operation-groups/{groupId}/approve`、`/reject`、`/issue`。旧客户端使用的 `/api/v1/manager/operation-groups/{groupId}/confirm` 是 approve 的兼容别名，必须经过相同的 auto 执行工作流，不得只改变工单状态。approve/reject 需要 `queue` 工作区；issue 需要 `ready` 工作区且只能作用于 approved group。reject 可携带可选 `reason`，issue 可携带可选 `executionNote`。所有操作幂等或返回稳定冲突错误。
 
 ### operation-groups.list-overview
 
-`GET /api/v1/manager/operation-groups/overview` 返回按客服聚合的 total、pending、approved、rejected、issued、cancelled 计数；需要管理或超级管理，使用游标分页。单个申请详情通过 queue/archive 契约查询。
+`GET /api/v1/manager/operation-groups/overview` 返回按客服聚合的 total、pending、approved、rejected、issued、cancelled 计数；需要 `queue` 工作区权限，使用游标分页。单个申请详情通过 queue/archive 契约查询。

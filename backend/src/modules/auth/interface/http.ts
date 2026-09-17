@@ -8,6 +8,13 @@ function objectBody(request: FastifyRequest) {
   return body as Record<string, unknown>;
 }
 
+function canonicalizeWorkspaceInput(body: Record<string, unknown>) {
+  if (!Object.prototype.hasOwnProperty.call(body, 'tabPermissions')) return body;
+  if (Object.prototype.hasOwnProperty.call(body, 'workspacePermissions')) throw new AuthError('invalid-input');
+  const { tabPermissions, ...rest } = body;
+  return { ...rest, workspacePermissions: tabPermissions };
+}
+
 function tokenFromRequest(request: FastifyRequest) {
   const auth = request.headers.authorization;
   if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7).trim();
@@ -67,8 +74,8 @@ export function registerAuthRoutes(app: FastifyInstance, auth: AuthService) {
   const createUser = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = objectBody(request);
-      if (Object.keys(body).some((key) => !['username', 'password', 'displayName', 'role'].includes(key))) throw new AuthError('invalid-input');
-      const user = auth.createUser(identity(request), body as unknown as CreateUserInput);
+      if (Object.keys(body).some((key) => !['username', 'password', 'displayName', 'role', 'workspacePermissions', 'uploadPermissions', 'tabPermissions'].includes(key))) throw new AuthError('invalid-input');
+      const user = auth.createUser(identity(request), canonicalizeWorkspaceInput(body) as unknown as CreateUserInput);
       return reply.code(201).send(user);
     } catch (error) { return sendAuthError(reply, error); }
   };
@@ -77,8 +84,8 @@ export function registerAuthRoutes(app: FastifyInstance, auth: AuthService) {
   const updateUser = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = objectBody(request);
-      if (Object.keys(body).some((key) => !['password', 'displayName', 'role', 'active'].includes(key))) throw new AuthError('invalid-input');
-      const user = auth.updateUser(identity(request), (request.params as { userId: string }).userId, body as UpdateUserInput);
+      if (Object.keys(body).some((key) => !['password', 'displayName', 'role', 'active', 'workspacePermissions', 'uploadPermissions', 'tabPermissions'].includes(key))) throw new AuthError('invalid-input');
+      const user = auth.updateUser(identity(request), (request.params as { userId: string }).userId, canonicalizeWorkspaceInput(body) as UpdateUserInput);
       return reply.send(user);
     } catch (error) { return sendAuthError(reply, error); }
   };

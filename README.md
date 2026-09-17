@@ -2,7 +2,7 @@
 
 Project ID: game-support-ops
 
-这是一个供普通客服提交玩家操作申请、供管理审核并由超级管理确认发放的内部工单系统。仓库现在包含可运行的本地 MVP：后端负责登录授权、校验、快照、状态和指令生成，前端提供客服、管理和账号管理工作台。
+这是一个按工作区权限处理玩家操作申请的内部工单系统。仓库现在包含可运行的本地 MVP：后端负责登录授权、校验、快照、状态和指令生成，前端提供统一工作区和账号管理工作台。
 
 详细文档入口：[docs/README.md](docs/README.md)，项目注册表见 [docs/PROJECT.md](docs/PROJECT.md)。
 
@@ -13,8 +13,8 @@ Project ID: game-support-ops
 - 理由支持常用预设（玩家申请、补偿、异常恢复、活动奖励、其他）和补充说明，预设可扩展。
 - 初始操作包括发物品、发点券、踢人和封号；服务器和操作类型都按配置扩展。
 - 物品从 CSV 目录中模糊搜索，图片由独立的物品代码映射补充；提交时保存物品代码和名称快照，每个物品数量独立。
-- 客服只能看到自己的文字信息和状态，不能得到任何指令；客服可以取消自己尚未处理的工单。
-- 管理按服务器查看待审核工单，管理/超级管理可通过或驳回；只有超级管理能确认已发放。管理可按客服查看申请总览并维护客服账号，超级管理可维护全部三类账号。
+- `records` 工作区内只能看到当前账号自己的文字信息和状态，不能得到任何指令；拥有该工作区的账号可以取消自己尚未处理的工单。
+- 角色只提供默认工作区；拥有 `queue`、`ready`、`reissue`、`archive` 或其他工作区的任意角色看到该工作区的相同内容和操作。拥有 `accounts` 工作区的账号可维护全部三类账号，系统仍保护最后一个已启用的超级管理账号。
 - 发物品数量超过 1000 时，后端按原顺序拆成多个无空格指令。
 - 归档面板保留全部历史状态，未处理、已完成和已取消均可查询。
 
@@ -47,7 +47,7 @@ npm install
 npm run dev
 ```
 
-打开 http://localhost:5173。开发环境测试会使用固定测试账号；生产环境必须通过 `INITIAL_ADMIN_*` 初始化一个超管，禁止使用默认密码。登录后由超管创建管理和客服账号；账号只能由管理或超级管理创建，页面不提供注册。也可以分别运行 `npm run dev --workspace backend` 和 `npm run dev --workspace frontend`。
+打开 http://localhost:5173。开发环境测试会使用固定测试账号；生产环境必须通过 `INITIAL_ADMIN_*` 初始化一个超管，禁止使用默认密码。登录后由拥有 `accounts` 工作区的账号创建后续账号，页面不提供注册。也可以分别运行 `npm run dev --workspace backend` 和 `npm run dev --workspace frontend`。
 
 验证命令：`npm test`、`npm run lint`、`npm run build`。
 
@@ -62,10 +62,12 @@ reporting requires it. See `docs/DEPLOYMENT-DEBIAN.md`.
 
 On a new production database, startup refuses to continue unless
 `INITIAL_ADMIN_PASSWORD` is set. Exactly one `super_admin` is created, public
-registration remains disabled, and later accounts are created by that admin.
+registration remains disabled, and later accounts are created by an account with
+the `accounts` workspace.
 
-同机部署运营台和 `mxd-player` 的长期更新流程见
-[docs/DEPLOYMENT-UPDATE.md](docs/DEPLOYMENT-UPDATE.md)。
+同机部署运营台、`mxd-player` 和 `mxd-auto-process` 的长期更新流程见
+[docs/DEPLOYMENT-UPDATE.md](docs/DEPLOYMENT-UPDATE.md)；auto 首次部署见
+[docs/DEPLOYMENT-MXD-AUTO-26909.md](docs/DEPLOYMENT-MXD-AUTO-26909.md)。
 
 For local development, set the same initialization variables before starting
 the backend (PowerShell: `$env:INITIAL_ADMIN_PASSWORD='local-only-password'`).

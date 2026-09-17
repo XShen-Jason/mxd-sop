@@ -1,0 +1,17 @@
+bin/
+*.exe
+*.test
+.env
+config/servers.local.json
+backend-auto-process/data/auto-credentials.key
+# Runtime SQLite state and encrypted account data never belong in Git.
+backend-auto-process/data/*.db
+backend-auto-process/data/*.sqlite*
+logs/
+
+backend-auto-process/datacj/
+backend-auto-process/internal/operatorapi/assets/*
+!backend-auto-process/internal/operatorapi/assets/.gitkeep
+*.pcap
+*.pcapng
+docs/pcap_*.json

@@ -13,8 +13,9 @@ describe('player integration', () => {
   const usersPath = path.join(os.tmpdir(), `ops-player-integration-users-${randomUUID()}.json`);
   const calls: Array<{ endpoint: string; serverId: string }> = [];
   let failImport = false;
+  let healthCalls = 0;
   const client: PlayerIntegrationClient = {
-    health: async () => true,
+    health: async () => { healthCalls += 1; return true; },
     importAccounts: async (endpoint, _token, serverId) => { if (failImport) throw new Error('player offline'); calls.push({ endpoint, serverId }); return { serverId, rowCount: 1, skippedRows: 0, importedAt: new Date().toISOString() }; }
   };
 
@@ -28,7 +29,7 @@ describe('player integration', () => {
     for (const file of [dataPath, usersPath]) if (fs.existsSync(file)) fs.unlinkSync(file);
   });
 
-  it('requires super admin confirmation and reports both endpoint health checks', async () => {
+  it('requires workspace confirmation and reports both endpoint health checks', async () => {
     const login = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'integration-admin', password: 'Admin123' } });
     const token = login.json().token as string;
     const status = await app.inject({ method: 'GET', url: '/api/v1/player-integration/status', headers: { authorization: `Bearer ${token}` } });
@@ -61,5 +62,33 @@ describe('player integration', () => {
     expect(imported.statusCode).toBe(503);
     const search = await app.inject({ method: 'GET', url: '/api/v1/player-directory/search?q=blocked', headers: { authorization: `Bearer ${token}` } });
     expect(search.json().totalCount).toBe(0);
+  });
+
+  it('stops health checks, imports, and snapshot scheduling traffic while disconnected', async () => {
+    const login = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'integration-admin', password: 'Admin123' } });
+    const headers = { authorization: `Bearer ${login.json().token as string}` };
+    const rejected = await app.inject({ method: 'POST', url: '/api/v1/player-integration/connection', headers, payload: { enabled: false, confirmation: 'DISCONNECT' } });
+    expect(rejected.statusCode).toBe(400);
+    expect(rejected.json().error.code).toBe('confirmation-required');
+    const disabled = await app.inject({ method: 'POST', url: '/api/v1/player-integration/connection', headers, payload: { enabled: false, confirmation: 'CHANGE PLAYER CONNECTION' } });
+    expect(disabled.statusCode).toBe(200);
+    expect(disabled.json().enabled).toBe(false);
+
+    const healthBeforeStatus = healthCalls;
+    const status = await app.inject({ method: 'GET', url: '/api/v1/player-integration/status', headers });
+    expect(status.json()).toMatchObject({ enabled: false, endpoints: { local: { available: null }, remote: { available: null } } });
+    expect(healthCalls).toBe(healthBeforeStatus);
+
+    const callsBeforeImport = calls.length;
+    const imported = await app.inject({ method: 'POST', url: '/api/v1/player-directory/import', headers, payload: { serverId: 'mushroom', file: { name: 'mg-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n301,7,paused,12345678\n' } } });
+    expect(imported.statusCode).toBe(503);
+    expect(imported.json().error.code).toBe('player-sync-failed');
+    expect(calls).toHaveLength(callsBeforeImport);
+
+    const healthBeforeEnable = healthCalls;
+    const enabled = await app.inject({ method: 'POST', url: '/api/v1/player-integration/connection', headers, payload: { enabled: true, confirmation: 'CHANGE PLAYER CONNECTION' } });
+    expect(enabled.statusCode).toBe(200);
+    expect(enabled.json().enabled).toBe(true);
+    expect(healthCalls).toBe(healthBeforeEnable + 1);
   });
 });

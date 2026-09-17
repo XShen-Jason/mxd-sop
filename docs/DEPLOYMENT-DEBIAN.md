@@ -55,5 +55,5 @@ concurrency, or centralized operational reporting.
 - Use an internal CA or ACME certificate and keep `COOKIE_SECURE=true`.
 - Do not enable `CORS_ORIGIN` unless a separate trusted frontend origin is
   required.
-- Accounts are created only by an authenticated manager or super admin; public
-  registration is not implemented.
+- Accounts are created only by an authenticated user with the `accounts`
+  workspace; public registration is not implemented.

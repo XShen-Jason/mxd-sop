@@ -132,7 +132,7 @@
   .users-panel { margin-top: 16px; }
   .users-toolbar { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-bottom: 14px; }
   .users-toolbar .toolbar-actions, .users-toolbar .primary-button { width: 100%; }
-  .user-role-groups, .user-role-groups.role-columns-2, .user-role-groups.role-columns-3 { grid-template-columns: 1fr; gap: 16px; overflow: visible; padding: 0; }
+  .user-role-groups { grid-template-columns: 1fr; gap: 16px; overflow: visible; padding: 0; }
   .user-role-group { min-width: 0; }
   .user-row, .user-role-group .user-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "avatar main actions" "avatar role status"; min-height: 70px; padding: 10px; gap: 5px 8px; align-items: center; }
   .user-avatar { grid-area: avatar; }
@@ -143,12 +143,14 @@
   .user-actions .icon-button { width: 40px; height: 40px; }
 
   .dialog-backdrop { align-items: end; padding: 10px; }
-  .account-dialog, .action-dialog { width: 100%; max-height: calc(100dvh - 20px); border-radius: 10px; padding: 16px; }
+  .account-dialog { width: 100%; border-radius: 10px; padding: 16px; }
+  .action-dialog { width: 100%; max-height: calc(100dvh - 20px); border-radius: 10px; padding: 16px; }
   .dialog-header h2, .action-dialog h2 { font-size: 19px; }
   .role-options { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 15px; }
   .role-option { min-height: 44px; padding-inline: 4px; }
   .dialog-actions, .account-dialog .user-form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .dialog-actions .primary-button, .dialog-actions .secondary-button, .account-dialog .submit-button { width: 100%; min-height: 44px; }
+  .account-dialog-tabs { gap: 18px; }
 
   .toast { top: 70px; right: 12px; width: calc(100vw - 24px); }
   .notice-stack { top: 12px; width: calc(100vw - 24px); }

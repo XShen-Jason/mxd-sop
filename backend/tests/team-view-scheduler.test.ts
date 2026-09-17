@@ -14,6 +14,7 @@ describe('locked team daily synchronization', () => {
   }]);
   const onError = vi.fn();
   let service: TeamViewService;
+  let connectionEnabled: boolean;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -21,8 +22,9 @@ describe('locked team daily synchronization', () => {
     snapshots.clear();
     fetch.mockClear();
     onError.mockClear();
+    connectionEnabled = true;
     service = new TeamViewService(repository, { fetch }, [{ id: 'mushroom', displayName: 'Mushroom' }]);
-    scheduler = new TeamViewScheduler(service, onError);
+    scheduler = new TeamViewScheduler(service, onError, () => connectionEnabled);
   });
 
   afterEach(async () => { await scheduler.stop(); vi.useRealTimers(); });
@@ -72,6 +74,20 @@ describe('locked team daily synchronization', () => {
     await vi.advanceTimersByTimeAsync(86_400_000);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('pauses without logging or fetching while disconnected and resumes immediately after reconnecting', async () => {
+    connectionEnabled = false;
+    scheduler.start();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+
+    connectionEnabled = true;
+    scheduler.connectionChanged(true);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledWith('2026-09-08', expect.any(AbortSignal));
   });
 
   it('defaults the read API to the current Beijing lock date', () => {

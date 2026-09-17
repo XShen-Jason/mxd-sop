@@ -1,4 +1,8 @@
 export type Role = 'customer' | 'manager' | 'super_admin';
+export type WorkspaceId = 'request' | 'records' | 'reminders' | 'queue' | 'ready' | 'reissue' | 'archive' | 'activities' | 'player-directory' | 'team-view' | 'accounts' | 'server-operations';
+export type WorkspacePermissions = Record<WorkspaceId, boolean>;
+export type UploadPermissionId = 'player-directory' | 'team-view' | 'item-catalog';
+export type UploadPermissions = Record<UploadPermissionId, boolean>;
 export type GroupStatus = 'pending' | 'approved' | 'rejected' | 'issued' | 'completed' | 'cancelled';
 export type OperationType = 'item' | 'cash' | 'kick' | 'ban' | 'warp';
 
@@ -41,6 +45,7 @@ export interface Group {
   updatedAt?: string;
   updatedBy?: { id: string; displayName: string };
   executionNote?: string;
+  automationFailureReason?: 'no-online-accounts' | 'execution-failed';
   reminderCount?: number;
   lastRemindedAt?: string;
   lastRemindedBy?: { id: string; displayName: string };
@@ -48,7 +53,7 @@ export interface Group {
 export interface GeneratedCommand { operationIndex: number; sequence: number; text: string }
 export interface ManagerGroup extends Group { commands: GeneratedCommand[]; commandRuleVersion: string }
 export interface Page<T> { groups: T[]; nextCursor: string | null }
-export interface User { id: string; username: string; displayName: string; role: Role; active: boolean; createdAt: string; createdBy?: { id: string; displayName: string } }
+export interface User { id: string; username: string; displayName: string; role: Role; active: boolean; createdAt: string; workspacePermissions: WorkspacePermissions; uploadPermissions: UploadPermissions; createdBy?: { id: string; displayName: string } }
 export interface Session { token?: string; expiresAt: string; user: User }
 
 export interface DirectoryAccount {
@@ -71,6 +76,7 @@ export interface TeamViewResult { date: string; fetchedAt: string | null; source
 
 export type PlayerDeploymentMode = 'local' | 'remote';
 export interface PlayerIntegrationStatus {
+  enabled: boolean;
   mode: PlayerDeploymentMode;
   activeEndpoint: string | null;
   endpoints: Record<PlayerDeploymentMode, { configured: boolean; available: boolean | null }>;
@@ -86,4 +92,60 @@ export interface ActivityReward {
   itemClass?: string;
   image?: string;
 }
-export interface Activity { id: string; name: string; description: string; rewards: ActivityReward[]; updatedAt: string }
+export interface Activity { id: string; name: string; description: string; rewards: ActivityReward[]; visible?: boolean; updatedAt: string }
+
+export type AutoAccountStatus = 'disabled' | 'offline' | 'connecting' | 'online' | 'reconnecting' | 'failed';
+export interface AutoSession {
+  id: string;
+  server_id: string;
+  state: string;
+  character_id?: string;
+  map_id?: string;
+  roles: AutoRole[];
+  sent_messages: number;
+  chat_success_count: number;
+  chat_failure_count: number;
+  chat_unknown_count: number;
+  last_error?: string;
+  created_at: string;
+  updated_at: string;
+}
+export interface AutoRole { id: string; name?: string; map_id?: string; opaque_available: boolean }
+export interface AutoAccount {
+  id: string;
+  server_id: string;
+  username: string;
+  character_id: string;
+  character_name?: string;
+  enabled: boolean;
+  status: AutoAccountStatus;
+  session_id?: string;
+  session?: AutoSession;
+  last_error?: string;
+  updated_at: string;
+}
+export interface AutoServer { id: string; name: string; address: string; version: string; map_id: string; enabled: boolean; keyless_probe_enabled?: boolean; accounts: AutoAccount[] }
+export interface AutoAuditEntry { id: string; created_at: string; request_id?: string; method: string; path: string; actor?: string; action?: string; status: number; duration_ms: number; detail?: Record<string, unknown> }
+export interface AutoOverview { fetched_at: string; servers: AutoServer[]; sessions: AutoSession[]; logs: AutoAuditEntry[] }
+export interface AutoServiceStatus { enabled: boolean; endpoint: string | null; configured: boolean; available: boolean | null; checkedAt: string }
+export interface AutoMessageResult {
+  result: {
+    status: string;
+    message: string;
+    delivery_status: string;
+    server_response?: string;
+    server_response_type?: string;
+    server_response_observed?: boolean;
+    server_response_code?: number;
+    server_event?: number;
+    server_key_included?: boolean;
+    connection_mode?: string;
+    game_server_response_latency_ms?: number;
+    game_server_status?: 'success' | 'failure' | 'unknown';
+  };
+  account: AutoAccount;
+  auto_process?: {
+    latency_ms: number;
+    status: 'success' | 'failure' | 'unknown';
+  };
+}

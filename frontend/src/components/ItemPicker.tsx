@@ -7,7 +7,7 @@ import { ItemThumbnail } from './ItemThumbnail';
 
 type InputState = 'empty' | 'invalid';
 
-export function ItemPicker({ value, name, image, onChange, onClear, onInputState, token }: { value: string; name: string; image?: string; onChange: (item: CatalogItem) => boolean | void; onClear?: () => void; onInputState?: (state: InputState) => void; token?: string }) {
+export function ItemPicker({ value, name, image, onChange, onClear, onInputState, userId, token }: { value: string; name: string; image?: string; onChange: (item: CatalogItem) => boolean | void; onClear?: () => void; onInputState?: (state: InputState) => void; userId?: string; token?: string }) {
   const [query, setQuery] = useState(name);
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [open, setOpen] = useState(false);
@@ -38,7 +38,7 @@ export function ItemPicker({ value, name, image, onChange, onClear, onInputState
       abortRef.current = controller;
       setLoading(true); setError('');
       try {
-        const result = await new ApiClient('customer', token).searchItems(text, controller.signal);
+        const result = await new ApiClient(userId ?? 'anonymous', token).searchItems(text, controller.signal);
         if (!controller.signal.aborted) setItems(result.items);
       } catch (err) {
         if (!controller.signal.aborted) setError(err instanceof ApiError ? err.message : '目录暂不可用');
@@ -47,7 +47,7 @@ export function ItemPicker({ value, name, image, onChange, onClear, onInputState
       }
     }, 260);
     return () => window.clearTimeout(timer);
-  }, [open, query, token]);
+  }, [open, query, token, userId]);
 
   const unresolved = !value && query.trim().length > 0;
   return <div className="item-picker" ref={pickerRef}>

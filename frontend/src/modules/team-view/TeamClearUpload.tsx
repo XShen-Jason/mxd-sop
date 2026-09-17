@@ -3,16 +3,17 @@ import { useState } from 'react';
 import { ApiClient, ApiError } from '../../api/client';
 import type { ServerOption, TeamClearImportResult } from '../../types';
 
-export function TeamClearUpload({ client, servers, onImported, onNotice: setNotice }: {
+export function TeamClearUpload({ client, servers, onImported, onNotice: setNotice, uploadEnabled = true }: {
   client: ApiClient; servers: ServerOption[]; onImported: (result: TeamClearImportResult) => void;
   onNotice: (notice: { kind: 'success' | 'error'; text: string } | null) => void;
+  uploadEnabled?: boolean;
 }) {
   const [serverId, setServerId] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
   async function upload() {
-    if (!serverId || !file || uploading) return;
+    if (!uploadEnabled || !serverId || !file || uploading) return;
     setUploading(true);
     setNotice(null);
     try {
@@ -29,18 +30,18 @@ export function TeamClearUpload({ client, servers, onImported, onNotice: setNoti
   return <>
     <div className="team-clear-upload" aria-label="上传通关列表">
       <label className="directory-server-picker">
-        <select aria-label="通关服务器" value={serverId} disabled={uploading} onChange={event => { setServerId(event.target.value); setFile(null); }}>
+        <select aria-label="通关服务器" value={serverId} disabled={!uploadEnabled || uploading} onChange={event => { setServerId(event.target.value); setFile(null); }}>
           <option value="">请选择服务器</option>{servers.map(server => <option key={server.id} value={server.id}>{server.displayName}</option>)}
         </select>
       </label>
-      <label className={`directory-file-picker ${!serverId || uploading ? 'disabled' : ''}`}>
+      <label className={`directory-file-picker ${!uploadEnabled || !serverId || uploading ? 'disabled' : ''}`}>
         <FileUp size={17} /><span>{file?.name ?? '选择 CSV'}</span>
-        <input aria-label="通关 CSV" type="file" accept=".csv,text/csv" disabled={!serverId || uploading} onChange={event => {
+        <input aria-label="通关 CSV" type="file" accept=".csv,text/csv" disabled={!uploadEnabled || !serverId || uploading} onChange={event => {
           setFile(event.target.files?.[0] ?? null); event.target.value = '';
         }} />
       </label>
-      {file && <button type="button" className="icon-button" title="移除文件" aria-label="移除文件" disabled={uploading} onClick={() => setFile(null)}><X size={16} /></button>}
-      <button type="button" className="primary-button" disabled={!serverId || !file || uploading} onClick={() => void upload()}>
+      {file && <button type="button" className="icon-button" title="移除文件" aria-label="移除文件" disabled={!uploadEnabled || uploading} onClick={() => setFile(null)}><X size={16} /></button>}
+      <button type="button" className="primary-button" disabled={!uploadEnabled || !serverId || !file || uploading} onClick={() => void upload()}>
         {uploading ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />}{uploading ? '上传中…' : '上传通关列表'}
       </button>
     </div>

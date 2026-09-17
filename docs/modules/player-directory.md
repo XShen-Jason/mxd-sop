@@ -23,11 +23,13 @@ communicate through the versioned internal HTTP contracts only.
 
 ## Invariants
 
-- Search is available to every authenticated role.
-- Import is available only to `super_admin`; the active player service accepts
-  the validated upload in a transaction before the support directory replaces
-  only the selected server. Player teams, sessions, and accounts are not
-  deleted by synchronization.
+- Search is available to every authenticated role with the `player-directory`
+  workspace.
+- Import requires the `player-directory` workspace and the independent
+  `player-directory` upload permission; the
+  active player service accepts the validated upload in a transaction before
+  the support directory replaces only the selected server. Player teams,
+  sessions, and accounts are not deleted by synchronization.
 - A row contains a server ID, character ID, user ID, game account, and numeric
   binding QQ. Invalid rows never enter the repository.
 - Results are grouped by account identity and expose all character IDs for that

@@ -34,4 +34,12 @@ describe('shared activities', () => {
     expect(listed.statusCode).toBe(200);
     expect(listed.json().activities).toEqual([activity]);
   });
+
+  it('keeps hidden activities in the manager catalogue but omits them from request quick fill', async () => {
+    const hidden = { id: 'event-hidden', name: 'Hidden', description: '', visible: false, rewards: [{ kind: 'cash', quantity: 1 }], updatedAt: new Date().toISOString() };
+    const saved = await app.inject({ method: 'PUT', url: '/api/v1/activities', headers: manager, payload: { activities: [hidden] } });
+    expect(saved.statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/v1/activities', headers: customer })).json().activities).toEqual([]);
+    expect((await app.inject({ method: 'GET', url: '/api/v1/activities', headers: manager })).json().activities).toEqual([hidden]);
+  });
 });

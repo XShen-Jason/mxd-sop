@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { isSuperAdmin } from '../../auth/public/index.js';
+import { hasWorkspaceAccess } from '../../auth/public/index.js';
 import { PlayerIntegrationError } from './errors.js';
 import type { PlayerAccountSync, PlayerDeploymentMode, PlayerEndpointConfig, PlayerImportResult, PlayerIntegrationActor, PlayerIntegrationClient, PlayerIntegrationRepository, PlayerIntegrationState, PlayerIntegrationStatus } from './types.js';
 import type { UploadFile } from '../../player-directory/public/index.js';
 
 export const SWITCH_CONFIRMATION = 'SWITCH PLAYER SERVER';
+export const CONNECTION_CONFIRMATION = 'CHANGE PLAYER CONNECTION';
 
 export class PlayerIntegrationService implements PlayerAccountSync {
   private readonly config: Required<Pick<PlayerEndpointConfig, 'initialMode' | 'timeoutMs'>> & PlayerEndpointConfig;
@@ -15,32 +16,62 @@ export class PlayerIntegrationService implements PlayerAccountSync {
   }
 
   activeMode(): PlayerDeploymentMode { return this.repository.get()?.mode ?? this.config.initialMode; }
+  isEnabled() { return this.repository.get()?.enabled ?? true; }
 
   activeEndpoint() { return this.endpoint(this.activeMode()); }
-  teamSnapshotEndpoint() { const endpoint = this.activeEndpoint(); return endpoint ? `${endpoint}/api/v1/internal/player/teams/snapshot` : undefined; }
+  teamSnapshotEndpoint() { const endpoint = this.isEnabled() ? this.activeEndpoint() : undefined; return endpoint ? `${endpoint}/api/v1/internal/player/teams/snapshot` : undefined; }
   serviceToken() { return this.config.serviceToken ?? ''; }
   hasConfiguredEndpoint() { return this.endpointConfigured(this.activeMode()); }
 
   async status(actor: PlayerIntegrationActor): Promise<PlayerIntegrationStatus> {
-    this.requireSuperAdmin(actor);
+    this.requireAuthenticated(actor);
+    if (!hasWorkspaceAccess(actor, 'server-operations')) throw new PlayerIntegrationError('forbidden');
     const checkedAt = new Date().toISOString();
-    const [local, remote] = await Promise.all([this.check('local'), this.check('remote')]);
-    return { mode: this.activeMode(), activeEndpoint: this.activeEndpoint() ?? null, endpoints: { local, remote }, checkedAt };
+    const enabled = this.isEnabled();
+    const [local, remote] = enabled
+      ? await Promise.all([this.check('local'), this.check('remote')])
+      : [this.configuredStatus('local'), this.configuredStatus('remote')];
+    return { enabled, mode: this.activeMode(), activeEndpoint: this.activeEndpoint() ?? null, endpoints: { local, remote }, checkedAt };
   }
 
   async switchMode(actor: PlayerIntegrationActor, mode: unknown, confirmation: unknown) {
-    this.requireSuperAdmin(actor);
+    this.requireAuthenticated(actor);
+    if (!hasWorkspaceAccess(actor, 'server-operations')) throw new PlayerIntegrationError('forbidden');
+    if (!this.isEnabled()) throw new PlayerIntegrationError('connection-disabled', 'player service connection is disabled');
     if (mode !== 'local' && mode !== 'remote') throw new PlayerIntegrationError('invalid-input', 'mode must be local or remote');
     if (confirmation !== SWITCH_CONFIRMATION) throw new PlayerIntegrationError('confirmation-required', `type ${SWITCH_CONFIRMATION} to confirm`);
     const endpoint = this.endpoint(mode);
     if (!endpoint || !this.serviceToken()) throw new PlayerIntegrationError('endpoint-not-configured', `${mode} player endpoint is not configured`);
     if (!await this.client.health(endpoint)) throw new PlayerIntegrationError('endpoint-unavailable', `${mode} player endpoint is unavailable`);
-    const state: PlayerIntegrationState = { mode, updatedAt: new Date().toISOString(), updatedBy: { id: actor.id, displayName: actor.displayName } };
+    const state: PlayerIntegrationState = { mode, enabled: this.isEnabled(), updatedAt: new Date().toISOString(), updatedBy: { id: actor.id, displayName: actor.displayName } };
     this.repository.save(state);
     return { mode: state.mode, activeEndpoint: endpoint, updatedAt: state.updatedAt };
   }
 
+  async setConnection(actor: PlayerIntegrationActor, enabled: unknown, confirmation: unknown) {
+    this.requireAuthenticated(actor);
+    if (!hasWorkspaceAccess(actor, 'server-operations')) throw new PlayerIntegrationError('forbidden');
+    if (typeof enabled !== 'boolean') throw new PlayerIntegrationError('invalid-input', 'enabled must be a boolean');
+    if (confirmation !== CONNECTION_CONFIRMATION) throw new PlayerIntegrationError('confirmation-required', `type ${CONNECTION_CONFIRMATION} to confirm`);
+    const mode = this.activeMode();
+    const endpoint = this.endpoint(mode);
+    if (enabled) {
+      if (!endpoint || !this.serviceToken()) throw new PlayerIntegrationError('endpoint-not-configured', `${mode} player endpoint is not configured`);
+      if (!await this.client.health(endpoint)) throw new PlayerIntegrationError('endpoint-unavailable', `${mode} player endpoint is unavailable`);
+    }
+    const state: PlayerIntegrationState = { mode, enabled, updatedAt: new Date().toISOString(), updatedBy: { id: actor.id, displayName: actor.displayName } };
+    this.repository.save(state);
+    for (const listener of this.connectionListeners) listener(enabled);
+    return { enabled, mode, activeEndpoint: endpoint ?? null, updatedAt: state.updatedAt };
+  }
+
+  onConnectionChange(listener: (enabled: boolean) => void) {
+    this.connectionListeners.add(listener);
+    return () => this.connectionListeners.delete(listener);
+  }
+
   async sync(serverId: string, file: UploadFile, signal?: AbortSignal): Promise<PlayerImportResult> {
+    if (!this.isEnabled()) throw new PlayerIntegrationError('connection-disabled', 'player service connection is disabled');
     const endpoint = this.activeEndpoint();
     const token = this.serviceToken();
     if (!endpoint || !token) throw new PlayerIntegrationError('endpoint-not-configured', 'player service integration is not configured');
@@ -58,9 +89,12 @@ export class PlayerIntegrationService implements PlayerAccountSync {
     return { configured: true, available: await this.client.health(endpoint) };
   }
 
+  private configuredStatus(mode: PlayerDeploymentMode) { return { configured: this.endpointConfigured(mode), available: null }; }
+
   private endpoint(mode: PlayerDeploymentMode) { return mode === 'local' ? this.config.localUrl : this.config.remoteUrl; }
   private endpointConfigured(mode: PlayerDeploymentMode) { return Boolean(this.endpoint(mode) && this.serviceToken()); }
-  private requireSuperAdmin(actor: PlayerIntegrationActor) { if (!isSuperAdmin(actor)) throw new PlayerIntegrationError('forbidden', 'super admin required'); }
+  private requireAuthenticated(actor: PlayerIntegrationActor) { if (!actor?.id) throw new PlayerIntegrationError('forbidden'); }
+  private readonly connectionListeners = new Set<(enabled: boolean) => void>();
 }
 
 export function loadPlayerEndpointConfig(env: NodeJS.ProcessEnv = process.env): PlayerEndpointConfig {

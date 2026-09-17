@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { ItemCatalog } from '../src/modules/item-catalog/public/index.js';
 import { OperationGroupsService, type GroupRepository } from '../src/modules/operation-groups/public/index.js';
 import { projectGroupChanges, type GroupChange } from '../src/modules/operation-groups/domain/changes.js';
+import { defaultWorkspacePermissions } from '../src/modules/auth/public/index.js';
 import type { Identity, OperationGroup, SubmitGroupInput } from '../src/shared/types.js';
 
-const owner: Identity = { id: 'owner', role: 'customer', displayName: 'Owner' };
+const owner: Identity = { id: 'owner', role: 'customer', displayName: 'Owner', workspacePermissions: { ...defaultWorkspacePermissions('customer'), reissue: true, archive: true } };
 const admin: Identity = { id: 'admin', role: 'super_admin', displayName: 'Admin' };
 const input: SubmitGroupInput = { serverId: 'mushroom', account: 'account', playerQQ: '123', characterId: '123',
   reason: { code: 'compensation' }, operations: [{ type: 'cash', quantity: 1 }] };
@@ -28,18 +29,21 @@ const views = (event: ReturnType<typeof projectGroupChanges>) => [...new Set(eve
 describe('scoped operation-group notifications', () => {
   it('routes submit, approve, remind, repeat and issue to their affected lists', () => {
     const { service, event, events } = setup();
+    const workflowCustomer: Identity = { ...owner, workspacePermissions: { ...defaultWorkspacePermissions('customer'), queue: true, ready: true, reissue: false, archive: false } };
     const group = service.submit(owner, input);
     expect(views(event())).toEqual(['queue', 'reissue']);
     expect(event().counts).toBe(true);
-    expect(views(event(owner))).toEqual(['records']);
-    expect(event({ ...owner, id: 'another-customer' })).toEqual({ scopes: [], counts: false });
+    expect(views(event(owner))).toEqual(['records', 'reissue']);
+    expect(views(event(workflowCustomer))).toEqual(['queue', 'records']);
+    expect(event({ id: 'another-customer', role: 'customer', displayName: 'Another Customer' })).toEqual({ scopes: [], counts: false });
     service.approve(admin, group.id);
     expect(views(event())).toEqual(['queue', 'ready', 'reissue']);
     expect(views(event({ ...admin, role: 'manager' }))).toEqual(['queue', 'reissue']);
+    expect(views(event(workflowCustomer))).toEqual(['queue', 'ready', 'records']);
     service.remind(admin, group.id);
     expect(views(event())).toEqual(['ready', 'reissue']);
     expect(event().counts).toBe(false);
-    expect(views(event(owner))).toEqual(['records', 'reminders']);
+    expect(views(event(owner))).toEqual(['records', 'reissue', 'reminders']);
     expect(event(owner).counts).toBe(true);
     service.remind(admin, group.id);
     expect(event(owner).counts).toBe(false);
@@ -62,7 +66,7 @@ describe('scoped operation-group notifications', () => {
     service.update(owner, group.id, { serverId: 'yeti', characterId: '123', reason: { code: 'player-request' }, operations: [{ type: 'kick' }] });
     expect(event().scopes).toContainEqual({ view: 'ready', serverId: 'mushroom', kind: 'issuance', status: 'approved' });
     expect(event().scopes).toContainEqual({ view: 'queue', serverId: 'yeti', kind: 'regular', status: 'pending' });
-    expect(views(event(owner))).toEqual(['records', 'reminders']);
+    expect(views(event(owner))).toEqual(['archive', 'records', 'reissue', 'reminders']);
     service.cancel(owner, group.id);
     expect(views(event())).toEqual(['archive', 'queue']);
   });
@@ -104,7 +108,7 @@ describe('scoped operation-group notifications', () => {
     expect(service.workspaceCounts(owner).reminders).toBe(0);
     expect(views(event())).toEqual(['ready', 'reissue']);
     expect(event().counts).toBe(false);
-    expect(views(event(owner))).toEqual(['records', 'reminders']);
+    expect(views(event(owner))).toEqual(['records', 'reissue', 'reminders']);
     expect(event(owner).counts).toBe(true);
     const count = events.length;
     service.markOnline(owner, group.id);

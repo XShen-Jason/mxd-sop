@@ -6,7 +6,7 @@ export interface CatalogItem {
 }
 
 export class CatalogError extends Error {
-  constructor(public readonly code: 'catalog-unavailable' | 'invalid-query' | 'invalid-cursor', message: string = code) {
+  constructor(public readonly code: 'catalog-unavailable' | 'invalid-query' | 'invalid-cursor' | 'invalid-file', message: string = code) {
     super(message);
     this.name = 'CatalogError';
   }
@@ -40,9 +40,9 @@ function compareCode(a: string, b: string) {
 }
 
 export class ItemCatalog {
-  private readonly byCode: Map<string, CatalogItem>;
-  private readonly byClass: Map<string, CatalogItem[]>;
-  private readonly items: CatalogItem[];
+  private byCode: Map<string, CatalogItem>;
+  private byClass: Map<string, CatalogItem[]>;
+  private items: CatalogItem[];
 
   constructor(items: CatalogItem[]) {
     const deduped = new Map<string, CatalogItem>();
@@ -56,7 +56,19 @@ export class ItemCatalog {
       deduped.set(code, { code, name, itemClass: itemClass || undefined, image: image || undefined });
     }
     this.byCode = deduped;
-    this.items = [...deduped.values()].sort((a, b) => compareCode(a.code, b.code));
+    this.items = [];
+    this.byClass = new Map<string, CatalogItem[]>();
+    this.rebuildIndexes();
+  }
+
+  replaceFrom(next: ItemCatalog) {
+    this.byCode = new Map(next.byCode);
+    this.items = next.items.map((item) => ({ ...item }));
+    this.byClass = new Map([...next.byClass].map(([itemClass, items]) => [itemClass, items.map((item) => ({ ...item }))]));
+  }
+
+  private rebuildIndexes() {
+    this.items = [...this.byCode.values()].sort((a, b) => compareCode(a.code, b.code));
     this.byClass = new Map<string, CatalogItem[]>();
     for (const item of this.items) {
       const itemClass = item.itemClass ?? '-';

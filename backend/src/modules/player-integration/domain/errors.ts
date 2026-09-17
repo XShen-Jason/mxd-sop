@@ -2,6 +2,7 @@ export type PlayerIntegrationErrorCode =
   | 'forbidden'
   | 'invalid-input'
   | 'confirmation-required'
+  | 'connection-disabled'
   | 'endpoint-not-configured'
   | 'endpoint-unavailable'
   | 'player-import-failed';

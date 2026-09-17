@@ -4,13 +4,17 @@ Equipment rewards include an optional `itemLevel` (default 1, maximum 10). Level
 
 ## Purpose
 
-管理客服常用活动及其道具、点券奖励，并在发物资申请中提供一键填充。活动与道具工作区仅管理和超级管理可见、可用和配置；申请页的活动快捷填充读取已配置活动，对所有角色开放。
+管理客服常用活动及其道具、点券奖励，并在发物资申请中提供一键填充。`activities` 工作区控制活动页面读取与编辑入口；`request` 工作区同时授予申请表单读取共享活动配置。拥有 `activities` 工作区的任意角色都能读取和编辑共享配置。
 
 ## Scope
 
-活动名称、说明、奖励编辑与后端持久化；左侧活动列表与编辑表单在同一位置切换，点击“添加活动”后才显示表单，已配置活动和申请页活动快捷填充均使用自适应多列布局。右侧道具面板以单列展示，筛选栏仅保留消耗品、装备、时装、材料、椅子、任务和称号，点券及未分类（金币所在的“其他”）不提供筛选入口；固定分类使用中文标签；“全部”无搜索词时展示最近使用物品，输入关键词按目录搜索，选择分类时按游标分页直接读取该分类。活动通过 activities.list/activities.replace 跨账号共享，localStorage 仅作为缓存和旧配置迁移来源，目录分类通过 item-catalog.by-class 读取。
+活动名称、说明、奖励编辑与后端持久化；左侧活动列表与编辑表单在同一位置切换，点击“添加活动”后才显示表单，已配置活动和申请页活动快捷填充均使用自适应多列布局。右侧道具面板以单列展示，筛选栏仅保留消耗品、装备、时装、材料、椅子、任务和称号，点券及未分类（金币所在的“其他”）不提供筛选入口；固定分类筛选使用中文标签，目录条目保留原始英文 `itemClass` 并提供常驻的物品代码复制按钮。未打开活动编辑器时，目录搜索、筛选、分页、文本选择和代码复制仍可用，只有将道具加入奖励的动作不可用。“全部”无搜索词时展示最近使用物品，输入关键词按目录搜索，选择分类时按游标分页直接读取该分类。活动通过 activities.list/activities.replace 跨账号共享，localStorage 仅作为缓存和旧配置迁移来源，目录分类通过 item-catalog.by-class 读取。
 
 ## Ownership and invariants
+
+`visible` is owned by the activities module. A hidden activity remains in the
+configuration list and can be edited, but is excluded from request quick-fill
+responses. Legacy records without the field are treated as visible.
 
 每个活动有稳定 id、名称和至少一项正数量奖励；道具奖励必须来自 item-catalog 搜索结果，单个活动内同一 itemCode 不得重复。选择多个活动时，相同道具/点券按数量累加，取消活动只回退该活动贡献。
 

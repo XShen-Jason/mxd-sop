@@ -1,0 +1,21 @@
+{
+  "servers": [
+    {
+      "id": "my-server",
+      "name": "My authorized server",
+      "address": "127.0.0.1:12660",
+      "version": "1.0.2",
+      "map_id": "211000000",
+      "enabled": true,
+      "max_body_bytes": 4194304,
+      "connect_timeout_seconds": 8,
+      "request_timeout_seconds": 10,
+      "chat_response_timeout_seconds": 1,
+      "map_ready_timeout_seconds": 8,
+      "require_map_events": true,
+      "post_entry_init": true,
+      "retention_mode": "session",
+      "allow_keyless_probe": false
+    }
+  ]
+}

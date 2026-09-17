@@ -5,10 +5,11 @@ export function clearReminder(group: OperationGroup) {
   delete group.reminderCount;
   delete group.lastRemindedAt;
   delete group.lastRemindedBy;
+  delete group.automationFailureReason;
 }
 
 export function changeReminder(group: OperationGroup, identity: Identity, now: Date, action: 'remind' | 'online') {
-  if (action === 'remind' ? identity.role !== 'super_admin' : group.submittedBy.id !== identity.id) throw new GroupError('forbidden');
+  if (action === 'online' && group.submittedBy.id !== identity.id) throw new GroupError('forbidden');
   if (group.status !== 'approved') throw new GroupError('invalid-status-transition');
   if (action === 'online') {
     if (!(group.reminderCount && group.reminderCount > 0)) return false;

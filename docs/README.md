@@ -28,4 +28,5 @@
 
 - [DEPLOYMENT-UPDATE.md](DEPLOYMENT-UPDATE.md)：同机部署的长期更新流程。
 - [DEPLOYMENT-MXD-SOP-26901.md](DEPLOYMENT-MXD-SOP-26901.md)：运营台首次部署与同机升级。
+- [DEPLOYMENT-MXD-AUTO-26909.md](DEPLOYMENT-MXD-AUTO-26909.md)：mxd-auto-process 同机首次部署。
 - [../mxd-player/DEPLOYMENT.md](../mxd-player/DEPLOYMENT.md)：mxd-player 首次部署与同机升级。

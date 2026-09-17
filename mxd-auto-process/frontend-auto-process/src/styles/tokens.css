@@ -1,0 +1,30 @@
+:root {
+  color-scheme: dark;
+  --color-primary: #0f172a;
+  --color-secondary: #1e293b;
+  --color-accent: #22c55e;
+  --color-accent-bright: #4ade80;
+  --color-background: #020617;
+  --color-foreground: #f8fafc;
+  --color-card: #0e1223;
+  --color-muted: #1a1e2f;
+  --color-muted-foreground: #94a3b8;
+  --color-border: #334155;
+  --color-border-soft: #1e293b;
+  --color-destructive: #f87171;
+  --color-warning: #fbbf24;
+  --color-ring: #86efac;
+  --space-xs: 2px;
+  --space-sm: 4px;
+  --space-md: 8px;
+  --space-lg: 12px;
+  --space-xl: 16px;
+  --space-2xl: 24px;
+  --space-3xl: 32px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-panel: 0 18px 55px rgba(0, 0, 0, .28);
+  --font-body: "Fira Sans", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "Fira Code", "SFMono-Regular", Consolas, monospace;
+}

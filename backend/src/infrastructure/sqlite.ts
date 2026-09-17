@@ -17,6 +17,8 @@ export function openDatabase(filePath: string) {
       username TEXT NOT NULL COLLATE NOCASE UNIQUE,
       display_name TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('customer', 'manager', 'super_admin')),
+      workspace_permissions_json TEXT,
+      upload_permissions_json TEXT,
       password_hash TEXT NOT NULL,
       active INTEGER NOT NULL CHECK (active IN (0, 1)),
       created_at TEXT NOT NULL,
@@ -52,6 +54,7 @@ export function openDatabase(filePath: string) {
       name TEXT NOT NULL,
       description TEXT NOT NULL,
       rewards_json TEXT NOT NULL,
+      visible INTEGER NOT NULL DEFAULT 1 CHECK (visible IN (0, 1)),
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS activities_updated ON activities(updated_at DESC, id DESC);
@@ -88,17 +91,37 @@ export function openDatabase(filePath: string) {
     CREATE TABLE IF NOT EXISTS player_integration_state (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       mode TEXT NOT NULL CHECK (mode IN ('local', 'remote')),
+      enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+      updated_at TEXT NOT NULL,
+      updated_by_id TEXT,
+      updated_by_name TEXT
+    );
+    CREATE TABLE IF NOT EXISTS auto_integration_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
       updated_at TEXT NOT NULL,
       updated_by_id TEXT,
       updated_by_name TEXT
     );
   `);
+  const userColumns = db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
+  const userColumnNames = new Set(userColumns.map((column) => column.name));
+  if (!userColumnNames.has('workspace_permissions_json')) db.exec('ALTER TABLE users ADD COLUMN workspace_permissions_json TEXT');
+  if (!userColumnNames.has('upload_permissions_json')) db.exec('ALTER TABLE users ADD COLUMN upload_permissions_json TEXT');
+  if (userColumnNames.has('tab_permissions_json')) {
+    db.exec('UPDATE users SET workspace_permissions_json = COALESCE(workspace_permissions_json, tab_permissions_json) WHERE tab_permissions_json IS NOT NULL');
+    db.exec('ALTER TABLE users DROP COLUMN tab_permissions_json');
+  }
   const columns = db.prepare('PRAGMA table_info(operation_groups)').all() as Array<{ name: string }>;
   const existing = new Set(columns.map((column) => column.name));
   if (!existing.has('reminder_count')) db.exec('ALTER TABLE operation_groups ADD COLUMN reminder_count INTEGER NOT NULL DEFAULT 0');
   if (!existing.has('last_reminded_at')) db.exec('ALTER TABLE operation_groups ADD COLUMN last_reminded_at TEXT');
   if (!existing.has('last_reminded_by_json')) db.exec('ALTER TABLE operation_groups ADD COLUMN last_reminded_by_json TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS groups_reminders ON operation_groups(submitted_by_id, status, reminder_count, submitted_at DESC, id DESC)');
+  const activityColumns = db.prepare('PRAGMA table_info(activities)').all() as Array<{ name: string }>;
+  if (!activityColumns.some((column) => column.name === 'visible')) db.exec('ALTER TABLE activities ADD COLUMN visible INTEGER NOT NULL DEFAULT 1 CHECK (visible IN (0, 1))');
+  const playerIntegrationColumns = db.prepare('PRAGMA table_info(player_integration_state)').all() as Array<{ name: string }>;
+  if (!playerIntegrationColumns.some((column) => column.name === 'enabled')) db.exec('ALTER TABLE player_integration_state ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1))');
   return db;
 }
 

@@ -13,6 +13,7 @@ export interface PlayerEndpointConfig {
 
 export interface PlayerIntegrationState {
   mode: PlayerDeploymentMode;
+  enabled: boolean;
   updatedAt: string;
   updatedBy?: { id: string; displayName: string };
 }
@@ -35,6 +36,7 @@ export interface PlayerIntegrationClient {
 }
 
 export interface PlayerIntegrationStatus {
+  enabled: boolean;
   mode: PlayerDeploymentMode;
   activeEndpoint: string | null;
   endpoints: Record<PlayerDeploymentMode, { configured: boolean; available: boolean | null }>;
@@ -45,4 +47,4 @@ export interface PlayerAccountSync {
   sync(serverId: string, file: UploadFile, signal?: AbortSignal): Promise<PlayerImportResult>;
 }
 
-export type PlayerIntegrationActor = Pick<Identity, 'id' | 'role' | 'displayName'>;
+export type PlayerIntegrationActor = Pick<Identity, 'id' | 'role' | 'displayName' | 'workspacePermissions'>;

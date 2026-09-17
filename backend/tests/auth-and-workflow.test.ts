@@ -51,7 +51,7 @@ describe('authentication and approval workflow', () => {
     expect(rejected.statusCode).toBe(400);
   });
 
-  it('supports edit, approval, rejection and super-admin-only issuance', async () => {
+  it('supports edit, approval, rejection and workspace-specific issuance', async () => {
     const customerHeaders = { authorization: `Bearer ${customerToken}` };
     const created = await app.inject({ method: 'POST', url: '/api/v1/operation-groups', headers: customerHeaders, payload: { serverId: 'mushroom', account: 'item-player', playerQQ: '9', characterId: '9001', reason: { code: 'compensation', text: '测试' }, operations: [{ type: 'item', itemCode: '02000000', quantity: 1 }] } });
     expect(created.statusCode).toBe(201);
@@ -98,12 +98,14 @@ describe('authentication and approval workflow', () => {
     expect(own.json().groups.some((group: { id: string }) => group.id === response.json().id)).toBe(true);
   });
 
-  it('protects the last super admin and limits manager account visibility', async () => {
+  it('protects the last super admin and gives accounts workspaces the same directory', async () => {
     const blocked = await app.inject({ method: 'DELETE', url: `/api/v1/auth/users/${superAdminId}`, headers: { authorization: `Bearer ${superToken}` } });
     expect(blocked.statusCode).toBe(409);
     const users = await app.inject({ method: 'GET', url: '/api/v1/manager/customers', headers: { authorization: `Bearer ${managerToken}` } });
     expect(users.statusCode).toBe(200);
-    expect(users.json().users.every((user: { role: string }) => user.role === 'customer' || user.role === 'manager')).toBe(true);
+    expect(users.json().users.some((user: { role: string }) => user.role === 'super_admin')).toBe(true);
+    const superUsers = await app.inject({ method: 'GET', url: '/api/v1/auth/users', headers: { authorization: `Bearer ${superToken}` } });
+    expect(users.json()).toEqual(superUsers.json());
   });
 
   it('lets a super admin delete a subordinate while keeping self protection', async () => {
@@ -132,7 +134,7 @@ describe('authentication and approval workflow', () => {
     expect(complete.statusCode).toBe(409);
   });
 
-  it('lets only super admins remind customers and reopens edited applications for review', async () => {
+  it('requires the ready workspace for reminders and reopens edited applications for review', async () => {
     const headers = { authorization: `Bearer ${customerToken}` };
     const payload = { serverId: 'mushroom', account: 'remind-player', playerQQ: '12', characterId: '991', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '02000000', quantity: 1 }] };
     const created = await app.inject({ method: 'POST', url: '/api/v1/operation-groups', headers, payload });
@@ -141,7 +143,10 @@ describe('authentication and approval workflow', () => {
 
     const denied = await app.inject({ method: 'POST', url: `/api/v1/super-admin/operation-groups/${id}/remind`, headers: { authorization: `Bearer ${managerToken}` } });
     expect(denied.statusCode).toBe(403);
-    const reminded = await app.inject({ method: 'POST', url: `/api/v1/super-admin/operation-groups/${id}/remind`, headers: { authorization: `Bearer ${superToken}` } });
+    const readyCustomer = await app.inject({ method: 'POST', url: '/api/v1/auth/users', headers: { authorization: `Bearer ${superToken}` }, payload: { username: 'ready-reminder-customer', displayName: 'Ready Reminder Customer', password: 'CustomerPass1!', role: 'customer', workspacePermissions: { ready: true } } });
+    expect(readyCustomer.statusCode).toBe(201);
+    const readyCustomerLogin = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'ready-reminder-customer', password: 'CustomerPass1!' } });
+    const reminded = await app.inject({ method: 'POST', url: `/api/v1/operation-groups/${id}/remind`, headers: { authorization: `Bearer ${readyCustomerLogin.json().token}` } });
     expect(reminded.statusCode).toBe(200);
     expect(reminded.json().reminderCount).toBe(1);
     const reminders = await app.inject({ method: 'GET', url: '/api/v1/operation-groups/reminders', headers });

@@ -18,6 +18,12 @@ GET /api/v1/item-catalog/by-class?class={class}&cursor={opaque-cursor}&limit={n}
 - limit 默认 20，最大 50；cursor 保持与搜索接口相同的不透明分页语义。
 - 认证用户可以读取，权限不影响目录内容。
 
+POST /api/v1/item-catalog/import
+
+- 请求体为 `{ "file": { "name": "items.csv", "content": "..." } }`。
+- 调用者必须同时拥有 `activities` 工作区和独立的 `item-catalog` 上传权限；缺少任一项返回 `forbidden`（403）。
+- 文件表头、列数、行 ID 和 CSV 引号结构必须有效；数据行采用与启动加载一致的标准化规则，空代码、空名称、非法代码或重复代码行不进入目录。其余记录通过完整校验后原子替换目录；成功返回 `{ fileName, itemCount }`，其中 `itemCount` 为实际导入条数，已提交工单中的物品快照不受影响。
+
 ## Response/handling
 
 ~~~json
@@ -36,11 +42,11 @@ GET /api/v1/item-catalog/by-class?class={class}&cursor={opaque-cursor}&limit={n}
 
 ## Errors
 
-unauthorized（401）、invalid-query（400）、invalid-cursor（400）、catalog-unavailable（503）。
+unauthorized（401）、forbidden（403，仅目录替换）、invalid-input/invalid-query/invalid-cursor（400）、catalog-unavailable（503）。
 
 ## Limits and side effects
 
-只读、有界查询；后端应对 q 做索引/前缀或受控包含搜索，避免全表无界扫描。前端应 debounce 和取消过期请求，但这些是交互优化，不改变契约。
+查询只读且有界；后端应对 q 做索引/前缀或受控包含搜索，避免全表无界扫描。目录替换是有界同步写入，只有文件完整校验成功后才改变当前目录。前端应 debounce 和取消过期请求，但这些是交互优化，不改变契约。
 
 ## Compatibility
 

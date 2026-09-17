@@ -1,4 +1,4 @@
-import type { Activity, AppOptions, CatalogItem, DirectoryImportResult, DirectoryPage, Group, ManagerGroup, Page, PlayerDeploymentMode, PlayerIntegrationStatus, Role, Session, TeamClearImportResult, TeamViewResult, User } from '../types';
+import type { Activity, AppOptions, AutoAccount, AutoMessageResult, AutoOverview, AutoServer, AutoServiceStatus, AutoSession, CatalogItem, DirectoryImportResult, DirectoryPage, Group, ManagerGroup, Page, PlayerDeploymentMode, PlayerIntegrationStatus, Role, Session, TeamClearImportResult, TeamViewResult, UploadPermissions, User, WorkspacePermissions } from '../types';
 
 export class ApiError extends Error {
   constructor(public readonly code: string, message: string, public readonly status: number) { super(message); }
@@ -26,8 +26,24 @@ const errorMessages: Record<string, string> = {
   'invalid-date': '日期格式不正确，请重新选择',
   'source-unavailable': '队伍数据源暂时不可用',
   'confirmation-required': '请完成二次确认并输入指定文本',
+  'connection-disabled': '服务连接已关闭',
   'endpoint-not-configured': '玩家服务端点未配置',
   'endpoint-unavailable': '玩家服务暂时不可用',
+  'auto-request-failed': '自动处理服务请求失败',
+  'account_offline': '账号当前不在线',
+  'account_disabled': '账号已关闭',
+  'account_exists': '该服务器已存在同名账号',
+  'account_not_found': '账号不存在',
+  'server_not_found': '服务器不存在',
+  server_disabled: '服务器已停用',
+  capacity_full: '自动处理服务会话已达到上限',
+  invalid_state: '当前登录流程状态无效，请重新开始',
+  missing_character_id: '请选择角色',
+  missing_credential: '请输入游戏账号和密码',
+  invalid_password: '游戏账号密码无效，请检查密码长度',
+  timeout: '登录服务响应超时',
+  map_initialization_timeout: '进入游戏地图超时',
+  session_server_mismatch: '登录会话与服务器不匹配',
   'player-import-failed': '玩家账号同步失败，客服目录未更新',
   'player-sync-failed': '玩家账号同步失败，客服目录未更新',
   'invalid-status': '状态筛选无效',
@@ -61,12 +77,12 @@ export function resetApiClientState() {
 }
 
 export class ApiClient {
-  constructor(private readonly role: Role = 'customer', private readonly token?: string) {}
+  constructor(private readonly userScope = 'anonymous', private readonly token?: string) {}
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const method = (init.method ?? 'GET').toUpperCase();
     const cacheable = method === 'GET' && !init.signal;
-    const cacheKey = `${this.role}:${this.token ?? 'cookie'}:${path}`;
+    const cacheKey = `${this.userScope}:${this.token ?? 'cookie'}:${path}`;
     if (cacheable) {
       const cached = responseCache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) return cached.value as T;
@@ -111,8 +127,8 @@ export class ApiClient {
   logout() { return this.request<void>('/api/v1/auth/logout', { method: 'POST' }); }
   me() { return this.request<User>('/api/v1/auth/me'); }
   users() { return this.request<{ users: User[] }>('/api/v1/auth/users'); }
-  createUser(input: { username: string; password: string; displayName: string; role: Role }) { return this.request<User>('/api/v1/auth/users', { method: 'POST', body: JSON.stringify(input) }); }
-  updateUser(id: string, input: Partial<{ password: string; displayName: string; role: Role; active: boolean }>) { return this.request<User>(`/api/v1/auth/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }); }
+  createUser(input: { username: string; password: string; displayName: string; role: Role; workspacePermissions?: Partial<WorkspacePermissions>; uploadPermissions?: Partial<UploadPermissions> }) { return this.request<User>('/api/v1/auth/users', { method: 'POST', body: JSON.stringify(input) }); }
+  updateUser(id: string, input: Partial<{ password: string; displayName: string; role: Role; active: boolean; workspacePermissions: Partial<WorkspacePermissions>; uploadPermissions: Partial<UploadPermissions> }>) { return this.request<User>(`/api/v1/auth/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }); }
   deleteUser(id: string) { return this.request<User>(`/api/v1/auth/users/${encodeURIComponent(id)}/delete`, { method: 'POST' }); }
 
   options() { return this.request<AppOptions>('/api/v1/operation-groups/options'); }
@@ -137,6 +153,23 @@ export class ApiClient {
   applyTeamRewards(input: { date: string; serverId: string; bossType: 'black-dragon' | 'zakum' }) { return this.request<{ count: number; skippedCount: number; teamCount: number }>('/api/v1/team-view/apply', { method: 'POST', body: JSON.stringify({ date: input.date, serverId: input.serverId, type: input.bossType }) }); }
   playerIntegrationStatus() { return this.request<PlayerIntegrationStatus>('/api/v1/player-integration/status'); }
   switchPlayerIntegration(mode: PlayerDeploymentMode, confirmation: string) { return this.request<{ mode: PlayerDeploymentMode; activeEndpoint: string; updatedAt: string }>('/api/v1/player-integration/switch', { method: 'POST', body: JSON.stringify({ mode, confirmation }) }); }
+  setPlayerIntegrationConnection(enabled: boolean) { return this.request<{ enabled: boolean }>('/api/v1/player-integration/connection', { method: 'POST', body: JSON.stringify({ enabled, confirmation: 'CHANGE PLAYER CONNECTION' }) }); }
+  autoStatus(signal?: AbortSignal) { return this.request<AutoServiceStatus>('/api/v1/auto/status', { signal }); }
+  setAutoConnection(enabled: boolean) { return this.request<{ enabled: boolean }>('/api/v1/auto/connection', { method: 'POST', body: JSON.stringify({ enabled, confirmation: 'CHANGE AUTO CONNECTION' }) }); }
+  autoOverview(signal?: AbortSignal) { return this.request<AutoOverview>('/api/v1/auto/overview', { signal }); }
+  startAutoSession(serverId: string, input: { account: string; password: string }) { return this.request<AutoSession>(`/api/v1/auto/servers/${encodeURIComponent(serverId)}/sessions`, { method: 'POST', body: JSON.stringify(input) }); }
+  selectAndEnterAutoSession(sessionId: string, characterId: string) { return this.request<AutoSession>(`/api/v1/auto/sessions/${encodeURIComponent(sessionId)}/select-and-enter`, { method: 'POST', body: JSON.stringify({ character_id: characterId }) }); }
+  stopAutoSession(sessionId: string) { return this.request<void>(`/api/v1/auto/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }); }
+  createAutoServer(input: { id: string; name: string; address: string; version: string; map_id: string; enabled?: boolean }) { return this.request<AutoServer>('/api/v1/auto/servers', { method: 'POST', body: JSON.stringify(input) }); }
+  updateAutoServer(id: string, input: Partial<{ name: string; address: string; version: string; map_id: string; enabled: boolean }>) { return this.request<AutoServer>(`/api/v1/auto/servers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }); }
+  deleteAutoServer(id: string) { return this.request<void>(`/api/v1/auto/servers/${encodeURIComponent(id)}`, { method: 'DELETE' }); }
+  createAutoAccount(serverId: string, input: { username: string; password: string; character_id: string; character_name?: string; enabled?: boolean; session_id?: string }) { return this.request<AutoAccount>(`/api/v1/auto/servers/${encodeURIComponent(serverId)}/accounts`, { method: 'POST', body: JSON.stringify(input) }); }
+  updateAutoAccount(serverId: string, accountId: string, input: Partial<{ username: string; password: string; character_id: string; character_name: string; enabled: boolean }>) { return this.request<AutoAccount>(`/api/v1/auto/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}`, { method: 'PATCH', body: JSON.stringify(input) }); }
+  deleteAutoAccount(serverId: string, accountId: string) { return this.request<void>(`/api/v1/auto/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}`, { method: 'DELETE' }); }
+  startAutoAccount(serverId: string, accountId: string) { return this.request<AutoAccount>(`/api/v1/auto/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}/start`, { method: 'POST', body: '{}' }); }
+  stopAutoAccount(serverId: string, accountId: string) { return this.request<AutoAccount>(`/api/v1/auto/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}/stop`, { method: 'POST', body: '{}' }); }
+  reconnectAutoAccount(serverId: string, accountId: string) { return this.request<AutoAccount>(`/api/v1/auto/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}/reconnect`, { method: 'POST', body: '{}' }); }
+  sendAutoMessage(serverId: string, accountId: string, input: { message: string; mode: 'scene' | 'guild' | 'team' | 'world' | 'privateChat' }) { return this.request<AutoMessageResult>(`/api/v1/auto/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}/message`, { method: 'POST', body: JSON.stringify(input) }); }
   searchItems(query: string, signal?: AbortSignal, cursor?: string, limit = 12) {
     const params = new URLSearchParams({ q: query, limit: String(limit) });
     if (cursor) params.set('cursor', cursor);
@@ -147,6 +180,9 @@ export class ApiClient {
     if (cursor) params.set('cursor', cursor);
     return this.request<{ items: CatalogItem[]; nextCursor: string | null; totalCount: number }>(`/api/v1/item-catalog/by-class?${params}`, { signal });
   }
+  importItemCatalog(file: { name: string; content: string }) {
+    return this.request<{ fileName: string; itemCount: number }>('/api/v1/item-catalog/import', { method: 'POST', body: JSON.stringify({ file }) });
+  }
   submit(input: unknown) {
     const key = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return this.request<Group>('/api/v1/operation-groups', { method: 'POST', headers: { 'idempotency-key': key }, body: JSON.stringify(input) });
@@ -156,7 +192,7 @@ export class ApiClient {
   reminders(cursor?: string, limit = 20, kind?: 'issuance' | 'regular') { const params = new URLSearchParams({ limit: String(limit) }); if (cursor) params.set('cursor', cursor); if (kind) params.set('kind', kind); return this.request<Page<Group>>(`/api/v1/operation-groups/reminders?${params}`); }
   workspaceCounts() { return this.request<{ pending?: number; ready?: number; reminders?: number; reminderIssuance?: number; reminderRegular?: number; ownIssuance?: number; ownRegular?: number }>('/api/v1/operation-groups/workspace-counts'); }
   events() {
-    const connectionKey = `${this.role}:${this.token ?? 'cookie'}`;
+    const connectionKey = `${this.userScope}:${this.token ?? 'cookie'}`;
     let connection = eventConnections.get(connectionKey);
     if (!connection || connection.source.readyState === EventSource.CLOSED) {
       connection = { source: new EventSource('/api/v1/operation-groups/events', { withCredentials: true }), users: 0 };
@@ -188,7 +224,7 @@ export class ApiClient {
   approve(id: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/approve`, { method: 'POST' }); }
   reject(id: string, reason?: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/reject`, { method: 'POST', body: JSON.stringify(reason ? { reason } : {}) }); }
   issue(id: string, executionNote?: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/issue`, { method: 'POST', body: JSON.stringify(executionNote ? { executionNote } : {}) }); }
-  remind(id: string) { return this.request<Group>(`/api/v1/super-admin/operation-groups/${encodeURIComponent(id)}/remind`, { method: 'POST' }); }
+  remind(id: string) { return this.request<Group>(`/api/v1/operation-groups/${encodeURIComponent(id)}/remind`, { method: 'POST' }); }
   markOnline(id: string) { return this.request<Group>(`/api/v1/operation-groups/${encodeURIComponent(id)}/online`, { method: 'POST' }); }
   complete(id: string, executionNote?: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/complete`, { method: 'POST', body: JSON.stringify(executionNote ? { executionNote } : {}) }); }
 }

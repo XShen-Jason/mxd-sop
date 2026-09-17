@@ -21,6 +21,13 @@ Out of scope:
 
 ## Ownership and invariants
 
+- Search and class browsing remain read-only for authenticated consumers.
+- CSV replacement requires both the `activities` workspace and the independent
+  `item-catalog` upload permission; validation completes before replacement.
+- CSV replacement uses the same row normalization as startup loading: malformed
+  table structure is rejected, while rows with unusable or duplicate code/name
+  data are skipped before the validated catalog is atomically replaced.
+
 原始文件 data/item-catalog/source/道具表-9-5.csv，首行字段为：
 
 | source column | domain meaning |

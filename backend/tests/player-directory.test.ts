@@ -35,7 +35,7 @@ describe('player account directory', () => {
     for (const file of [dataPath, usersPath, `${dataPath}.player-directory.json`]) if (fs.existsSync(file)) fs.unlinkSync(file);
   });
 
-  it('allows all roles to search and only super admins to replace CSV data', async () => {
+  it('gives every player-directory workspace holder the same import and search controls', async () => {
     const files = [
       { name: 'mg-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n101,7,alpha,12345678\n102,7,alpha,12345678\n103,8,beta,87654321\n' },
       { name: 'xr-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n201,8,beta,87654321\n' },
@@ -43,8 +43,10 @@ describe('player account directory', () => {
       { name: 'uu-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n401,10,delta,22223333\n' },
       { name: 'ppz-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n501,11,epsilon,33334444\n' }
     ];
-    const denied = await app.inject({ method: 'POST', url: '/api/v1/player-directory/import', headers: { authorization: `Bearer ${managerToken}` }, payload: { serverId: 'mushroom', file: files[0] } });
-    expect(denied.statusCode).toBe(403);
+    const managerImport = await app.inject({ method: 'POST', url: '/api/v1/player-directory/import', headers: { authorization: `Bearer ${managerToken}` }, payload: { serverId: 'mushroom', file: files[0] } });
+    expect(managerImport.statusCode).toBe(201);
+    const customerImport = await app.inject({ method: 'POST', url: '/api/v1/player-directory/import', headers: { authorization: `Bearer ${customerToken}` }, payload: { serverId: 'yeti', file: files[1] } });
+    expect(customerImport.statusCode).toBe(201);
     for (const [serverId, index] of [['mushroom', 0], ['yeti', 1], ['red-snail', 2], ['uu', 3], ['piaopiao-pig', 4]] as const) {
       const imported = await app.inject({ method: 'POST', url: '/api/v1/player-directory/import', headers: { authorization: `Bearer ${superToken}` }, payload: { serverId, file: files[index] } });
       expect(imported.statusCode).toBe(201);

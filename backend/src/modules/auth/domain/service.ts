@@ -1,6 +1,15 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
-import type { Identity, Role, UserSummary } from '../../../shared/types.js';
+import type { Identity, Role, UploadPermissionId, UploadPermissions, UserSummary, WorkspaceId, WorkspacePermissions } from '../../../shared/types.js';
 import type { StoredUser, UserRepository } from '../infrastructure/json-users.js';
+import {
+  defaultUploadPermissions,
+  defaultWorkspacePermissions,
+  effectiveUploadPermissions,
+  effectiveWorkspacePermissions,
+  hasWorkspaceAccess,
+  UPLOAD_PERMISSIONS,
+  WORKSPACES,
+} from './permissions.js';
 import type { SessionRepository } from './session-repository.js';
 
 export type AuthErrorCode =
@@ -25,6 +34,8 @@ export interface CreateUserInput {
   password: string;
   displayName: string;
   role: Role;
+  workspacePermissions?: Partial<WorkspacePermissions>;
+  uploadPermissions?: Partial<UploadPermissions>;
 }
 
 export interface UpdateUserInput {
@@ -32,6 +43,8 @@ export interface UpdateUserInput {
   displayName?: string;
   role?: Role;
   active?: boolean;
+  workspacePermissions?: Partial<WorkspacePermissions>;
+  uploadPermissions?: Partial<UploadPermissions>;
 }
 
 interface Session { userId: string; expiresAt: number }
@@ -42,12 +55,6 @@ class MemorySessionRepository implements SessionRepository {
   remove(token: string) { this.values.delete(token); }
   removeForUser(userId: string) { for (const [token, value] of this.values) if (value.userId === userId) this.values.delete(token); }
 }
-
-const ROLE_LEVEL: Record<Role, number> = { customer: 1, manager: 2, super_admin: 3 };
-
-export function roleLevel(role: Role) { return ROLE_LEVEL[role] ?? 0; }
-export function isManager(identity: Identity) { return roleLevel(identity.role) >= ROLE_LEVEL.manager; }
-export function isSuperAdmin(identity: Identity) { return identity.role === 'super_admin'; }
 
 function passwordHash(password: string) {
   const salt = randomBytes(16).toString('hex');
@@ -86,9 +93,37 @@ function role(value: unknown): Role {
   throw new AuthError('invalid-input', 'role is invalid');
 }
 
+function parseWorkspacePermissions(value: unknown, fallback: WorkspacePermissions): WorkspacePermissions {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AuthError('invalid-input', 'workspacePermissions is invalid');
+  const input = value as Record<string, unknown>;
+  if (Object.keys(input).some((key) => !WORKSPACES.includes(key as WorkspaceId))) throw new AuthError('invalid-input', 'workspacePermissions is invalid');
+  const next = { ...fallback };
+  for (const [key, enabled] of Object.entries(input)) {
+    if (typeof enabled !== 'boolean') throw new AuthError('invalid-input', 'workspacePermissions is invalid');
+    next[key as WorkspaceId] = enabled;
+  }
+  return next;
+}
+
+function parseUploadPermissions(value: unknown, fallback: UploadPermissions): UploadPermissions {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AuthError('invalid-input', 'uploadPermissions is invalid');
+  const input = value as Record<string, unknown>;
+  if (Object.keys(input).some((key) => !UPLOAD_PERMISSIONS.includes(key as UploadPermissionId))) throw new AuthError('invalid-input', 'uploadPermissions is invalid');
+  const next = { ...fallback };
+  for (const [key, enabled] of Object.entries(input)) {
+    if (typeof enabled !== 'boolean') throw new AuthError('invalid-input', 'uploadPermissions is invalid');
+    next[key as UploadPermissionId] = enabled;
+  }
+  return next;
+}
+
 function summary(user: StoredUser): UserSummary {
   const { passwordHash: _password, ...safe } = structuredClone(user);
-  return safe;
+  return { ...safe, workspacePermissions: effectiveWorkspacePermissions(user.role, user.workspacePermissions), uploadPermissions: effectiveUploadPermissions(user.role, user.uploadPermissions) };
+}
+
+function identityFromUser(user: StoredUser): Identity {
+  return { id: user.id, role: user.role, displayName: user.displayName, workspacePermissions: effectiveWorkspacePermissions(user.role, user.workspacePermissions), uploadPermissions: effectiveUploadPermissions(user.role, user.uploadPermissions) };
 }
 
 export class AuthService {
@@ -129,7 +164,7 @@ export class AuthService {
     if (session.expiresAt <= this.now().getTime()) { this.sessions.remove(token); return undefined; }
     const user = this.repository.findById(session.userId);
     if (!user || !user.active) { this.sessions.remove(token); return undefined; }
-    return { id: user.id, role: user.role, displayName: user.displayName };
+    return identityFromUser(user);
   }
 
   requestIdentity(headers: Record<string, unknown>): Identity {
@@ -141,7 +176,7 @@ export class AuthService {
     const idHeader = this.header(headers, 'x-user-id');
     if (this.allowLegacyHeaders && roleHeader && idHeader && this.isLegacyDemo(idHeader, roleHeader)) {
       const mappedRole = role(roleHeader);
-      return { id: idHeader, role: mappedRole, displayName: this.header(headers, 'x-display-name') || (mappedRole === 'customer' ? '演示客服' : mappedRole === 'manager' ? '演示管理' : '演示超管') };
+      return { id: idHeader, role: mappedRole, displayName: this.header(headers, 'x-display-name') || (mappedRole === 'customer' ? '演示客服' : mappedRole === 'manager' ? '演示管理' : '演示超管'), workspacePermissions: defaultWorkspacePermissions(mappedRole), uploadPermissions: defaultUploadPermissions(mappedRole) };
     }
     throw new AuthError('unauthorized', 'authentication required');
   }
@@ -157,38 +192,43 @@ export class AuthService {
   }
 
   listUsers(actor: Identity, limit = 100) {
-    this.requireManager(actor);
+    this.requireAuthenticated(actor);
+    this.requireWorkspace(actor, 'accounts');
     if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new AuthError('invalid-input', 'invalid limit');
-    const users = this.repository.all().filter((user) => isSuperAdmin(actor) || user.role !== 'super_admin');
+    const users = this.repository.all();
     return users.sort((a, b) => a.username.localeCompare(b.username)).slice(0, limit).map(summary);
   }
 
   createUser(actor: Identity, input: CreateUserInput) {
-    this.requireManager(actor);
+    this.requireWorkspace(actor, 'accounts');
     const name = username(input?.username);
-    const targetRole = input?.role === undefined && actor.role === 'manager' ? 'customer' : role(input?.role);
-    if (actor.role === 'manager' && targetRole === 'super_admin') throw new AuthError('forbidden', '普通管理不能创建超级管理员');
+    const targetRole = input?.role === undefined ? 'customer' : role(input.role);
     if (!validPassword(input?.password)) throw new AuthError('invalid-input', '密码至少 6 位');
     const label = displayName(input?.displayName);
     if (this.repository.findByUsername(name)) throw new AuthError('username-taken', '用户名已存在');
-    const user: StoredUser = { id: this.idFactory(), username: name, displayName: label, role: targetRole, passwordHash: passwordHash(input.password), active: true, createdAt: this.now().toISOString(), createdBy: { id: actor.id, displayName: actor.displayName } };
+    const workspacePermissions = input?.workspacePermissions === undefined ? defaultWorkspacePermissions(targetRole) : parseWorkspacePermissions(input.workspacePermissions, defaultWorkspacePermissions(targetRole));
+    const uploadPermissions = input?.uploadPermissions === undefined ? defaultUploadPermissions(targetRole) : parseUploadPermissions(input.uploadPermissions, defaultUploadPermissions(targetRole));
+    const user: StoredUser = { id: this.idFactory(), username: name, displayName: label, role: targetRole, workspacePermissions, uploadPermissions, passwordHash: passwordHash(input.password), active: true, createdAt: this.now().toISOString(), createdBy: { id: actor.id, displayName: actor.displayName } };
     this.repository.insert(user);
     return summary(user);
   }
 
   updateUser(actor: Identity, id: string, input: UpdateUserInput) {
-    this.requireManager(actor);
+    this.requireWorkspace(actor, 'accounts');
     const user = this.repository.findById(id);
     if (!user) throw new AuthError('user-not-found');
-    if (actor.role === 'manager' && user.role === 'super_admin') throw new AuthError('forbidden');
     const nextRole = input?.role === undefined ? user.role : role(input.role);
-    if (actor.role === 'manager' && nextRole === 'super_admin') throw new AuthError('forbidden');
-    if (nextRole !== user.role && !isSuperAdmin(actor)) throw new AuthError('forbidden');
     const active = input?.active === undefined ? user.active : input.active;
     if (typeof active !== 'boolean') throw new AuthError('invalid-input');
     if (user.role === 'super_admin' && (nextRole !== 'super_admin' || !active) && this.activeSuperAdminCount() <= 1) throw new AuthError('last-super-admin');
     if (input?.password !== undefined && !validPassword(input.password)) throw new AuthError('invalid-input', '密码至少 6 位');
-    const next: StoredUser = { ...user, role: nextRole, active, displayName: input?.displayName === undefined ? user.displayName : displayName(input.displayName), passwordHash: input?.password === undefined ? user.passwordHash : passwordHash(input.password) };
+    const currentWorkspacePermissions = effectiveWorkspacePermissions(user.role, user.workspacePermissions);
+    const fallbackWorkspacePermissions = nextRole === user.role ? currentWorkspacePermissions : defaultWorkspacePermissions(nextRole);
+    const workspacePermissions = input?.workspacePermissions === undefined ? fallbackWorkspacePermissions : parseWorkspacePermissions(input.workspacePermissions, fallbackWorkspacePermissions);
+    const currentUploadPermissions = effectiveUploadPermissions(user.role, user.uploadPermissions);
+    const fallbackUploadPermissions = nextRole === user.role ? currentUploadPermissions : defaultUploadPermissions(nextRole);
+    const uploadPermissions = input?.uploadPermissions === undefined ? fallbackUploadPermissions : parseUploadPermissions(input.uploadPermissions, fallbackUploadPermissions);
+    const next: StoredUser = { ...user, role: nextRole, workspacePermissions, uploadPermissions, active, displayName: input?.displayName === undefined ? user.displayName : displayName(input.displayName), passwordHash: input?.password === undefined ? user.passwordHash : passwordHash(input.password) };
     this.repository.replace(next);
     if (input?.password !== undefined || nextRole !== user.role || !active) {
       this.sessions.removeForUser(user.id);
@@ -197,20 +237,18 @@ export class AuthService {
   }
 
   deleteUser(actor: Identity, id: string) {
-    this.requireManager(actor);
+    this.requireWorkspace(actor, 'accounts');
     if (actor.id === id) throw new AuthError('forbidden', '不能删除当前登录账号');
     const user = this.repository.findById(id);
     if (!user) throw new AuthError('user-not-found');
-    if (actor.role === 'manager' && user.role === 'super_admin') throw new AuthError('forbidden');
     if (user.role === 'super_admin' && user.active && this.activeSuperAdminCount() <= 1) throw new AuthError('last-super-admin');
     this.repository.remove(id);
     this.sessions.removeForUser(id);
     return summary(user);
   }
 
-  canCreate(actor: Identity, targetRole: Role) { return isSuperAdmin(actor) || (actor.role === 'manager' && targetRole !== 'super_admin'); }
-
-  private requireManager(actor: Identity) { if (!isManager(actor)) throw new AuthError('forbidden'); }
+  private requireAuthenticated(actor: Identity) { if (!actor?.id || !['customer', 'manager', 'super_admin'].includes(actor.role)) throw new AuthError('forbidden'); }
+  private requireWorkspace(actor: Identity, workspace: WorkspaceId) { this.requireAuthenticated(actor); if (!hasWorkspaceAccess(actor, workspace)) throw new AuthError('forbidden'); }
   private activeSuperAdminCount() { return this.repository.all().filter((user) => user.role === 'super_admin' && user.active).length; }
 
   private ensureInitialAdmin(initialAdmin?: { username: string; displayName: string; password: string }) {
@@ -218,7 +256,7 @@ export class AuthService {
     if (!initialAdmin || !validPassword(initialAdmin.password)) throw new Error('INITIAL_ADMIN_PASSWORD is required for first startup and must be 6-128 characters');
     const name = username(initialAdmin.username);
     const label = displayName(initialAdmin.displayName);
-    this.repository.insert({ id: this.idFactory(), username: name, displayName: label, role: 'super_admin', passwordHash: passwordHash(initialAdmin.password), active: true, createdAt: this.now().toISOString() });
+    this.repository.insert({ id: this.idFactory(), username: name, displayName: label, role: 'super_admin', workspacePermissions: defaultWorkspacePermissions('super_admin'), uploadPermissions: defaultUploadPermissions('super_admin'), passwordHash: passwordHash(initialAdmin.password), active: true, createdAt: this.now().toISOString() });
   }
 
   private extractToken(headers: Record<string, unknown>) {

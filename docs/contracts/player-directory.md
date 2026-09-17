@@ -13,7 +13,8 @@ This module interface is consumed by team-view; it has no additional HTTP route.
 `GET /api/v1/player-directory/search`
 
 Authentication is required. `customer`, `manager`, and `super_admin` may use
-the endpoint. Query parameters are:
+the endpoint when they have the `player-directory` workspace. Query parameters
+are:
 
 - `q` optional text search, trimmed and limited to 64 characters. It matches
   server ID, user ID, game account, bind QQ, and character ID.
@@ -45,7 +46,9 @@ ordering), and grouped by `(server, userId, username, bindQQ)`:
 
 `POST /api/v1/player-directory/import`
 
-Only `super_admin` may call this endpoint. The JSON body is
+The caller must have both the `player-directory` workspace and the independent
+`player-directory` upload permission. Missing either permission returns
+`forbidden` (403). The JSON body is
 `{ "serverId": "mushroom", "file": { "name": "mg-char-user-qq.csv", "content": "..." } }`.
 The file is no larger than 1,000,000 characters and the request is limited to
 2 MiB. Supported names are `mg`, `xr`, `hwn`, `uu`, and `ppz` followed by

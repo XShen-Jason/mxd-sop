@@ -3,12 +3,12 @@ import { ChevronLeft, ChevronRight, ContactRound, FileUp, LoaderCircle, RefreshC
 import { ApiClient, ApiError } from '../../api/client';
 import { CopyButton } from '../../components/CopyButton';
 import { FloatingNotice } from '../../components/FloatingNotice';
-import type { AppOptions, DirectoryAccount, Role } from '../../types';
+import type { AppOptions, DirectoryAccount } from '../../types';
 
 const pageSize = 20;
 
-export function PlayerDirectoryView({ options, role = 'customer', token }: { options: AppOptions; role?: Role; token?: string }) {
-  const client = useMemo(() => new ApiClient(role, token), [role, token]);
+export function PlayerDirectoryView({ options, userId, token, uploadEnabled = true }: { options: AppOptions; userId?: string; token?: string; uploadEnabled?: boolean }) {
+  const client = useMemo(() => new ApiClient(userId ?? 'anonymous', token), [userId, token]);
   const [query, setQuery] = useState('');
   const [serverId, setServerId] = useState('');
   const [accounts, setAccounts] = useState<DirectoryAccount[]>([]);
@@ -24,7 +24,6 @@ export function PlayerDirectoryView({ options, role = 'customer', token }: { opt
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const canUpload = role === 'super_admin';
 
   useEffect(() => {
     const controller = new AbortController();
@@ -83,7 +82,7 @@ export function PlayerDirectoryView({ options, role = 'customer', token }: { opt
   };
 
   const upload = async () => {
-    if (!uploadServerId || !file || uploading) return;
+    if (!uploadEnabled || !uploadServerId || !file || uploading) return;
     setUploading(true);
     setNotice(null);
     try {
@@ -101,7 +100,7 @@ export function PlayerDirectoryView({ options, role = 'customer', token }: { opt
 
   return <section className="workspace directory-workspace">
     <div className="page-heading directory-heading"><div><p className="eyebrow">客服工作台</p><h1>玩家列表</h1><p className="heading-copy">按服务器、账号、角色 ID 或绑定 QQ 查询，复制服务器、账户和 QQ 直接发送给玩家。</p></div><div className="heading-stat"><span>匹配账号</span><strong>{totalCount}</strong></div></div>
-    {canUpload && <section className="directory-upload-panel"><div><p className="eyebrow">超管工具</p><h2>更新服务器账号数据</h2><p>先选择服务器，再上传对应 CSV；新文件会替换该服务器的旧数据。</p></div><label className="directory-server-picker"><span>服务器</span><select value={uploadServerId} onChange={(event) => selectUploadServer(event.target.value)}><option value="">请选择服务器</option>{options.servers.map((server) => <option key={server.id} value={server.id}>{server.displayName}</option>)}</select></label><label className={`directory-file-picker ${!uploadServerId ? 'disabled' : ''}`}><FileUp size={17} /><span>{file ? file.name : '选择 CSV'}</span><input type="file" accept=".csv,text/csv" disabled={!uploadServerId} onChange={selectFile} /></label>{file && <button type="button" className="icon-button directory-file-remove" title="移除文件" aria-label={`移除 ${file.name}`} onClick={() => setFile(null)}><X size={14} /></button>}<button type="button" className="primary-button" disabled={!uploadServerId || !file || uploading} onClick={() => void upload()}>{uploading ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />}{uploading ? '替换中…' : '上传并替换'}</button></section>}
+    <section className="directory-upload-panel"><div><p className="eyebrow">目录维护</p><h2>更新服务器账号数据</h2><p>先选择服务器，再上传对应 CSV；新文件会替换该服务器的旧数据。</p></div><label className="directory-server-picker"><span>服务器</span><select value={uploadServerId} disabled={!uploadEnabled} onChange={(event) => selectUploadServer(event.target.value)}><option value="">请选择服务器</option>{options.servers.map((server) => <option key={server.id} value={server.id}>{server.displayName}</option>)}</select></label><label className={`directory-file-picker ${!uploadEnabled || !uploadServerId ? 'disabled' : ''}`}><FileUp size={17} /><span>{file ? file.name : '选择 CSV'}</span><input type="file" accept=".csv,text/csv" disabled={!uploadEnabled || !uploadServerId} onChange={selectFile} /></label>{file && <button type="button" className="icon-button directory-file-remove" title="移除文件" aria-label={`移除 ${file.name}`} disabled={!uploadEnabled} onClick={() => setFile(null)}><X size={14} /></button>}<button type="button" className="primary-button" disabled={!uploadEnabled || !uploadServerId || !file || uploading} onClick={() => void upload()}>{uploading ? <LoaderCircle className="spin" size={16} /> : <Upload size={16} />}{uploading ? '替换中…' : '上传并替换'}</button></section>
     <section className="directory-search-panel"><div className="directory-toolbar"><label className="directory-search-field"><Search size={17} /><span className="visually-hidden">搜索账号目录</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="账户、QQ、角色 ID 或用户 ID" /></label><button type="button" className="icon-button" title="刷新目录" aria-label="刷新目录" onClick={() => setRefreshKey((value) => value + 1)}><RefreshCw size={16} /></button></div><div className="directory-server-filters" role="group" aria-label="按服务器筛选"><button type="button" className={!serverId ? 'selected' : ''} onClick={() => setServerId('')}>全部服务器</button>{options.servers.map((server) => <button type="button" className={serverId === server.id ? 'selected' : ''} key={server.id} onClick={() => setServerId(server.id)}>{server.displayName}</button>)}</div></section>
     {error && <FloatingNotice kind="error" text={error} onDismiss={() => setError('')} actionLabel="重试" onAction={() => setRefreshKey((value) => value + 1)} />}
     {loading ? <div className="empty-state"><LoaderCircle className="spin" size={24} /></div> : accounts.length ? <DirectoryTable accounts={accounts} onCopied={() => setNotice({ kind: 'success', text: '已复制完整玩家信息' })} /> : <div className="empty-state"><div className="empty-icon"><ContactRound size={22} /></div><h3>没有找到匹配账号</h3><p>尝试输入账户、绑定 QQ 或角色 ID。</p></div>}

@@ -9,11 +9,12 @@ import { ItemThumbnail } from '../../components/ItemThumbnail';
 import { RecordTableHeader } from '../operation-groups/RecordPresentation';
 import { OwnRecordCard } from './OwnRecordCard';
 import './reminders.css';
-import type { AppOptions, CatalogItem, Group, Role } from '../../types';
+import type { AppOptions, CatalogItem, Group } from '../../types';
 import { activityRewardLabel, readActivities, writeActivities, type Activity } from '../activities/store';
 import { expandCompletedStatuses } from '../operation-groups/pagination';
 import { codeForLevel, isEquipment, MAX_EQUIPMENT_LEVEL, normalizeEquipmentLevel, splitEquipmentCode } from '../../shared/item-level';
 import { useOperationGroupRefresh } from '../operation-groups/live-refresh';
+import { CursorPagination } from '../../components/CursorPagination';
 
 type Mode = 'issue' | 'kick' | 'ban';
 type ItemDraft = { itemCode: string; itemName: string; itemClass?: string; image?: string; itemLevel?: number; quantity: string; state: 'empty' | 'selected' | 'invalid' };
@@ -34,11 +35,13 @@ function readRecentItems() {
   try { const value = JSON.parse(localStorage.getItem(RECENT_ITEMS_KEY) ?? '[]') as CatalogItem[]; return Array.isArray(value) ? value.slice(0, 6) : []; } catch { return []; }
 }
 
-export function CustomerView({ options, token, role = 'customer', section = 'operations', onNavigate, reminderCounts, recordCounts }: { options: AppOptions; token?: string; role?: Role; section?: 'operations' | 'records' | 'reminders'; onNavigate?: (section: 'operations' | 'records' | 'reminders') => void; reminderCounts?: { issuance?: number; regular?: number }; recordCounts?: { issuance?: number; regular?: number } }) {
-  const client = useMemo(() => new ApiClient(role, token), [role, token]);
+export function CustomerView({ options, token, userId, section = 'operations', onNavigate, reminderCounts, recordCounts }: { options: AppOptions; token?: string; userId?: string; section?: 'operations' | 'records' | 'reminders'; onNavigate?: (section: 'operations' | 'records' | 'reminders') => void; reminderCounts?: { issuance?: number; regular?: number }; recordCounts?: { issuance?: number; regular?: number } }) {
+  const client = useMemo(() => new ApiClient(userId ?? 'anonymous', token), [token, userId]);
   const [mode, setMode] = useState<Mode>('issue');
   const [groups, setGroups] = useState<Group[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
+  const [pageCursors, setPageCursors] = useState<Array<string | undefined>>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -56,41 +59,41 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
   const [form, setForm] = useState<FormState>({ serverId: options.servers[0]?.id ?? '', account: '', characterId: '', playerQQ: '', reasonCode: options.reasons[0]?.code ?? 'bug-recovery', reasonText: '' });
   const [items, setItems] = useState<ItemDraft[]>([emptyItem()]);
   const [cashQuantity, setCashQuantity] = useState('');
-  const [activities, setActivities] = useState<Activity[]>(readActivities);
+  const [activities, setActivities] = useState<Activity[]>(() => readActivities().filter((activity) => activity.visible !== false));
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const loadingRequest = useRef(0);
-  const loadingMore = useRef(false);
-  useEffect(() => { const sync = () => setActivities(readActivities()); window.addEventListener('storage', sync); window.addEventListener('activities-updated', sync); return () => { window.removeEventListener('storage', sync); window.removeEventListener('activities-updated', sync); }; }, []);
+  useEffect(() => { const sync = () => setActivities(readActivities().filter((activity) => activity.visible !== false)); window.addEventListener('storage', sync); window.addEventListener('activities-updated', sync); return () => { window.removeEventListener('storage', sync); window.removeEventListener('activities-updated', sync); }; }, []);
   useEffect(() => {
     if (section !== 'operations') return;
     let active = true;
     void client.activities().then(({ activities: remote }) => {
       if (!active) return;
-      setActivities(remote);
+      setActivities(remote.filter((activity) => activity.visible !== false));
       writeActivities(remote);
     }).catch(() => { /* retain the local cache when the API is temporarily unavailable */ });
     return () => { active = false; };
   }, [client, section]);
 
-  const load = async (append = false) => {
-    if (append && loadingMore.current) return;
+  const load = async (requestedCursor?: string, requestedPageIndex = 0) => {
     const requestId = ++loadingRequest.current;
-    if (append) loadingMore.current = true;
     if (section === 'operations') {
       setGroups([]);
       setCursor(null);
       setLoading(false);
-      loadingMore.current = false;
       return;
     }
     setLoading(true);
     try {
       if (section === 'reminders') {
         const kind = recordTypeFilter === 'issue' ? 'issuance' : 'regular';
-        const result = await client.reminders(append ? cursor ?? undefined : undefined, 20, kind);
+        const result = await client.reminders(requestedCursor, 20, kind);
         if (requestId !== loadingRequest.current) return;
-        setGroups((current) => append ? [...current, ...result.groups.filter((group) => !current.some((item) => item.id === group.id))] : result.groups);
+        setGroups(result.groups);
         setCursor(result.nextCursor);
+        setPageIndex(requestedPageIndex);
+        if (!requestedCursor) setPageCursors([undefined]);
+        else setPageCursors((current) => [...current.slice(0, requestedPageIndex), requestedCursor]);
+        if (result.nextCursor) setPageCursors((current) => { const next = [...current]; next[requestedPageIndex + 1] = result.nextCursor as string; return next; });
         return;
       }
        const kind = section === 'records' ? (recordTypeFilter === 'issue' ? 'issuance' : 'regular') : undefined;
@@ -98,13 +101,24 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
       if (section === 'records' && statuses?.length === 0) {
         setGroups([]); setCursor(null); return;
       }
-      const result = await client.mine(append ? cursor ?? undefined : undefined, 20, statuses, kind);
+       const result = await client.mine(requestedCursor, 20, statuses, kind);
       if (requestId !== loadingRequest.current) return;
-      setGroups((current) => append ? [...current, ...result.groups.filter((group) => !current.some((item) => item.id === group.id))] : result.groups);
-      setCursor(result.nextCursor);
+       setGroups(result.groups);
+       setCursor(result.nextCursor);
+       setPageIndex(requestedPageIndex);
+       if (!requestedCursor) setPageCursors([undefined]);
+       else setPageCursors((current) => [...current.slice(0, requestedPageIndex), requestedCursor]);
+       if (result.nextCursor) setPageCursors((current) => { const next = [...current]; next[requestedPageIndex + 1] = result.nextCursor as string; return next; });
     }
     catch (error) { if (requestId === loadingRequest.current) pushNotice('error', error instanceof ApiError ? error.message : '暂时无法加载申请记录'); }
-    finally { if (requestId === loadingRequest.current) setLoading(false); if (append) loadingMore.current = false; }
+    finally { if (requestId === loadingRequest.current) setLoading(false); }
+  };
+  const changePage = (direction: -1 | 1) => {
+    const target = pageIndex + direction;
+    if (target < 0 || (direction > 0 && !cursor)) return;
+    const nextCursor = direction > 0 ? cursor ?? undefined : pageCursors[target];
+    if (direction < 0 && target > 0 && !nextCursor) return;
+    void load(nextCursor, target);
   };
   useEffect(() => { void load(); }, [client, section, recordTypeFilter, recordStatuses.join(',')]);
   useOperationGroupRefresh({ view: section, kind: recordTypeFilter === 'issue' ? 'issuance' : 'regular',
@@ -148,7 +162,6 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
   };
 
   const edit = (group: Group) => {
-    onNavigate?.('operations');
     const firstItem = group.operations.find((operation) => operation.type === 'item');
     const cash = group.operations.find((operation) => operation.type === 'cash');
     const action = group.operations.find((operation) => operation.type === 'kick' || operation.type === 'ban' || operation.type === 'warp');
@@ -156,7 +169,13 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
     setMode(nextMode); setEditingId(group.id);
     setForm({ serverId: group.server.id, account: group.account ?? '', characterId: group.characterId, playerQQ: group.playerQQ ?? '', reasonCode: group.reason.code, reasonText: group.reason.text ?? '' });
     setItems(firstItem && firstItem.type === 'item' ? group.operations.filter((operation): operation is Extract<Group['operations'][number], { type: 'item' }> => operation.type === 'item').map((operation) => { const parsed = isEquipment(operation.itemClass) ? splitEquipmentCode(operation.itemCode) : { baseCode: operation.itemCode, level: undefined }; return { itemCode: parsed.baseCode, itemName: operation.itemName, itemClass: operation.itemClass, image: operation.itemImage, itemLevel: isEquipment(operation.itemClass) ? normalizeEquipmentLevel(operation.itemLevel ?? parsed.level) : undefined, quantity: String(operation.quantity), state: 'selected' }; }) : [emptyItem()]);
-    setCashQuantity(cash && cash.type === 'cash' ? String(cash.quantity) : ''); window.scrollTo({ top: 0, behavior: 'smooth' });
+    setCashQuantity(cash && cash.type === 'cash' ? String(cash.quantity) : '');
+    if (onNavigate) onNavigate('operations');
+    else if (section === 'reminders') {
+      window.history.pushState({}, '', '/request');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const validateBase = () => {
@@ -165,7 +184,7 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
     if (mode === 'issue' && !form.account.trim()) throw new Error('请填写游戏账号');
     if (mode === 'issue' && !form.playerQQ.trim()) throw new Error('请填写玩家 QQ');
     if (!form.reasonCode) throw new Error('请选择申请理由');
-    if (form.reasonCode === 'other' && !form.reasonText.trim()) throw new Error('选择“其他”时请补充说明');
+    if (!form.reasonText.trim()) throw new Error('请填写补充说明');
   };
 
   const buildPayload = () => {
@@ -211,9 +230,9 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
     if (onlineSaving.current) return;
     onlineSaving.current = true; setOnlineSavingId(id);
     try {
-      await client.markOnline(id);
+      const saved = await client.markOnline(id);
       await load();
-      pushNotice('success', '已标记用户上线');
+      pushNotice(saved.automationFailureReason === 'no-online-accounts' ? 'error' : 'success', saved.status === 'issued' || saved.status === 'completed' ? '成功发放' : saved.automationFailureReason === 'no-online-accounts' ? '无在线GM账号，无法自动完成' : '仍然不在线');
     } catch (error) { pushNotice('error', error instanceof ApiError ? error.message : '标记上线失败'); }
     finally { onlineSaving.current = false; setOnlineSavingId(null); }
   };
@@ -225,7 +244,7 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
     finally { setCanceling(false); }
   };
   const reasons = mode === 'issue' ? options.reasons : options.actionReasons?.[mode] ?? options.reasons;
-  const baseComplete = Boolean(form.serverId && /^[0-9]+$/.test(form.characterId) && form.reasonCode && (mode !== 'issue' || (form.account.trim() && form.playerQQ.trim())) && (form.reasonCode !== 'other' || form.reasonText.trim()));
+  const baseComplete = Boolean(form.serverId && /^[0-9]+$/.test(form.characterId) && form.reasonCode && form.reasonText.trim() && (mode !== 'issue' || (form.account.trim() && form.playerQQ.trim())));
   const showRecords = section === 'records' || section === 'reminders';
   const visibleGroups = groups;
   const reminderCountFor = (type: RecordFilterType) => type === 'issue' ? (reminderCounts?.issuance ?? 0) : (reminderCounts?.regular ?? 0);
@@ -242,13 +261,13 @@ export function CustomerView({ options, token, role = 'customer', section = 'ope
       <div className={mode === 'issue' ? 'request-top-grid' : ''}><section className="panel-surface form-panel player-panel"><div className="section-title"><span className="step-index">01</span><div><h2>玩家信息</h2><p>{mode === 'issue' ? '发物资需要完整玩家资料' : `${actionLabel[mode]}只需填写服务器、角色 ID 和理由`}</p></div></div>
         <div className="server-picker" aria-label="选择服务器">{options.servers.map((server) => <button type="button" key={server.id} aria-pressed={form.serverId === server.id} className={form.serverId === server.id ? 'server-choice selected' : 'server-choice'} onClick={() => setForm({ ...form, serverId: server.id })}>{server.displayName}</button>)}</div>
         <div className={`field-grid ${mode !== 'issue' ? 'compact-grid' : ''}`}>{mode === 'issue' && <><label><span>游戏账号</span><input value={form.account} placeholder="输入账号" onChange={(event) => setForm({ ...form, account: event.target.value })} /></label><label><span>玩家 QQ</span><input inputMode="numeric" value={form.playerQQ} placeholder="输入 QQ" onChange={(event) => setForm({ ...form, playerQQ: event.target.value })} /></label></>}<label><span>角色 ID</span><input inputMode="numeric" value={form.characterId} placeholder="仅数字" onChange={(event) => setForm({ ...form, characterId: event.target.value.replace(/[^0-9]/g, '') })} /></label><label className="reason-select-field"><span>申请理由</span><select value={form.reasonCode} onChange={(event) => setForm({ ...form, reasonCode: event.target.value })}>{reasons.map((reason) => <option key={reason.code} value={reason.code}>{reason.displayName}</option>)}</select></label></div>
-        <label className="reason-note"><span>补充说明 <em>{form.reasonCode === 'other' ? '必填' : '可选'}</em></span><textarea value={form.reasonText} rows={2} placeholder={mode === 'ban' ? '填写违规事实或证据摘要' : mode === 'kick' ? '填写踢人原因' : '补充必要背景'} onChange={(event) => setForm({ ...form, reasonText: event.target.value })} /></label>
+        <label className="reason-note"><span>补充说明 <em>必填</em></span><textarea required value={form.reasonText} rows={2} placeholder={mode === 'ban' ? '填写违规事实或证据摘要' : mode === 'kick' ? '填写踢人原因' : '补充必要背景'} onChange={(event) => setForm({ ...form, reasonText: event.target.value })} /></label>
       </section>{mode === 'issue' && <ActivityChooser activities={activities} selected={selectedActivities} enabled={baseComplete} onToggle={toggleActivity} />}</div>
-      {mode === 'issue' && baseComplete && <IssueOperations items={items} setItems={setItems} cashQuantity={cashQuantity} setCashQuantity={setCashQuantity} token={token} recentItems={recentItems} onRecentSelect={chooseRecent} onItemSelected={rememberItem} onDuplicateItem={() => pushNotice('error', '同一物品不能重复选择')} />}
+      {mode === 'issue' && baseComplete && <IssueOperations items={items} setItems={setItems} cashQuantity={cashQuantity} setCashQuantity={setCashQuantity} userId={userId} token={token} recentItems={recentItems} onRecentSelect={chooseRecent} onItemSelected={rememberItem} onDuplicateItem={() => pushNotice('error', '同一物品不能重复选择')} />}
       {mode !== 'issue' && baseComplete && <section className="panel-surface mini-action-panel compact-action"><div className="mini-action-icon">{mode === 'kick' ? <UserRound size={20} /> : <ShieldBan size={20} />}</div><strong>{actionLabel[mode]}申请</strong><span>目标：{targetLabel(form, options)}</span></section>}
       <div className="form-footer request-footer"><span className="muted-note">{editingId ? '保存后重新进入审核队列' : mode === 'issue' && !baseComplete ? '填写完整玩家信息后自动展开操作内容' : '提交后可在申请记录中查看进度'}</span><div className="footer-actions">{editingId && <button type="button" className="secondary-button" onClick={() => reset(mode)}>取消编辑</button>}<button className="primary-button submit-button" disabled={submitting} type="submit">{submitting ? '处理中…' : editingId ? '保存修改' : '提交申请'}<Send size={17} /></button></div></div>
     </form>}
-    {showRecords && <section id="my-requests" className="records-section records-page">{loading ? <div className="empty-state"><LoaderDots /></div> : <><div className="manager-toolbar"><div className="filter-row">{(section === 'records' || section === 'reminders') && <div className="record-type-filter filter-choice-group" role="group" aria-label="筛选申请类型"><span className="filter-choice-label"><Package size={14} />类型</span>{(Object.entries(recordTypeName) as Array<[RecordFilterType, string]>).map(([type, label]) => <button type="button" className={recordTypeFilter === type ? 'filter-choice selected' : 'filter-choice'} key={type} aria-pressed={recordTypeFilter === type} onClick={() => { setRecordTypeFilter(type); setExpandedRecordId(null); }}>{label}{section === 'reminders' ? ` ${reminderCountFor(type)}` : section === 'records' ? ` ${recordCountFor(type)}` : ''}</button>)}</div>}{section === 'records' && <div className="record-status-filter filter-choice-group" role="group" aria-label="筛选申请状态"><span className="filter-choice-label"><Layers3 size={14} />状态</span><button type="button" className={recordStatuses.length === Object.keys(recordStatusName).length ? 'filter-choice selected' : 'filter-choice'} onClick={selectAllRecordStatuses}>全部</button>{Object.entries(recordStatusName).map(([status, label]) => <button type="button" className={`filter-choice status-filter-choice status-filter-${status} ${recordStatuses.includes(status as RecordFilterStatus) ? 'selected' : ''}`} key={status} onClick={() => toggleRecordStatus(status as RecordFilterStatus)}>{label}</button>)}</div>}<button type="button" className="icon-button refresh-button" title="刷新" aria-label="刷新申请记录" onClick={() => void load()}><RefreshCw size={17} /></button></div></div>{visibleGroups.length === 0 ? <div className="empty-state"><div className="empty-icon"><Package size={22} /></div><h3>{groups.length ? '没有符合筛选条件的记录' : section === 'reminders' ? '暂无待提醒记录' : '还没有申请记录'}</h3><p>{groups.length ? `当前筛选：${recordTypeName[recordTypeFilter]}，请选择其他条件查看申请` : '提交的申请会显示在这里'}</p></div> : <div className={`record-table-shell ${section === 'reminders' ? 'reminders-table' : ''}`}>{recordTypeFilter === 'issue' ? <RecordTableHeader isReissue /> : <RecordTableHeader />}<div className="record-table-body">{visibleGroups.map((group, index) => <OwnRecordCard key={group.id} index={index + 1} group={group} options={options} expanded={expandedRecordId === group.id} onToggle={() => setExpandedRecordId((current) => current === group.id ? null : group.id)} onEdit={edit} onCancel={requestCancel} onOnline={section === 'reminders' ? markOnline : undefined} onlineSavingId={onlineSavingId} />)}</div></div>}</>}{cursor && <button type="button" className="load-more" disabled={loading} onClick={() => void load(true)}>加载更多</button>}</section>}
+     {showRecords && <section id="my-requests" className="records-section records-page">{loading ? <div className="empty-state"><LoaderDots /></div> : <><div className="manager-toolbar"><div className="filter-row">{(section === 'records' || section === 'reminders') && <div className="record-type-filter filter-choice-group" role="group" aria-label="筛选申请类型"><span className="filter-choice-label"><Package size={14} />类型</span>{(Object.entries(recordTypeName) as Array<[RecordFilterType, string]>).map(([type, label]) => <button type="button" className={recordTypeFilter === type ? 'filter-choice selected' : 'filter-choice'} key={type} aria-pressed={recordTypeFilter === type} onClick={() => { setRecordTypeFilter(type); setExpandedRecordId(null); }}>{label}{section === 'reminders' ? ` ${reminderCountFor(type)}` : section === 'records' ? ` ${recordCountFor(type)}` : ''}</button>)}</div>}{section === 'records' && <div className="record-status-filter filter-choice-group" role="group" aria-label="筛选申请状态"><span className="filter-choice-label"><Layers3 size={14} />状态</span><button type="button" className={recordStatuses.length === Object.keys(recordStatusName).length ? 'filter-choice selected' : 'filter-choice'} onClick={selectAllRecordStatuses}>全部</button>{Object.entries(recordStatusName).map(([status, label]) => <button type="button" className={`filter-choice status-filter-choice status-filter-${status} ${recordStatuses.includes(status as RecordFilterStatus) ? 'selected' : ''}`} key={status} onClick={() => toggleRecordStatus(status as RecordFilterStatus)}>{label}</button>)}</div>}<button type="button" className="icon-button refresh-button" title="刷新" aria-label="刷新申请记录" onClick={() => void load()}><RefreshCw size={17} /></button></div></div>{visibleGroups.length === 0 ? <div className="empty-state"><div className="empty-icon"><Package size={22} /></div><h3>{groups.length ? '没有符合筛选条件的记录' : section === 'reminders' ? '暂无待提醒记录' : '还没有申请记录'}</h3><p>{groups.length ? `当前筛选：${recordTypeName[recordTypeFilter]}，请选择其他条件查看申请` : '提交的申请会显示在这里'}</p></div> : <div className={`record-table-shell ${section === 'reminders' ? 'reminders-table' : ''}`}>{recordTypeFilter === 'issue' ? <RecordTableHeader isReissue /> : <RecordTableHeader />}<div className="record-table-body">{visibleGroups.map((group, index) => <OwnRecordCard key={group.id} index={index + 1} group={group} options={options} expanded={expandedRecordId === group.id} onToggle={() => setExpandedRecordId((current) => current === group.id ? null : group.id)} onEdit={edit} onCancel={requestCancel} onOnline={section === 'reminders' ? markOnline : undefined} onlineSavingId={onlineSavingId} />)}</div></div>}</>}{groups.length > 0 && <CursorPagination page={pageIndex + 1} hasNext={Boolean(cursor)} disabled={loading} onPrevious={() => changePage(-1)} onNext={() => changePage(1)} label="申请记录分页" />}</section>}
     {confirm && <ConfirmDialog title={confirm.title} description={confirm.description} confirmLabel={editingId ? '保存修改' : '确认提交'} busy={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirmSubmit()} />}
     {cancelTarget && <ConfirmDialog title="确认取消申请？" description="取消后将停止处理，且无法恢复。" confirmLabel="确认取消" danger busy={canceling} onCancel={() => setCancelTarget(null)} onConfirm={() => void cancel()} />}
   </section>;
@@ -264,12 +283,12 @@ function ActivityChooser({ activities, selected, enabled, onToggle }: { activiti
   return <section className={`panel-surface activity-chooser ${enabled ? '' : 'is-disabled'}`}><div className="section-title"><span className="step-index">活动</span><div><h2>活动快捷填充</h2></div></div>{activities.length ? <div className="activity-chooser-list">{activities.map((activity) => <button type="button" key={activity.id} aria-pressed={selected.includes(activity.id)} className={`activity-choice ${selected.includes(activity.id) ? 'selected' : ''}`} disabled={!enabled} onClick={() => onToggle(activity)}><span className="activity-choice-main"><strong>{activity.name}</strong></span><span className="activity-choice-rewards">{activity.rewards.map((reward, index) => <em key={`${reward.itemCode ?? reward.kind}-${index}`}>{activityRewardLabel(reward)}</em>)}</span>{selected.includes(activity.id) && <span className="activity-selected-mark">已选</span>}</button>)}</div> : <div className="activity-chooser-empty">暂无活动</div>}</section>;
 }
 
-function IssueOperations({ items, setItems, cashQuantity, setCashQuantity, token, recentItems, onRecentSelect, onItemSelected, onDuplicateItem }: { items: ItemDraft[]; setItems: (value: ItemDraft[] | ((current: ItemDraft[]) => ItemDraft[])) => void; cashQuantity: string; setCashQuantity: (value: string) => void; token?: string; recentItems: CatalogItem[]; onRecentSelect: (item: CatalogItem) => void; onItemSelected: (item: CatalogItem) => void; onDuplicateItem: () => void }) {
+function IssueOperations({ items, setItems, cashQuantity, setCashQuantity, userId, token, recentItems, onRecentSelect, onItemSelected, onDuplicateItem }: { items: ItemDraft[]; setItems: (value: ItemDraft[] | ((current: ItemDraft[]) => ItemDraft[])) => void; cashQuantity: string; setCashQuantity: (value: string) => void; userId?: string; token?: string; recentItems: CatalogItem[]; onRecentSelect: (item: CatalogItem) => void; onItemSelected: (item: CatalogItem) => void; onDuplicateItem: () => void }) {
   const selectItem = (index: number, next: CatalogItem) => { const parsed = isEquipment(next.itemClass) ? splitEquipmentCode(next.code) : { baseCode: next.code, level: undefined }; if (!isEquipment(next.itemClass) && items.some((entry, i) => i !== index && entry.itemCode === next.code)) { onDuplicateItem(); return false; } onItemSelected(next); setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: parsed.baseCode, itemName: next.name, itemClass: next.itemClass, image: next.image, itemLevel: isEquipment(next.itemClass) ? normalizeEquipmentLevel(parsed.level) : undefined, state: 'selected' } : entry)); return true; };
   const clearItem = (index: number) => setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: '', itemClass: undefined, image: undefined, itemLevel: undefined, quantity: '', state: 'empty' } : entry));
   const removeItem = (index: number) => setItems((current) => current.length > 1 ? current.filter((_, i) => i !== index) : current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: '', itemClass: undefined, image: undefined, itemLevel: undefined, quantity: '', state: 'empty' } : entry));
   const markInput = (index: number, state: 'empty' | 'invalid') => setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemCode: '', itemName: state === 'empty' ? '' : entry.itemName, itemClass: undefined, image: undefined, itemLevel: undefined, state } : entry));
-  return <section className="panel-surface form-panel operations-panel"><div className="section-title"><span className="step-index">02</span><div><h2>具体操作内容</h2></div></div><div className="recent-items-panel"><div><strong>最近选择</strong><span>常用物品快捷入口</span></div><div className="recent-items-list">{recentItems.length ? recentItems.map((item) => <button type="button" key={item.code} className="recent-item-button" onClick={() => onRecentSelect(item)}><span className="recent-item-content"><ItemThumbnail src={item.image} alt="" size="small" /><span>{item.name}</span></span></button>) : <span className="recent-empty">选择物品后会出现在这里</span>}</div></div><div className="operation-split"><div className="operation-block"><div className="operation-block-title"><Package size={17} /><strong>发物品</strong><span>{items.filter((item) => item.itemCode).length}/100</span></div>{items.map((item, index) => <div className="item-line" key={index}><ItemPicker token={token} value={item.itemCode} name={item.itemName} image={item.image} onChange={(next: CatalogItem) => selectItem(index, next)} onClear={() => clearItem(index)} onInputState={(state) => markInput(index, state)} />{isEquipment(item.itemClass) && <label className="item-level-control"><span>等级</span><input className="item-level-input" type="text" inputMode="numeric" pattern="[0-9]*" aria-label={`第 ${index + 1} 个装备等级`} value={item.itemLevel ?? 1} onChange={(event) => { const value = event.target.value.replace(/[^0-9]/g, ''); setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemLevel: value ? Number(value) : undefined } : entry)); }} onBlur={(event) => { if (!event.currentTarget.value) setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemLevel: 1 } : entry)); }} /></label>}<label className="item-quantity-control"><span>数量</span><input className="item-quantity" inputMode="numeric" aria-label={`第 ${index + 1} 种物品数量`} value={item.quantity} onChange={(event) => setItems((current) => current.map((entry, i) => i === index ? { ...entry, quantity: event.target.value.replace(/[^0-9]/g, '') } : entry))} /></label><button type="button" className="icon-button danger-button clear-item-button" title={items.length > 1 ? '删除整条物品' : '清空物品和数量'} aria-label={items.length > 1 ? '删除整条物品' : '清空物品和数量'} onClick={() => removeItem(index)}><X size={16} /></button></div>)}<button type="button" className="add-operation" disabled={items.length >= 100 || items.some((item) => item.state !== 'selected')} onClick={() => setItems((current) => [...current, emptyItem()])}><CirclePlus size={16} />添加物品</button></div><div className="operation-block cash-block"><div className="operation-block-title"><Ticket size={17} /><strong>发点券</strong><span>单次数量</span></div><label><span>点券数量</span><input inputMode="numeric" value={cashQuantity} placeholder="可选" onChange={(event) => setCashQuantity(event.target.value.replace(/[^0-9]/g, ''))} /></label><div className="cash-hint">留空表示本次不发点券</div></div></div></section>;
+  return <section className="panel-surface form-panel operations-panel"><div className="section-title"><span className="step-index">02</span><div><h2>具体操作内容</h2></div></div><div className="recent-items-panel"><div><strong>最近选择</strong><span>常用物品快捷入口</span></div><div className="recent-items-list">{recentItems.length ? recentItems.map((item) => <button type="button" key={item.code} className="recent-item-button" onClick={() => onRecentSelect(item)}><span className="recent-item-content"><ItemThumbnail src={item.image} alt="" size="small" /><span>{item.name}</span></span></button>) : <span className="recent-empty">选择物品后会出现在这里</span>}</div></div><div className="operation-split"><div className="operation-block"><div className="operation-block-title"><Package size={17} /><strong>发物品</strong><span>{items.filter((item) => item.itemCode).length}/100</span></div>{items.map((item, index) => <div className="item-line" key={index}><ItemPicker userId={userId} token={token} value={item.itemCode} name={item.itemName} image={item.image} onChange={(next: CatalogItem) => selectItem(index, next)} onClear={() => clearItem(index)} onInputState={(state) => markInput(index, state)} />{isEquipment(item.itemClass) && <label className="item-level-control"><span>等级</span><input className="item-level-input" type="text" inputMode="numeric" pattern="[0-9]*" aria-label={`第 ${index + 1} 个装备等级`} value={item.itemLevel ?? 1} onChange={(event) => { const value = event.target.value.replace(/[^0-9]/g, ''); setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemLevel: value ? Number(value) : undefined } : entry)); }} onBlur={(event) => { if (!event.currentTarget.value) setItems((current) => current.map((entry, i) => i === index ? { ...entry, itemLevel: 1 } : entry)); }} /></label>}<label className="item-quantity-control"><span>数量</span><input className="item-quantity" inputMode="numeric" aria-label={`第 ${index + 1} 种物品数量`} value={item.quantity} onChange={(event) => setItems((current) => current.map((entry, i) => i === index ? { ...entry, quantity: event.target.value.replace(/[^0-9]/g, '') } : entry))} /></label><button type="button" className="icon-button danger-button clear-item-button" title={items.length > 1 ? '删除整条物品' : '清空物品和数量'} aria-label={items.length > 1 ? '删除整条物品' : '清空物品和数量'} onClick={() => removeItem(index)}><X size={16} /></button></div>)}<button type="button" className="add-operation" disabled={items.length >= 100 || items.some((item) => item.state !== 'selected')} onClick={() => setItems((current) => [...current, emptyItem()])}><CirclePlus size={16} />添加物品</button></div><div className="operation-block cash-block"><div className="operation-block-title"><Ticket size={17} /><strong>发点券</strong><span>单次数量</span></div><label><span>点券数量</span><input inputMode="numeric" value={cashQuantity} placeholder="可选" onChange={(event) => setCashQuantity(event.target.value.replace(/[^0-9]/g, ''))} /></label><div className="cash-hint">留空表示本次不发点券</div></div></div></section>;
 }
 
 

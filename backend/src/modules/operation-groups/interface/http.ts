@@ -1,9 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { AuthError, AuthService } from '../../auth/public/index.js';
+import { AuthError, AuthService, hasUploadAccess, hasWorkspaceAccess } from '../../auth/public/index.js';
 import { CatalogError, type ItemCatalog } from '../../item-catalog/public/index.js';
 import { GroupError, type OperationGroupsService } from '../public/index.js';
 import type { GroupStatus, Identity, Role, SubmitGroupInput } from '../../../shared/types.js';
 import { projectGroupChanges } from '../domain/changes.js';
+import type { OperationAutomationWorkflow } from '../application/automation-workflow.js';
 
 type Query = Record<string, unknown>;
 export { AuthError };
@@ -62,7 +63,7 @@ function bodyObject(request: FastifyRequest) {
   return body as Record<string, unknown>;
 }
 
-export function registerOperationRoutes(app: FastifyInstance, service: OperationGroupsService, catalog: ItemCatalog, auth?: AuthService) {
+export function registerOperationRoutes(app: FastifyInstance, service: OperationGroupsService, catalog: ItemCatalog, auth?: AuthService, automation?: OperationAutomationWorkflow, replaceUploadedCatalog?: (content: string) => { size: number }) {
   const identity = (request: FastifyRequest) => identityFromRequest(request, auth);
   app.get('/api/v1/operation-groups/options', async (request, reply) => {
     try { identity(request); return reply.send(service.getOptions()); } catch (error) { return sendError(reply, error); }
@@ -79,11 +80,28 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
       return reply.send(catalog.listByClass(itemClass, limit, query.cursor ? String(query.cursor) : undefined));
     } catch (error) { return sendError(reply, error); }
   });
+  app.post('/api/v1/item-catalog/import', { bodyLimit: 8 * 1024 * 1024 }, async (request, reply) => {
+    try {
+      const actor = identity(request);
+      if (!hasWorkspaceAccess(actor, 'activities') || !hasUploadAccess(actor, 'item-catalog')) throw new AuthError('forbidden');
+      if (!replaceUploadedCatalog) throw new CatalogError('catalog-unavailable', 'catalog replacement is unavailable');
+      const body = bodyObject(request);
+      if (Object.keys(body).some((key) => key !== 'file') || !body.file || typeof body.file !== 'object' || Array.isArray(body.file)) throw new GroupError('invalid-input', 'invalid csv file payload');
+      const file = body.file as Record<string, unknown>;
+      if (typeof file.name !== 'string' || typeof file.content !== 'string') throw new GroupError('invalid-input', 'invalid csv file payload');
+      const name = file.name.trim();
+      if (!name.toLowerCase().endsWith('.csv') || name.length > 128 || /[\u0000-\u001f\u007f/\\]/u.test(name) || file.content.length > 2_000_000) throw new GroupError('invalid-input', 'unsupported csv file');
+      const result = replaceUploadedCatalog(file.content);
+      return reply.code(201).send({ fileName: name, itemCount: result.size });
+    } catch (error) { return sendError(reply, error); }
+  });
   app.post('/api/v1/operation-groups', async (request, reply) => {
     try {
       const idempotencyKey = headerValue(request, 'idempotency-key');
       if (idempotencyKey && (idempotencyKey.length > 128 || /[\s\u0000-\u001f\u007f]/u.test(idempotencyKey))) throw new GroupError('invalid-input', 'invalid idempotency key');
-      return reply.code(201).send(service.submit(identity(request), request.body as SubmitGroupInput, idempotencyKey || undefined));
+      const saved = service.submit(identity(request), request.body as SubmitGroupInput, idempotencyKey || undefined);
+      if (automation && saved.status === 'approved') await automation.executeApproved(saved.id);
+      return reply.code(201).send(service.automationCustomerProjection(saved.id));
     } catch (error) { return sendError(reply, error); }
   });
   app.get('/api/v1/operation-groups/mine', async (request, reply) => {
@@ -109,7 +127,7 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
   });
   app.get('/api/v1/operation-groups/events', async (request, reply) => {
     try {
-      const subscriber = identity(request);
+      identity(request);
       reply.hijack();
       reply.raw.writeHead(200, {
         'content-type': 'text/event-stream; charset=utf-8',
@@ -121,6 +139,8 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
       reply.raw.write(': connected\n\n');
       const writeEvent = (payload: string) => { if (reply.raw.writableEnded || reply.raw.destroyed) return; try { reply.raw.write(payload); } catch { /* The client may disconnect between the guard and write. */ } };
       const unsubscribe = service.subscribe(changes => {
+        let subscriber: Identity;
+        try { subscriber = identity(request); } catch { return; }
         const event = projectGroupChanges(changes, subscriber);
         if (event.scopes.length) writeEvent(`event: changed\ndata: ${JSON.stringify(event)}\n\n`);
       });
@@ -153,23 +173,30 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
   app.get('/api/v1/manager/overview', async (request, reply) => {
     try { const query = request.query as Query; return reply.send(service.listOverview(identity(request), limitOf(query, 100), query.cursor ? String(query.cursor) : undefined)); } catch (error) { return sendError(reply, error); }
   });
-  app.post('/api/v1/manager/operation-groups/:groupId/approve', async (request, reply) => {
-    try { return reply.send(service.approve(identity(request), (request.params as { groupId: string }).groupId)); } catch (error) { return sendError(reply, error); }
-  });
-  app.post('/api/v1/manager/operation-groups/:groupId/confirm', async (request, reply) => {
-    try { return reply.send(service.approve(identity(request), (request.params as { groupId: string }).groupId)); } catch (error) { return sendError(reply, error); }
-  });
+  const approve = async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const id = (request.params as { groupId: string }).groupId;
+      return reply.send(automation ? await automation.approveAndExecute(identity(request), id) : service.approve(identity(request), id));
+    } catch (error) { return sendError(reply, error); }
+  };
+  app.post('/api/v1/manager/operation-groups/:groupId/approve', approve);
+  // Older clients use /confirm; sharing the handler prevents it from
+  // approving a group without dispatching the commands to auto-process.
+  app.post('/api/v1/manager/operation-groups/:groupId/confirm', approve);
   app.post('/api/v1/manager/operation-groups/:groupId/reject', async (request, reply) => {
     try { const body = bodyObject(request); if (Object.keys(body).some((key) => key !== 'reason' && key !== 'rejectionReason')) throw new GroupError('invalid-input'); const reason = body.reason ?? body.rejectionReason; if (reason !== undefined && typeof reason !== 'string') throw new GroupError('invalid-input'); return reply.send(service.reject(identity(request), (request.params as { groupId: string }).groupId, reason as string | undefined)); } catch (error) { return sendError(reply, error); }
   });
   app.post('/api/v1/manager/operation-groups/:groupId/issue', async (request, reply) => {
     try { const body = bodyObject(request); if (Object.keys(body).some((key) => key !== 'executionNote')) throw new GroupError('invalid-input'); if (body.executionNote !== undefined && typeof body.executionNote !== 'string') throw new GroupError('invalid-input'); return reply.send(service.issue(identity(request), (request.params as { groupId: string }).groupId, body.executionNote as string | undefined)); } catch (error) { return sendError(reply, error); }
   });
-  app.post('/api/v1/super-admin/operation-groups/:groupId/remind', async (request, reply) => {
+  const remind = async (request: FastifyRequest, reply: FastifyReply) => {
     try { return reply.send(service.remind(identity(request), (request.params as { groupId: string }).groupId)); } catch (error) { return sendError(reply, error); }
-  });
+  };
+  app.post('/api/v1/operation-groups/:groupId/remind', remind);
+  // Compatibility alias for clients released before workspace permissions.
+  app.post('/api/v1/super-admin/operation-groups/:groupId/remind', remind);
   app.post('/api/v1/operation-groups/:groupId/online', async (request, reply) => {
-    try { return reply.send(service.markOnline(identity(request), (request.params as { groupId: string }).groupId)); } catch (error) { return sendError(reply, error); }
+    try { const id = (request.params as { groupId: string }).groupId; return reply.send(automation ? await automation.retryAfterOnline(identity(request), id) : service.markOnline(identity(request), id)); } catch (error) { return sendError(reply, error); }
   });
   app.post('/api/v1/manager/operation-groups/:groupId/deliver', async (request, reply) => {
     try { const body = bodyObject(request); if (Object.keys(body).some((key) => key !== 'executionNote')) throw new GroupError('invalid-input'); if (body.executionNote !== undefined && typeof body.executionNote !== 'string') throw new GroupError('invalid-input'); return reply.send(service.issue(identity(request), (request.params as { groupId: string }).groupId, body.executionNote as string | undefined)); } catch (error) { return sendError(reply, error); }
