@@ -31,6 +31,10 @@ vulnerability scanning.
   System event and returns the server's text when present. Private `drop` and
   `cashid`, `herwarp`, and `ban` commands ignore their chat echo and unrelated
   system notifications, then match their command-specific terminal text.
+  `drop` treats the category label as opaque because the server can report
+  `物品`, `装备`, `称号`, or another category. It still requires the fixed
+  success sentence, exact item code, and exact quantity; the `×` separator
+  before the quantity is optional for compatibility with equipment responses.
   `cashid` also ignores the intermediate `evt=63` `WalletBalance` event. The
   result exposes `delivery_status` (`success`, `failure`, or `unknown`) apart
   from transport observation status. For `ban@<characterId>`, the success form

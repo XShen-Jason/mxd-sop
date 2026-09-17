@@ -28,7 +28,11 @@ field 65 set to `System`; field 36 is returned as the server response text.
 Private `drop@target@item@quantity` and `cashid@character@quantity` commands
 are handled separately. A matching `evt=1` echo and the command's self-
 notification are ignored until the command-result System message arrives.
-`drop` matches the item/quantity success form or target-offline failure form.
+`drop` matches the category/item and quantity success form or target-offline
+failure form. The server may use different category labels (for example `物品`,
+`装备`, or `称号`); the category is treated as opaque. It may also include or
+omit the `×` separator before the quantity. The item code and quantity must
+still match the outstanding command.
 `cashid` matches the character/quantity success form
 `已给角色[<name>(<characterId>)]发放点券 <quantity>` or the offline form
 `角色id[<characterId>]不在线。给账号发点券(支持离线)请使用: zzdd@账号@数量`.

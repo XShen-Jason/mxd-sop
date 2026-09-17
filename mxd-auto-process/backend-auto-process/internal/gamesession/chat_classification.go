@@ -32,9 +32,12 @@ type privateBanCommand struct {
 }
 
 var (
-	dropSuccessMessage    = regexp.MustCompile(`^已将物品\[([^\]]+)\]×([0-9]+)发送到玩家\[([^\]]+)\]的背包。$`)
+	// The server uses different labels (物品、装备、称号, …) for drop payloads.
+	// Keep that label opaque while retaining the fixed success sentence and
+	// exact item/quantity checks. Equipment responses may omit the × separator.
+	dropSuccessMessage    = regexp.MustCompile(`^已将[^\[\]]+\[([^\]]+)\](?:×)?([0-9]+)发送到玩家\[([^\]]+)\]的背包。$`)
 	dropOfflineMessage    = regexp.MustCompile(`^目标玩家\[([^\]]+)\]不在线，无法发送物品。$`)
-	dropSelfNotification  = regexp.MustCompile(`^GM赠送您物品\[([^\]]+)\]×([0-9]+)。$`)
+	dropSelfNotification  = regexp.MustCompile(`^GM赠送您[^\[\]]+\[([^\]]+)\](?:×)?([0-9]+)。$`)
 	cashIDSuccessMessage  = regexp.MustCompile(`^已给角色\[[^\]]+\(([^)]+)\)\]发放点券 ([0-9]+)$`)
 	cashIDOfflineMessage  = regexp.MustCompile(`^角色id\[([^\]]+)\]不在线。给账号发点券\(支持离线\)请使用: zzdd@账号@数量$`)
 	cashIDNotification    = regexp.MustCompile(`^GM\[[^\]]+\]给你发放点券: ([0-9]+)$`)

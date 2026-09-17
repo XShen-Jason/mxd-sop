@@ -56,6 +56,49 @@ func TestPrivateDropIgnoresEchoUntilSuccess(t *testing.T) {
 	}
 }
 
+func TestPrivateDropClassifiesEquipmentSuccess(t *testing.T) {
+	command := "drop@3785@01115371_1@1"
+	client := &scriptedClient{responses: []gameprotocol.Message{
+		systemEvent("已将装备[01115371_1]1发送到玩家[霸气]的背包。"),
+	}}
+	session, err := New(client, Config{ChatResponseTimeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session.state = StateReady
+
+	result, err := session.SendPrivateChat(context.Background(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.DeliveryStatus != ChatDeliverySuccess || result.ServerResponse != "已将装备[01115371_1]1发送到玩家[霸气]的背包。" {
+		t.Fatalf("equipment drop was not classified as success: %+v", result)
+	}
+	if snapshot := session.Snapshot(); snapshot.ChatSuccessCount != 1 || snapshot.ChatFailureCount != 0 || snapshot.ChatUnknownCount != 0 {
+		t.Fatalf("unexpected equipment drop counters: %+v", snapshot)
+	}
+}
+
+func TestPrivateDropClassifiesUnknownCategorySuccess(t *testing.T) {
+	command := "drop@3785@01142075@1"
+	client := &scriptedClient{responses: []gameprotocol.Message{
+		systemEvent("已将称号[01142075]1发送到玩家[霸气]的背包。"),
+	}}
+	session, err := New(client, Config{ChatResponseTimeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session.state = StateReady
+
+	result, err := session.SendPrivateChat(context.Background(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.DeliveryStatus != ChatDeliverySuccess || result.ServerResponse != "已将称号[01142075]1发送到玩家[霸气]的背包。" {
+		t.Fatalf("unknown-category drop was not classified as success: %+v", result)
+	}
+}
+
 func TestPrivateDropClassifiesOfflineFailure(t *testing.T) {
 	command := "drop@315@100000069@1"
 	client := &scriptedClient{responses: []gameprotocol.Message{
