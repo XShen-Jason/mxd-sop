@@ -64,7 +64,7 @@ Out of scope:
 
 ## Data, configuration, and assets
 
-权威目录数据位于 `data/item-catalog/source/道具表-9-5.csv`，权威图片关联位于 `data/item-catalog/source/item-image-map.json`，静态 PNG 位于 `frontend/public/item-images`。未来生成的标准化数据库快照应放在构建产物或后端存储中，不回写覆盖源文件。导入批次应记录文件哈希、时间和失败行。
+仓库内置种子数据位于 `data/item-catalog/source/道具表-9-5.csv`，权威图片关联位于 `data/item-catalog/source/item-image-map.json`，静态 PNG 位于 `frontend/public/item-images`。生产首次启动时将种子复制到 `DATABASE_PATH` 同目录的 `item-catalog.csv`，后续导入只原子替换该运行时副本；可用 `ITEM_CATALOG_PATH` 显式指定其他可写路径。运行时数据不得回写 Git 工作区。
 
 ## Tests
 
@@ -72,6 +72,6 @@ Out of scope:
 
 ## Migration notes
 
-The backend loads `data/item-catalog/source/道具表-9-5.csv` and joins the independent `data/item-catalog/source/item-image-map.json` by item code. The legacy workbook and JSON snapshot remain available only for explicit compatibility paths. Images are optional; missing mappings remain unset and are rendered as an empty slot.
+The backend seeds its production runtime CSV from `data/item-catalog/source/道具表-9-5.csv`, then reloads the writable copy beside `DATABASE_PATH` on later starts. It joins the independent `data/item-catalog/source/item-image-map.json` by item code. The legacy workbook and JSON snapshot remain available only for explicit compatibility paths. Images are optional; missing mappings remain unset and are rendered as an empty slot.
 
 保持 item_id 到 domain code 的映射和字符串语义。更换 Excel、CSV 或数据库时复用同一映射契约；任何代码重编号都必须作为显式数据迁移并评估历史指令。

@@ -25,9 +25,11 @@ CSV SHA-256（归档时）：013D5ED7DBB0B414F004162345BB2A252CF50347156E7B34AAB
 
 ## Handling rules
 
-Runtime catalog data comes from `source/道具表-9-5.csv`; image metadata comes
-from `source/item-image-map.json`. The backend joins them by `item_id` and returns
-the mapped static URL. Rows without a matching image remain valid and omit the
-optional `image` field.
+The repository CSV at `source/道具表-9-5.csv` seeds a production runtime copy
+named `item-catalog.csv` beside `DATABASE_PATH`; later uploads and restarts use
+that writable copy. `ITEM_CATALOG_PATH` may override its location. Image metadata
+continues to come from `source/item-image-map.json`. The backend joins them by
+`item_id` and returns the mapped static URL. Rows without a matching image remain
+valid and omit the optional `image` field.
 
-两个源文件均由 backend 的 item-catalog 导入适配器读取；frontend 不复制或直接解析目录数据，只提供映射所引用的静态 PNG。导入前验证字段、空值、重复 code、前导零和图片文件名，失败批次不得部分覆盖有效目录。标准化快照、导入日志和数据库数据属于派生物，应放在实现后的后端存储/构建产物中，不能覆盖 source 文件。
+两个种子文件均由 backend 的 item-catalog 导入适配器读取；frontend 不复制或直接解析目录数据，只提供映射所引用的静态 PNG。导入前验证字段、空值、重复 code、前导零和图片文件名，失败批次不得部分覆盖有效目录。生产上传结果属于运行时数据，应与 SQLite 一起放在可写数据目录和备份范围内，不能覆盖 source 文件。

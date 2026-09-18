@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { CatalogError, ItemCatalog } from '../domain/catalog.js';
 import { catalogFromRows, type TabularImportOptions } from './tabular-catalog.js';
 
@@ -67,6 +68,7 @@ export function replaceCatalogCsv(filePath: string, source: string, options: Tab
   const next = loadCatalogFromCsvContent(source, { ...options, strict: true });
   const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(temporaryPath, source, 'utf8');
     try {
       fs.renameSync(temporaryPath, filePath);
@@ -78,4 +80,10 @@ export function replaceCatalogCsv(filePath: string, source: string, options: Tab
     if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
   }
   return next;
+}
+
+export function loadOrSeedCatalogCsv(filePath: string, seedPath: string, options: TabularImportOptions = {}) {
+  if (fs.existsSync(filePath)) return loadCatalogFromCsv(filePath, options);
+  if (path.resolve(filePath) === path.resolve(seedPath)) return loadCatalogFromCsv(seedPath, options);
+  return replaceCatalogCsv(filePath, fs.readFileSync(seedPath, 'utf8'), options);
 }

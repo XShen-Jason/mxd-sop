@@ -50,6 +50,35 @@ describe('SQLite deployment persistence', () => {
     for (const suffix of ['', '-wal', '-shm']) if (fs.existsSync(`${emptyPath}${suffix}`)) fs.unlinkSync(`${emptyPath}${suffix}`);
   });
 
+  it('stores production catalog uploads beside the writable database and reloads them after restart', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ops-catalog-runtime-'));
+    const runtimeDatabasePath = path.join(directory, 'ops.sqlite');
+    const runtimeCatalogPath = path.join(directory, 'item-catalog.csv');
+    const previousCatalogPath = process.env.ITEM_CATALOG_PATH;
+    let app: Awaited<ReturnType<typeof createApp>> | undefined;
+    try {
+      delete process.env.ITEM_CATALOG_PATH;
+      app = await createApp({ databasePath: runtimeDatabasePath, initialAdmin: { username: 'catalog-owner', displayName: 'Catalog Owner', password: 'Abc123' } });
+      expect(fs.existsSync(runtimeCatalogPath)).toBe(true);
+      const login = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'catalog-owner', password: 'Abc123' } });
+      const cookie = String(login.headers['set-cookie']).split(';', 1)[0];
+      const uploaded = await app.inject({
+        method: 'POST', url: '/api/v1/item-catalog/import', headers: { cookie },
+        payload: { file: { name: 'items.csv', content: 'Id,item_id,class,name\n1,09999999,consume,Runtime item\n' } }
+      });
+      expect(uploaded.statusCode).toBe(201);
+      await app.close();
+      app = await createApp({ databasePath: runtimeDatabasePath });
+      const search = await app.inject({ method: 'GET', url: '/api/v1/item-catalog/search?q=Runtime', headers: { cookie } });
+      expect(search.statusCode).toBe(200);
+      expect(search.json().items).toEqual([expect.objectContaining({ code: '09999999', name: 'Runtime item' })]);
+    } finally {
+      await app?.close();
+      if (previousCatalogPath === undefined) delete process.env.ITEM_CATALOG_PATH; else process.env.ITEM_CATALOG_PATH = previousCatalogPath;
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('preserves reminder fields and customer counts across restart', async () => {
     const first = await createApp({ databasePath: reminderDatabasePath, catalogPath, initialAdmin: { username: 'owner', displayName: 'Owner', password: 'Abc123' } });
     const ownerLogin = await first.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'owner', password: 'Abc123' } });

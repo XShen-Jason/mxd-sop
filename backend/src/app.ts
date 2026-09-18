@@ -10,7 +10,7 @@ import { JsonUserRepository } from './modules/auth/public/index.js';
 import { SqliteUserRepository } from './modules/auth/infrastructure/sqlite-users.js';
 import { SqliteSessionRepository } from './modules/auth/infrastructure/sqlite-sessions.js';
 import { registerAuthRoutes } from './modules/auth/interface/http.js';
-import { loadCatalogFromCsv, loadCatalogFromExcel, loadCatalogFromJson, loadCatalogImageMap, replaceCatalogCsv } from './modules/item-catalog/public/index.js';
+import { loadCatalogFromCsv, loadCatalogFromExcel, loadCatalogFromJson, loadCatalogImageMap, loadOrSeedCatalogCsv, replaceCatalogCsv } from './modules/item-catalog/public/index.js';
 import { JsonDirectoryRepository, PlayerDirectoryService, SqliteDirectoryRepository } from './modules/player-directory/public/index.js';
 import { registerPlayerDirectoryRoutes } from './modules/player-directory/interface/http.js';
 import { HttpPlayerIntegrationClient, loadPlayerEndpointConfig, MemoryPlayerIntegrationRepository, PlayerIntegrationService, SqlitePlayerIntegrationRepository, type PlayerEndpointConfig, type PlayerIntegrationClient } from './modules/player-integration/public/index.js';
@@ -69,14 +69,21 @@ export async function createApp(config: AppConfig = {}) {
   });
   const projectRoot = findProjectRoot(process.cwd());
   const projectPath = (relative: string) => path.isAbsolute(relative) ? relative : path.join(projectRoot, relative);
-  const catalogPath = config.catalogPath ?? projectPath('data/item-catalog/source/道具表-9-5.csv');
+  const testPersistence = Boolean(config.dataPath || config.usersPath);
+  const databasePath = projectPath(config.databasePath ?? process.env.DATABASE_PATH ?? 'data/ops.sqlite');
+  const bundledCatalogPath = projectPath('data/item-catalog/source/道具表-9-5.csv');
+  const environmentCatalogPath = process.env.ITEM_CATALOG_PATH ? projectPath(process.env.ITEM_CATALOG_PATH) : undefined;
+  const runtimeCatalogPath = environmentCatalogPath ?? (testPersistence ? bundledCatalogPath : path.join(path.dirname(databasePath), 'item-catalog.csv'));
+  const catalogPath = config.catalogPath ?? runtimeCatalogPath;
   const catalogExtension = path.extname(catalogPath).toLowerCase();
   const imageMapPath = config.catalogImageMapPath ?? projectPath('data/item-catalog/source/item-image-map.json');
   const tabularOptions = () => ({ skipInvalidRows: true, images: loadCatalogImageMap(imageMapPath) });
   const catalog = catalogExtension === '.json'
     ? loadCatalogFromJson(catalogPath, { skipInvalidRows: true })
     : catalogExtension === '.csv'
-      ? loadCatalogFromCsv(catalogPath, tabularOptions())
+      ? config.catalogPath
+        ? loadCatalogFromCsv(catalogPath, tabularOptions())
+        : loadOrSeedCatalogCsv(catalogPath, bundledCatalogPath, tabularOptions())
       : loadCatalogFromExcel(catalogPath, tabularOptions());
   const replaceUploadedCatalog = catalogExtension === '.csv'
     ? (content: string) => {
@@ -85,8 +92,6 @@ export async function createApp(config: AppConfig = {}) {
       return { size: catalog.size };
     }
     : undefined;
-  const testPersistence = Boolean(config.dataPath || config.usersPath);
-  const databasePath = projectPath(config.databasePath ?? process.env.DATABASE_PATH ?? 'data/ops.sqlite');
   const databaseExisted = !testPersistence && fs.existsSync(databasePath);
   const db = testPersistence ? undefined : openDatabase(databasePath);
   const repository = testPersistence ? new JsonGroupRepository(config.dataPath ?? projectPath('data/generated/operation-groups.json')) : new SqliteGroupRepository(db!);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { CatalogError, ItemCatalog, loadCatalogFromCsv, loadCatalogFromCsvContent, loadCatalogFromJson, loadCatalogImageMap, replaceCatalogCsv } from '../src/modules/item-catalog/public/index.js';
+import { CatalogError, ItemCatalog, loadCatalogFromCsv, loadCatalogFromCsvContent, loadCatalogFromJson, loadCatalogImageMap, loadOrSeedCatalogCsv, replaceCatalogCsv } from '../src/modules/item-catalog/public/index.js';
 
 const requestedMedals = [
   ['01142392', '人级勋章'], ['01142977', '地级勋章'], ['01142504', '天级勋章'],
@@ -99,6 +99,25 @@ describe('item-catalog.search', () => {
       const replaced = replaceCatalogCsv(targetPath, source, { skipInvalidRows: true });
       expect(replaced.size).toBe(startup.size);
       expect(fs.readFileSync(targetPath, 'utf8')).toBe(source);
+    } finally {
+      fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('seeds a writable runtime catalog once and preserves later imports', () => {
+    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'mxdcmd-runtime-catalog-'));
+    const seedPath = path.join(temporaryDirectory, 'seed.csv');
+    const runtimePath = path.join(temporaryDirectory, 'runtime', 'item-catalog.csv');
+    const seed = 'Id,item_id,class,name\n1,00000001,consume,Seed item\n';
+    const uploaded = 'Id,item_id,class,name\n2,00000002,equip,Uploaded item\n';
+    try {
+      fs.writeFileSync(seedPath, seed, 'utf8');
+      expect(loadOrSeedCatalogCsv(runtimePath, seedPath).lookup('00000001')?.name).toBe('Seed item');
+      replaceCatalogCsv(runtimePath, uploaded);
+      fs.writeFileSync(seedPath, 'Id,item_id,class,name\n3,00000003,etc,New seed\n', 'utf8');
+      const restarted = loadOrSeedCatalogCsv(runtimePath, seedPath);
+      expect(restarted.lookup('00000002')?.name).toBe('Uploaded item');
+      expect(restarted.lookup('00000003')).toBeUndefined();
     } finally {
       fs.rmSync(temporaryDirectory, { recursive: true, force: true });
     }

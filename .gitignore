@@ -35,6 +35,7 @@ mxd-player/backend-player/.env.*
 
 # Generated catalog/import output
 data/item-catalog/generated/
+data/item-catalog.csv
 data/generated/
 data/player-fbhd
 data/char-user-qq/*.csv

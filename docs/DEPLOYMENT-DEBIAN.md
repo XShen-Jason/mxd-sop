@@ -49,6 +49,11 @@ The application uses WAL mode and transactional writes. PostgreSQL becomes
 appropriate only when you need multiple application replicas, high write
 concurrency, or centralized operational reporting.
 
+Production keeps the uploaded item catalog at `item-catalog.csv` beside
+`DATABASE_PATH`, so the existing writable `/var/lib/ops-desk` systemd path is
+sufficient. The repository CSV is copied there only when the runtime file does
+not exist. Include both the SQLite files and `item-catalog.csv` in backups.
+
 ## Security baseline
 
 - Keep Fastify bound to `127.0.0.1`; expose only Nginx on 443.

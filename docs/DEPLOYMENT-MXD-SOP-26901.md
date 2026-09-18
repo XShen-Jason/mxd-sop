@@ -81,6 +81,8 @@ NODE_ENV=production
 HOST=127.0.0.1
 PORT=26902
 DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite
+# 可选；默认自动使用 /var/lib/mxd-sop/item-catalog.csv
+# ITEM_CATALOG_PATH=/var/lib/mxd-sop/item-catalog.csv
 COOKIE_SECURE=true
 MXD_PLAYER_LOCAL_URL=http://127.0.0.1:26906
 # MXD_PLAYER_REMOTE_URL=https://player.example.internal
@@ -151,6 +153,10 @@ curl -fsS http://127.0.0.1:26902/health
 sudoedit /etc/mxd-sop/mxd-sop.env
 sudo systemctl restart mxd-sop
 ```
+
+生产环境的道具目录上传结果默认写入 `/var/lib/mxd-sop/item-catalog.csv`。该文件
+在升级后首次启动时由仓库内置 CSV 自动初始化，之后上传和重启均继续使用运行时
+副本；无需将 `/opt/mxd-sop` 加入 `ReadWritePaths`。备份时应同时保存此文件。
 
 ## 6. 配置 Nginx 临时 HTTP 站点
 

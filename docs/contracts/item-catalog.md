@@ -22,7 +22,7 @@ POST /api/v1/item-catalog/import
 
 - 请求体为 `{ "file": { "name": "items.csv", "content": "..." } }`。
 - 调用者必须同时拥有 `activities` 工作区和独立的 `item-catalog` 上传权限；缺少任一项返回 `forbidden`（403）。
-- 文件表头、列数、行 ID 和 CSV 引号结构必须有效；数据行采用与启动加载一致的标准化规则，空代码、空名称、非法代码或重复代码行不进入目录。其余记录通过完整校验后原子替换目录；成功返回 `{ fileName, itemCount }`，其中 `itemCount` 为实际导入条数，已提交工单中的物品快照不受影响。
+- 文件表头、列数、行 ID 和 CSV 引号结构必须有效；数据行采用与启动加载一致的标准化规则，空代码、空名称、非法代码或重复代码行不进入目录。其余记录通过完整校验后原子替换可写运行时目录，并在服务重启后继续生效；成功返回 `{ fileName, itemCount }`，其中 `itemCount` 为实际导入条数，已提交工单中的物品快照不受影响。
 
 ## Response/handling
 
