@@ -17,6 +17,7 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 };
 const ITEM_TYPES = Object.keys(ITEM_TYPE_LABELS);
 const ITEMS_PER_PAGE = 8;
+const MAX_CATALOG_FILE_BYTES = 2 * 1024 * 1024;
 const emptyActivity = (): Activity => ({ id: '', name: '', description: '', rewards: [{ kind: 'cash', quantity: 0 }, { kind: 'item', quantity: 1 }], updatedAt: '' });
 type CatalogPage = { source: string; index: number; cursors: Array<string | undefined>; nextCursor: string | null; totalCount: number | null };
 const emptyCatalogPage = (): CatalogPage => ({ source: '', index: 0, cursors: [undefined], nextCursor: null, totalCount: null });
@@ -173,6 +174,7 @@ export function ActivityView({ userId, token, uploadEnabled = true }: { userId?:
     if (!uploadEnabled || !catalogFile || catalogUploading) return;
     setCatalogUploading(true);
     try {
+      if (catalogFile.size > MAX_CATALOG_FILE_BYTES) throw new Error('CSV 文件不能超过 2 MiB');
       const result = await client.importItemCatalog({ name: catalogFile.name, content: await catalogFile.text() });
       setCatalogFile(null);
       setCatalogReloadKey((value) => value + 1);

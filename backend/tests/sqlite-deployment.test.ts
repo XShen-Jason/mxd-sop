@@ -79,6 +79,25 @@ describe('SQLite deployment persistence', () => {
     }
   });
 
+  it('imports the bundled tbl_item_class CSV through the production upload boundary', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ops-catalog-large-upload-'));
+    const runtimeDatabasePath = path.join(directory, 'ops.sqlite');
+    const sourcePath = path.resolve(process.cwd(), '..', 'data/item-catalog/source/tbl_item_class.csv');
+    let app: Awaited<ReturnType<typeof createApp>> | undefined;
+    try {
+      app = await createApp({ databasePath: runtimeDatabasePath, initialAdmin: { username: 'catalog-upload', displayName: 'Catalog Upload', password: 'Abc123' } });
+      const login = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'catalog-upload', password: 'Abc123' } });
+      const cookie = String(login.headers['set-cookie']).split(';', 1)[0];
+      const content = fs.readFileSync(sourcePath, 'utf8');
+      const uploaded = await app.inject({ method: 'POST', url: '/api/v1/item-catalog/import', headers: { cookie }, payload: { file: { name: 'tbl_item_class.csv', content } } });
+      expect(uploaded.statusCode).toBe(201);
+      expect(uploaded.json()).toMatchObject({ fileName: 'tbl_item_class.csv', itemCount: 5880 });
+    } finally {
+      await app?.close();
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('preserves reminder fields and customer counts across restart', async () => {
     const first = await createApp({ databasePath: reminderDatabasePath, catalogPath, initialAdmin: { username: 'owner', displayName: 'Owner', password: 'Abc123' } });
     const ownerLogin = await first.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'owner', password: 'Abc123' } });

@@ -46,6 +46,10 @@ unauthorized（401）、forbidden（403，仅目录替换）、invalid-input/inv
 
 ## Limits and side effects
 
+`item-catalog.import` accepts CSV content up to 2,000,000 characters in a JSON
+request. The backend and production reverse proxy allow an 8 MiB request body;
+validation completes before the writable runtime catalog is replaced.
+
 查询只读且有界；后端应对 q 做索引/前缀或受控包含搜索，避免全表无界扫描。目录替换是有界同步写入，只有文件完整校验成功后才改变当前目录。前端应 debounce 和取消过期请求，但这些是交互优化，不改变契约。
 
 ## Compatibility

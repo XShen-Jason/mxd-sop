@@ -51,8 +51,12 @@ export interface AppConfig {
   initialAdmin?: { username: string; displayName: string; password: string };
 }
 
+// Keep ordinary JSON requests bounded; large CSV uploads have a route-specific
+// limit because JSON wrapping makes them larger than the source file.
+const MAX_JSON_BODY_BYTES = 2 * 1024 * 1024;
+
 export async function createApp(config: AppConfig = {}) {
-  const app = Fastify({ logger: false, bodyLimit: 256 * 1024, trustProxy: true });
+  const app = Fastify({ logger: false, bodyLimit: MAX_JSON_BODY_BYTES, trustProxy: true });
   const allowedOrigin = process.env.CORS_ORIGIN;
   await app.register(cors, allowedOrigin ? { origin: allowedOrigin, credentials: true } : { origin: false });
   await app.register(helmet, { contentSecurityPolicy: false });

@@ -158,6 +158,10 @@ sudo systemctl restart mxd-sop
 在升级后首次启动时由仓库内置 CSV 自动初始化，之后上传和重启均继续使用运行时
 副本；无需将 `/opt/mxd-sop` 加入 `ReadWritePaths`。备份时应同时保存此文件。
 
+道具目录上传使用 JSON 请求封装 CSV，后端和 Nginx 示例均允许最大 8 MiB 请求体，
+CSV 内容本身最多 2,000,000 个字符。升级后必须重新执行 `npm run build` 并重启
+`mxd-sop`，同时执行 `nginx -t && systemctl reload nginx` 使代理限制生效。
+
 ## 6. 配置 Nginx 临时 HTTP 站点
 
 服务器已有 Nginx 时不要安装或启动第二个 Nginx，也不要修改现有项目的
@@ -351,6 +355,9 @@ server {
     ssl_certificate /etc/letsencrypt/live/mxd-sop.5202345.xyz/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/mxd-sop.5202345.xyz/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Catalog CSV uploads are sent as JSON and need an 8 MiB request limit.
+    client_max_body_size 8m;
 
     root /opt/mxd-sop/frontend/dist;
     index index.html;

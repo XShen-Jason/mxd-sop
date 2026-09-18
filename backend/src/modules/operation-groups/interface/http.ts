@@ -9,6 +9,8 @@ import type { OperationAutomationWorkflow } from '../application/automation-work
 type Query = Record<string, unknown>;
 export { AuthError };
 
+const MAX_CATALOG_CONTENT_CHARS = 2_000_000;
+
 function headerValue(request: FastifyRequest, name: string) {
   const value = request.headers[name];
   return Array.isArray(value) ? String(value[0] ?? '') : typeof value === 'string' ? value : '';
@@ -90,7 +92,7 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
       const file = body.file as Record<string, unknown>;
       if (typeof file.name !== 'string' || typeof file.content !== 'string') throw new GroupError('invalid-input', 'invalid csv file payload');
       const name = file.name.trim();
-      if (!name.toLowerCase().endsWith('.csv') || name.length > 128 || /[\u0000-\u001f\u007f/\\]/u.test(name) || file.content.length > 2_000_000) throw new GroupError('invalid-input', 'unsupported csv file');
+      if (!name.toLowerCase().endsWith('.csv') || name.length > 128 || /[\u0000-\u001f\u007f/\\]/u.test(name) || file.content.length > MAX_CATALOG_CONTENT_CHARS) throw new GroupError('invalid-input', 'unsupported csv file');
       const result = replaceUploadedCatalog(file.content);
       return reply.code(201).send({ fileName: name, itemCount: result.size });
     } catch (error) { return sendError(reply, error); }
