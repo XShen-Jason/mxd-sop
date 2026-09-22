@@ -136,7 +136,7 @@ export async function createApp(config: AppConfig = {}) {
   const automation = (process.env.NODE_ENV !== 'test' || config.autoIntegrationClient) ? new OperationAutomationWorkflow(service, autoIntegration) : undefined;
   registerAuthRoutes(app, auth);
   registerOperationRoutes(app, service, catalog, auth, automation, replaceUploadedCatalog);
-  registerActivityRoutes(app, new ActivitiesService(activitiesRepository), auth);
+  registerActivityRoutes(app, new ActivitiesService(activitiesRepository, catalog), auth);
   const playerSync = config.playerIntegrationClient || process.env.NODE_ENV !== 'test' ? integration : undefined;
   const playerDirectory = new PlayerDirectoryService(directoryRepository, appOptions.servers, playerSync);
   registerPlayerDirectoryRoutes(app, playerDirectory, auth);

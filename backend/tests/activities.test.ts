@@ -42,4 +42,29 @@ describe('shared activities', () => {
     expect((await app.inject({ method: 'GET', url: '/api/v1/activities', headers: customer })).json().activities).toEqual([]);
     expect((await app.inject({ method: 'GET', url: '/api/v1/activities', headers: manager })).json().activities).toEqual([hidden]);
   });
+
+  it('preserves numeric suffixes for non-equipment reward item codes', async () => {
+    const activity = {
+      id: 'bound-item', name: '绑定道具', description: '',
+      rewards: [{ kind: 'item', quantity: 1, itemCode: '02046830_1', itemName: '超级时装强化卷（绑定）', itemClass: 'consume' }],
+      updatedAt: new Date().toISOString(),
+    };
+    const saved = await app.inject({ method: 'PUT', url: '/api/v1/activities', headers: manager, payload: { activities: [activity] } });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json().activities[0].rewards[0].itemCode).toBe('02046830_1');
+    const listed = await app.inject({ method: 'GET', url: '/api/v1/activities', headers: customer });
+    expect(listed.json().activities[0].rewards[0].itemCode).toBe('02046830_1');
+  });
+
+  it('repairs binding suffixes stripped by older activity editors', async () => {
+    const legacy = {
+      id: 'legacy-bound-item', name: '旧绑定道具', description: '',
+      rewards: [{ kind: 'item', quantity: 1, itemCode: '05064000', itemName: '防爆卷轴（绑定）', itemClass: 'consume' }],
+      updatedAt: new Date().toISOString(),
+    };
+    const saved = await app.inject({ method: 'PUT', url: '/api/v1/activities', headers: manager, payload: { activities: [legacy] } });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json().activities[0].rewards[0].itemCode).toBe('05064000_1');
+    expect((await app.inject({ method: 'GET', url: '/api/v1/activities', headers: customer })).json().activities[0].rewards[0].itemCode).toBe('05064000_1');
+  });
 });

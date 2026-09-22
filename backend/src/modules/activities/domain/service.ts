@@ -1,24 +1,26 @@
 import { hasWorkspaceAccess } from '../../auth/public/index.js';
+import type { ItemCatalog } from '../../item-catalog/public/index.js';
 import type { Identity, Activity, ActivityReward } from '../../../shared/types.js';
 import type { ActivityRepository } from '../infrastructure/json-store.js';
 import { ActivityError } from './errors.js';
 
 export class ActivitiesService {
-  constructor(private readonly repository: ActivityRepository, private readonly now: () => Date = () => new Date()) {}
+  constructor(private readonly repository: ActivityRepository, private readonly catalog: ItemCatalog, private readonly now: () => Date = () => new Date()) {}
 
   list(identity: Identity) {
     this.requireAuthenticated(identity);
     // The request form consumes the same read-only activity catalogue for
     // quick filling, so either workspace grants this shared read.
     if (!hasWorkspaceAccess(identity, 'activities') && !hasWorkspaceAccess(identity, 'request')) throw new ActivityError('forbidden');
-    const activities = this.repository.all();
+    const activities = this.repository.all().map((activity) => repairLegacyBindingCodes(activity, this.catalog));
     return hasWorkspaceAccess(identity, 'activities') ? activities : activities.filter((activity) => activity.visible !== false);
   }
 
   replaceAll(identity: Identity, value: unknown) {
     this.requireAuthenticated(identity);
     if (!hasWorkspaceAccess(identity, 'activities')) throw new ActivityError('forbidden');
-    const activities = normalizeActivities(value, this.now().toISOString());
+    const activities = normalizeActivities(value, this.now().toISOString())
+      .map((activity) => repairLegacyBindingCodes(activity, this.catalog));
     this.repository.replaceAll(activities);
     return activities;
   }
@@ -26,6 +28,16 @@ export class ActivitiesService {
   private requireAuthenticated(identity: Identity) {
     if (!identity || !['customer', 'manager', 'super_admin'].includes(identity.role)) throw new ActivityError('forbidden');
   }
+}
+
+function repairLegacyBindingCodes(activity: Activity, catalog: ItemCatalog): Activity {
+  const rewards = activity.rewards.map((reward) => {
+    if (reward.kind !== 'item' || reward.itemClass === 'equip' || !reward.itemCode || !reward.itemName || /_[0-9]+$/u.test(reward.itemCode)) return reward;
+    const boundItem = catalog.lookup(`${reward.itemCode}_1`);
+    if (!boundItem || boundItem.name !== reward.itemName || boundItem.itemClass !== reward.itemClass) return reward;
+    return { ...reward, itemCode: boundItem.code, ...(boundItem.image ? { image: boundItem.image } : {}) };
+  });
+  return rewards.some((reward, index) => reward !== activity.rewards[index]) ? { ...activity, rewards } : activity;
 }
 
 function normalizeActivities(value: unknown, updatedAt: string): Activity[] {

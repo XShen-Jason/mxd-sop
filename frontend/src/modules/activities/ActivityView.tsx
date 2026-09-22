@@ -122,7 +122,9 @@ export function ActivityView({ userId, token, uploadEnabled = true }: { userId?:
     if (rewards.some((reward) => reward.kind === 'item' && isEquipment(reward.itemClass) && reward.itemLevel !== undefined && (!Number.isInteger(reward.itemLevel) || reward.itemLevel < 1 || reward.itemLevel > MAX_EQUIPMENT_LEVEL))) { setNotice({ kind: 'error', text: `装备等级必须是 1-${MAX_EQUIPMENT_LEVEL} 的整数` }); return; }
     const normalizedRewards = rewards.map((reward) => reward.kind === 'item' ? {
       ...reward,
-      itemCode: reward.itemCode?.replace(/_[0-9]+$/u, ''),
+      // Only equipment uses the numeric suffix as an editable level. Other
+      // item classes may use `_1` for binding or a distinct item variant.
+      itemCode: isEquipment(reward.itemClass) ? reward.itemCode?.replace(/_[0-9]+$/u, '') : reward.itemCode,
       ...(isEquipment(reward.itemClass) ? { itemLevel: normalizeEquipmentLevel(reward.itemLevel) } : { itemLevel: undefined })
     } : reward);
     const itemCodes = normalizedRewards.filter((reward) => reward.kind === 'item').map((reward) => codeForLevel(reward.itemCode as string, reward.itemClass, reward.itemLevel));

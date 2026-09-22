@@ -1,6 +1,8 @@
 # activities
 
-Equipment rewards include an optional `itemLevel` (default 1, maximum 10). Level 1 uses the catalog base code; higher levels append `_N` when the reward is applied to a request.
+Equipment rewards include an optional `itemLevel` (default 1, maximum 10). Level 1 uses the catalog base code; higher levels append `_N` when the reward is applied to a request. Numeric suffixes on non-equipment rewards are part of the catalog item code and must be preserved (for example, `_1` can mean a bound item).
+
+Legacy non-equipment rewards whose `_1` suffix was removed by an older editor are repaired only when the current catalog's suffixed item has the same saved name and class. This keeps binding recovery deterministic and avoids interpreting unrelated numeric suffixes as levels.
 
 ## Purpose
 
