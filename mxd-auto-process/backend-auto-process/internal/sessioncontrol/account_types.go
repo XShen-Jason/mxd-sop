@@ -20,17 +20,18 @@ var (
 )
 
 type AccountSnapshot struct {
-	ID            string        `json:"id"`
-	ServerID      string        `json:"server_id"`
-	Username      string        `json:"username"`
-	CharacterID   string        `json:"character_id"`
-	CharacterName string        `json:"character_name,omitempty"`
-	Enabled       bool          `json:"enabled"`
-	Status        AccountStatus `json:"status"`
-	SessionID     string        `json:"session_id,omitempty"`
-	Session       *Snapshot     `json:"session,omitempty"`
-	LastError     string        `json:"last_error,omitempty"`
-	UpdatedAt     string        `json:"updated_at"`
+	ID             string        `json:"id"`
+	ServerID       string        `json:"server_id"`
+	Username       string        `json:"username"`
+	CharacterID    string        `json:"character_id"`
+	CharacterName  string        `json:"character_name,omitempty"`
+	CredentialType string        `json:"credential_type"`
+	Enabled        bool          `json:"enabled"`
+	Status         AccountStatus `json:"status"`
+	SessionID      string        `json:"session_id,omitempty"`
+	Session        *Snapshot     `json:"session,omitempty"`
+	LastError      string        `json:"last_error,omitempty"`
+	UpdatedAt      string        `json:"updated_at"`
 }
 
 type accountRuntime struct {

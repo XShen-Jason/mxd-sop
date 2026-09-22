@@ -95,6 +95,7 @@ export interface ActivityReward {
 export interface Activity { id: string; name: string; description: string; rewards: ActivityReward[]; visible?: boolean; updatedAt: string }
 
 export type AutoAccountStatus = 'disabled' | 'offline' | 'connecting' | 'online' | 'reconnecting' | 'failed';
+export type AutoCredentialType = 'password' | 'md5';
 export interface AutoSession {
   id: string;
   server_id: string;
@@ -117,6 +118,7 @@ export interface AutoAccount {
   username: string;
   character_id: string;
   character_name?: string;
+  credential_type: AutoCredentialType;
   enabled: boolean;
   status: AutoAccountStatus;
   session_id?: string;

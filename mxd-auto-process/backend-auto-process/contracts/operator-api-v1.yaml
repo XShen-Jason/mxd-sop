@@ -489,13 +489,14 @@ components:
         enabled: {type: boolean}
     AccountSnapshot:
       type: object
-      required: [id, server_id, username, character_id, enabled, status, updated_at]
+      required: [id, server_id, username, character_id, credential_type, enabled, status, updated_at]
       properties:
         id: {type: string}
         server_id: {type: string}
         username: {type: string}
         character_id: {type: string}
         character_name: {type: string}
+        credential_type: {type: string, enum: [password, md5], description: Indicates whether the encrypted credential is a raw password or an already-derived 16-character MD5 login value}
         enabled: {type: boolean}
         status: {type: string, enum: [disabled, offline, connecting, online, reconnecting, failed]}
         session_id: {type: string}
@@ -509,6 +510,7 @@ components:
       properties:
         username: {type: string, minLength: 1}
         password: {type: string, minLength: 1, writeOnly: true}
+        credential_type: {type: string, enum: [password, md5], default: password, description: md5 accepts the already-derived 16 hexadecimal login value and sends it unchanged}
         character_id: {type: string, minLength: 1}
         character_name: {type: string}
         enabled: {type: boolean, default: true}
@@ -519,6 +521,7 @@ components:
       properties:
         username: {type: string, minLength: 1}
         password: {type: string, minLength: 1, writeOnly: true, description: Omit to retain the encrypted password}
+        credential_type: {type: string, enum: [password, md5], description: Applied with a new password value; md5 is sent unchanged}
         character_id: {type: string, minLength: 1}
         character_name: {type: string}
         enabled: {type: boolean}
@@ -575,6 +578,7 @@ components:
       properties:
         account: {type: string, minLength: 1}
         password: {type: string, minLength: 1, writeOnly: true, description: Runtime password}
+        credential_type: {type: string, enum: [password, md5], default: password, description: md5 treats password as an already-derived 16 hexadecimal login value and sends it unchanged}
         token: {type: string, minLength: 1, writeOnly: true, deprecated: true, description: Compatibility input for an already-derived protocol token}
     SelectRequest:
       type: object

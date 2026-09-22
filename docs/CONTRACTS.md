@@ -108,7 +108,7 @@ The main application's `/api/v1/auto/*` routes provide:
 | `auto-integration.overview` | `GET /api/v1/auto/overview` | `GET /api/v1/overview?include_logs=false` | Live server, account, and session projection |
 | `auto-integration.setup-session` | `POST /api/v1/auto/servers/{serverId}/sessions`, `POST /api/v1/auto/sessions/{sessionId}/select-and-enter`, `DELETE /api/v1/auto/sessions/{sessionId}` | Same paths under `/api/v1` | Interactive login, server role selection/map entry, and temporary-session cleanup |
 | `auto-integration.server-create/update/delete` | `/api/v1/auto/servers...` | `/api/v1/servers...` | Auto-owned server catalog CRUD |
-| `auto-integration.account-list/create/update/delete` | `/api/v1/auto/servers/{serverId}/accounts...` | Same path | Auto-owned account CRUD; passwords are write-only |
+| `auto-integration.account-list/create/update/delete` | `/api/v1/auto/servers/{serverId}/accounts...` | Same path | Auto-owned account CRUD; credentials are write-only; `md5` sends the supplied 16-character login value unchanged |
 | `auto-integration.account-start/stop/reconnect` | `POST .../{accountId}/{action}` | Same path | Complete login/entry, disable-and-close, or reconnect |
 | `auto-integration.account-message` | `POST .../{accountId}/message` | Same path | Backend-validated chat delivery through the account session |
 

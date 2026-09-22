@@ -14,6 +14,7 @@ import (
 )
 
 func TestCreateStartsEnabledAccountWithoutHoldingTheRequestOpen(t *testing.T) {
+	const md5Token = "5AA765D61D8327DE"
 	directory := t.TempDir()
 	store, err := autostore.Open(filepath.Join(directory, "auto.sqlite"), filepath.Join(directory, "credentials.key"), "InitialAutoPass!")
 	if err != nil {
@@ -39,7 +40,7 @@ func TestCreateStartsEnabledAccountWithoutHoldingTheRequestOpen(t *testing.T) {
 	}
 	defer accounts.Close()
 
-	created, err := accounts.Create(autostore.Account{ID: "account-1", ServerID: "local", Username: "player", CharacterID: "role-1", Enabled: true}, "GameAccountPass!")
+	created, err := accounts.Create(autostore.Account{ID: "account-1", ServerID: "local", Username: "player", CharacterID: "role-1", CredentialType: autostore.CredentialMD5, Enabled: true}, md5Token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,6 +63,9 @@ func TestCreateStartsEnabledAccountWithoutHoldingTheRequestOpen(t *testing.T) {
 			t.Fatalf("account did not finish the async login: %+v", current)
 		case <-time.After(10 * time.Millisecond):
 		}
+	}
+	if token, _ := dialer.clients[0].sent[0].StringParam(1); token != md5Token {
+		t.Fatalf("persisted MD5 login value changed before protocol send: got %q want %q", token, md5Token)
 	}
 
 	stopped, err := accounts.Stop("account-1")

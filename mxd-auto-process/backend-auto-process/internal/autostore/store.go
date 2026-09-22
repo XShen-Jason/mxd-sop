@@ -29,6 +29,7 @@ type Account struct {
 	Username       string `json:"username"`
 	CharacterID    string `json:"character_id"`
 	CharacterName  string `json:"character_name,omitempty"`
+	CredentialType string `json:"credential_type"`
 	PasswordCipher string `json:"-"`
 	Enabled        bool   `json:"enabled"`
 	CreatedAt      string `json:"created_at"`
@@ -102,6 +103,7 @@ CREATE TABLE IF NOT EXISTS game_accounts (
   username TEXT NOT NULL,
   character_id TEXT NOT NULL,
   character_name TEXT NOT NULL DEFAULT '',
+  credential_type TEXT NOT NULL DEFAULT 'password' CHECK (credential_type IN ('password', 'md5')),
   password_cipher TEXT NOT NULL,
   enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
   created_at TEXT NOT NULL,
@@ -148,6 +150,9 @@ CREATE TABLE IF NOT EXISTS automation_round_robin (
 	if _, err := s.db.Exec(schema); err != nil {
 		return fmt.Errorf("initialize auto database: %w", err)
 	}
+	if err := ensureCredentialTypeColumn(s.db); err != nil {
+		return fmt.Errorf("migrate account credential type: %w", err)
+	}
 	var count int
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM operator").Scan(&count); err != nil {
 		return err
@@ -160,5 +165,29 @@ CREATE TABLE IF NOT EXISTS automation_round_robin (
 		return err
 	}
 	_, err = s.db.Exec("INSERT INTO operator (id, username, password_hash, must_change) VALUES (1, ?, ?, 1)", OperatorUsername, hash)
+	return err
+}
+
+func ensureCredentialTypeColumn(db *sql.DB) error {
+	rows, err := db.Query("PRAGMA table_info(game_accounts)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notNull, primaryKey int
+		var name, dataType string
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return err
+		}
+		if name == "credential_type" {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = db.Exec("ALTER TABLE game_accounts ADD COLUMN credential_type TEXT NOT NULL DEFAULT 'password' CHECK (credential_type IN ('password', 'md5'))")
 	return err
 }

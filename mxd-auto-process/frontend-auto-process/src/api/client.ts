@@ -1,4 +1,4 @@
-import type { AccountSnapshot, AuditEntry, AutoMessageResult, AutoSession, OperatorSession, Overview, ServerRecord } from './types';
+import type { AccountSnapshot, AuditEntry, AutoMessageResult, AutoSession, CredentialType, OperatorSession, Overview, ServerRecord } from './types';
 
 export class ApiError extends Error {
   constructor(public readonly status: number, public readonly code: string) {
@@ -35,11 +35,11 @@ export const api = {
   createServer: (input: { id: string; name: string; address: string; version: string; map_id: string; enabled: boolean }) => request<ServerRecord>('/api/v1/servers', { method: 'POST', body: JSON.stringify(input) }),
   updateServer: (id: string, input: Partial<{ name: string; address: string; version: string; map_id: string; enabled: boolean }>) => request<ServerRecord>(`/api/v1/servers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteServer: (id: string) => request<void>(`/api/v1/servers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  startSession: (serverId: string, account: string, password: string) => request<AutoSession>(`/api/v1/servers/${encodeURIComponent(serverId)}/sessions`, { method: 'POST', body: JSON.stringify({ account, password }) }),
+  startSession: (serverId: string, account: string, password: string, credentialType: CredentialType) => request<AutoSession>(`/api/v1/servers/${encodeURIComponent(serverId)}/sessions`, { method: 'POST', body: JSON.stringify({ account, password, credential_type: credentialType }) }),
   selectAndEnter: (sessionId: string, characterId: string) => request<AutoSession>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/select-and-enter`, { method: 'POST', body: JSON.stringify({ character_id: characterId }) }),
   stopSession: (sessionId: string) => request<void>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
-  createAccount: (serverId: string, input: { username: string; password: string; character_id: string; character_name?: string; enabled?: boolean; session_id?: string }) => request<AccountSnapshot>(`/api/v1/servers/${encodeURIComponent(serverId)}/accounts`, { method: 'POST', body: JSON.stringify(input) }),
-  updateAccount: (serverId: string, accountId: string, input: Partial<{ username: string; password: string; character_id: string; character_name: string; enabled: boolean }>) => request<AccountSnapshot>(`/api/v1/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  createAccount: (serverId: string, input: { username: string; password: string; credential_type: CredentialType; character_id: string; character_name?: string; enabled?: boolean; session_id?: string }) => request<AccountSnapshot>(`/api/v1/servers/${encodeURIComponent(serverId)}/accounts`, { method: 'POST', body: JSON.stringify(input) }),
+  updateAccount: (serverId: string, accountId: string, input: Partial<{ username: string; password: string; credential_type: CredentialType; character_id: string; character_name: string; enabled: boolean }>) => request<AccountSnapshot>(`/api/v1/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteAccount: (serverId: string, accountId: string) => request<void>(`/api/v1/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
   startAccount: (serverId: string, accountId: string) => request<AccountSnapshot>(`/api/v1/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}/start`, { method: 'POST', body: '{}' }),
   stopAccount: (serverId: string, accountId: string) => request<AccountSnapshot>(`/api/v1/servers/${encodeURIComponent(serverId)}/accounts/${encodeURIComponent(accountId)}/stop`, { method: 'POST', body: '{}' }),

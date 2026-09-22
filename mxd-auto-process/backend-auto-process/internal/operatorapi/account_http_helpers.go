@@ -34,12 +34,13 @@ type serverRequest struct {
 }
 
 type accountRequest struct {
-	Username      *string `json:"username"`
-	Password      *string `json:"password"`
-	CharacterID   *string `json:"character_id"`
-	CharacterName *string `json:"character_name"`
-	Enabled       *bool   `json:"enabled"`
-	SessionID     *string `json:"session_id"`
+	Username       *string `json:"username"`
+	Password       *string `json:"password"`
+	CredentialType *string `json:"credential_type"`
+	CharacterID    *string `json:"character_id"`
+	CharacterName  *string `json:"character_name"`
+	Enabled        *bool   `json:"enabled"`
+	SessionID      *string `json:"session_id"`
 }
 
 func decodeAndRead(request *http.Request, target any) error {

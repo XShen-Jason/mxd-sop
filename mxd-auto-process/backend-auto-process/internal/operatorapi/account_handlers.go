@@ -159,7 +159,7 @@ func (h *Handler) createAccount(writer http.ResponseWriter, request *http.Reques
 }
 
 func (h *Handler) updateAccount(writer http.ResponseWriter, request *http.Request, serverID string, current sessioncontrol.AccountSnapshot) {
-	account := autostore.Account{ID: current.ID, ServerID: serverID, Username: current.Username, CharacterID: current.CharacterID, CharacterName: current.CharacterName, Enabled: current.Enabled}
+	account := autostore.Account{ID: current.ID, ServerID: serverID, Username: current.Username, CharacterID: current.CharacterID, CharacterName: current.CharacterName, CredentialType: current.CredentialType, Enabled: current.Enabled}
 	updated, password, sessionID, err := applyAccountRequest(request, serverID, current.ID, &account)
 	if err != nil {
 		writeAccountError(writer, err)
@@ -267,6 +267,9 @@ func applyAccountRequest(request *http.Request, serverID, accountID string, exis
 	}
 	if input.CharacterName != nil {
 		account.CharacterName = strings.TrimSpace(*input.CharacterName)
+	}
+	if input.CredentialType != nil {
+		account.CredentialType = strings.TrimSpace(*input.CredentialType)
 	}
 	if input.Enabled != nil {
 		account.Enabled = *input.Enabled

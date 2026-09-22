@@ -2,13 +2,19 @@ package autostore
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
 )
 
+const (
+	CredentialPassword = "password"
+	CredentialMD5      = "md5"
+)
+
 func (s *Store) Accounts(serverID string) ([]Account, error) {
-	query := "SELECT id, server_id, username, character_id, character_name, password_cipher, enabled, created_at, updated_at FROM game_accounts"
+	query := "SELECT id, server_id, username, character_id, character_name, credential_type, password_cipher, enabled, created_at, updated_at FROM game_accounts"
 	args := []any{}
 	if serverID != "" {
 		query += " WHERE server_id = ?"
@@ -24,7 +30,7 @@ func (s *Store) Accounts(serverID string) ([]Account, error) {
 	for rows.Next() {
 		var account Account
 		var enabled int
-		if err := rows.Scan(&account.ID, &account.ServerID, &account.Username, &account.CharacterID, &account.CharacterName, &account.PasswordCipher, &enabled, &account.CreatedAt, &account.UpdatedAt); err != nil {
+		if err := rows.Scan(&account.ID, &account.ServerID, &account.Username, &account.CharacterID, &account.CharacterName, &account.CredentialType, &account.PasswordCipher, &enabled, &account.CreatedAt, &account.UpdatedAt); err != nil {
 			return nil, err
 		}
 		account.Enabled = enabled != 0
@@ -36,7 +42,7 @@ func (s *Store) Accounts(serverID string) ([]Account, error) {
 func (s *Store) Account(id string) (Account, bool, error) {
 	var account Account
 	var enabled int
-	err := s.db.QueryRow("SELECT id, server_id, username, character_id, character_name, password_cipher, enabled, created_at, updated_at FROM game_accounts WHERE id = ?", id).Scan(&account.ID, &account.ServerID, &account.Username, &account.CharacterID, &account.CharacterName, &account.PasswordCipher, &enabled, &account.CreatedAt, &account.UpdatedAt)
+	err := s.db.QueryRow("SELECT id, server_id, username, character_id, character_name, credential_type, password_cipher, enabled, created_at, updated_at FROM game_accounts WHERE id = ?", id).Scan(&account.ID, &account.ServerID, &account.Username, &account.CharacterID, &account.CharacterName, &account.CredentialType, &account.PasswordCipher, &enabled, &account.CreatedAt, &account.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Account{}, false, nil
 	}
@@ -47,25 +53,26 @@ func (s *Store) Account(id string) (Account, bool, error) {
 	return account, true, nil
 }
 
-func (s *Store) Credentials(id string) (string, string, error) {
+func (s *Store) Credentials(id string) (string, string, string, error) {
 	account, ok, err := s.Account(id)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if !ok {
-		return "", "", ErrAccountNotFound
+		return "", "", "", ErrAccountNotFound
 	}
 	password, err := s.decrypt(account.PasswordCipher)
 	if err != nil {
-		return "", "", fmt.Errorf("decrypt account credential: %w", err)
+		return "", "", "", fmt.Errorf("decrypt account credential: %w", err)
 	}
-	return account.Username, password, nil
+	return account.Username, password, account.CredentialType, nil
 }
 
 func (s *Store) CreateAccount(account Account, password string) (Account, error) {
 	if err := validateAccount(account, password, true); err != nil {
 		return Account{}, err
 	}
+	account.CredentialType = normalizeCredentialType(account.CredentialType)
 	ciphertext, err := s.encrypt(password)
 	if err != nil {
 		return Account{}, err
@@ -92,6 +99,7 @@ func (s *Store) UpdateAccount(account Account, password string) (Account, error)
 		return Account{}, err
 	}
 	if password != "" {
+		account.CredentialType = normalizeCredentialType(account.CredentialType)
 		ciphertext, err := s.encrypt(password)
 		if err != nil {
 			return Account{}, err
@@ -99,10 +107,11 @@ func (s *Store) UpdateAccount(account Account, password string) (Account, error)
 		account.PasswordCipher = ciphertext
 	} else {
 		account.PasswordCipher = old.PasswordCipher
+		account.CredentialType = old.CredentialType
 	}
 	account.CreatedAt = old.CreatedAt
 	account.UpdatedAt = timestamp()
-	result, err := s.db.Exec("UPDATE game_accounts SET server_id = ?, username = ?, character_id = ?, character_name = ?, password_cipher = ?, enabled = ?, updated_at = ? WHERE id = ?", account.ServerID, account.Username, account.CharacterID, account.CharacterName, account.PasswordCipher, boolInt(account.Enabled), account.UpdatedAt, account.ID)
+	result, err := s.db.Exec("UPDATE game_accounts SET server_id = ?, username = ?, character_id = ?, character_name = ?, credential_type = ?, password_cipher = ?, enabled = ?, updated_at = ? WHERE id = ?", account.ServerID, account.Username, account.CharacterID, account.CharacterName, account.CredentialType, account.PasswordCipher, boolInt(account.Enabled), account.UpdatedAt, account.ID)
 	if err != nil {
 		return Account{}, normalizeAccountError(err)
 	}
@@ -145,7 +154,7 @@ func (s *Store) SetEnabled(id string, enabled bool) error {
 }
 
 func (s *Store) insertAccount(account Account) error {
-	_, err := s.db.Exec("INSERT INTO game_accounts (id, server_id, username, character_id, character_name, password_cipher, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", account.ID, account.ServerID, account.Username, account.CharacterID, account.CharacterName, account.PasswordCipher, boolInt(account.Enabled), account.CreatedAt, account.UpdatedAt)
+	_, err := s.db.Exec("INSERT INTO game_accounts (id, server_id, username, character_id, character_name, credential_type, password_cipher, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", account.ID, account.ServerID, account.Username, account.CharacterID, account.CharacterName, account.CredentialType, account.PasswordCipher, boolInt(account.Enabled), account.CreatedAt, account.UpdatedAt)
 	return normalizeAccountError(err)
 }
 
@@ -162,7 +171,29 @@ func validateAccount(account Account, password string, requirePassword bool) err
 	if !requirePassword && password != "" && (len(password) < minAccountPasswordSize || len(password) > 512) {
 		return ErrInvalidPassword
 	}
+	credentialType := normalizeCredentialType(account.CredentialType)
+	if credentialType != CredentialPassword && credentialType != CredentialMD5 {
+		return ErrInvalidAccount
+	}
+	if password != "" && credentialType == CredentialMD5 && !validMD5Token(password) {
+		return ErrInvalidPassword
+	}
 	return nil
+}
+
+func normalizeCredentialType(value string) string {
+	if value == "" {
+		return CredentialPassword
+	}
+	return value
+}
+
+func validMD5Token(value string) bool {
+	if len(value) != 16 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
 }
 
 func normalizeAccountError(err error) error {

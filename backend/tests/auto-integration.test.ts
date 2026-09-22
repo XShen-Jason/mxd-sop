@@ -19,7 +19,7 @@ describe('auto integration boundary', () => {
   let executionFailureReason: AutoExecutionResult['failure_reason'];
   let healthCalls = 0;
   const server: AutoServer = { id: 'fairyland-main', name: 'Fairyland', address: '127.0.0.1:12660', version: '1.0.2', map_id: '211000000', enabled: true, accounts: [] };
-  const account: AutoAccount = { id: 'account-1', server_id: server.id, username: 'ops-account', character_id: '265', character_name: 'Galaxy', enabled: true, status: 'online', updated_at: '2026-09-15T00:00:00Z' };
+  const account: AutoAccount = { id: 'account-1', server_id: server.id, username: 'ops-account', character_id: '265', character_name: 'Galaxy', credential_type: 'md5', enabled: true, status: 'online', updated_at: '2026-09-15T00:00:00Z' };
   const session: AutoSession = { id: 'session-1', server_id: server.id, state: 'logged_in', roles: [{ id: '265', name: 'Galaxy', opaque_available: true }], sent_messages: 0, chat_success_count: 0, chat_failure_count: 0, chat_unknown_count: 0, created_at: '2026-09-15T00:00:00Z', updated_at: '2026-09-15T00:00:00Z' };
   const record = (name: string, actor: { id: string }, input?: unknown) => calls.push({ name, actor: actor.id, input });
   const client: AutoIntegrationClient = {
@@ -55,15 +55,17 @@ describe('auto integration boundary', () => {
     const headers = { authorization: `Bearer ${token}` };
     expect((await app.inject({ method: 'GET', url: '/api/v1/auto/status', headers })).json()).toMatchObject({ configured: true, available: true });
     expect((await app.inject({ method: 'GET', url: '/api/v1/auto/overview', headers })).statusCode).toBe(200);
-    expect((await app.inject({ method: 'POST', url: `/api/v1/auto/servers/${server.id}/sessions`, headers, payload: { account: 'ops-account', password: 'account-secret' } })).statusCode).toBe(201);
+    expect((await app.inject({ method: 'POST', url: `/api/v1/auto/servers/${server.id}/sessions`, headers, payload: { account: 'ops-account', password: '5AA765D61D8327DE', credential_type: 'md5' } })).statusCode).toBe(201);
     expect((await app.inject({ method: 'POST', url: '/api/v1/auto/sessions/session-1/select-and-enter', headers, payload: { character_id: '265' } })).statusCode).toBe(200);
     expect((await app.inject({ method: 'DELETE', url: '/api/v1/auto/sessions/session-1', headers })).statusCode).toBe(204);
     expect((await app.inject({ method: 'POST', url: '/api/v1/auto/servers', headers, payload: { id: server.id, name: server.name, address: server.address, version: server.version, map_id: server.map_id, enabled: server.enabled } })).statusCode).toBe(201);
     expect((await app.inject({ method: 'PATCH', url: `/api/v1/auto/servers/${server.id}`, headers, payload: { address: '127.0.0.1:12661' } })).statusCode).toBe(200);
-    expect((await app.inject({ method: 'POST', url: `/api/v1/auto/servers/${server.id}/accounts`, headers, payload: { username: account.username, password: 'account-secret', character_id: account.character_id, character_name: account.character_name, enabled: true } })).statusCode).toBe(201);
+    expect((await app.inject({ method: 'POST', url: `/api/v1/auto/servers/${server.id}/accounts`, headers, payload: { username: account.username, password: '5AA765D61D8327DE', credential_type: 'md5', character_id: account.character_id, character_name: account.character_name, enabled: true } })).statusCode).toBe(201);
     const edited = await app.inject({ method: 'PATCH', url: `/api/v1/auto/servers/${server.id}/accounts/${account.id}`, headers, payload: { username: 'edited-account', password: 'new-account-secret', character_id: '266' } });
     expect(edited.statusCode).toBe(200);
     expect(edited.body).not.toContain('new-account-secret');
+    expect(calls.find((call) => call.name === 'startSession')?.input).toMatchObject({ input: { password: '5AA765D61D8327DE', credential_type: 'md5' } });
+    expect(calls.find((call) => call.name === 'createAccount')?.input).toMatchObject({ input: { password: '5AA765D61D8327DE', credential_type: 'md5' } });
     for (const action of ['start', 'stop', 'reconnect'] as const) expect((await app.inject({ method: 'POST', url: `/api/v1/auto/servers/${server.id}/accounts/${account.id}/${action}`, headers, payload: {} })).statusCode).toBe(200);
     const message = await app.inject({ method: 'POST', url: `/api/v1/auto/servers/${server.id}/accounts/${account.id}/message`, headers, payload: { message: 'hello', mode: 'world' } });
     expect(message.statusCode).toBe(200);

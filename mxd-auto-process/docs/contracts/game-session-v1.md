@@ -123,8 +123,11 @@ unambiguous shared value across its game-server endpoints. It requires a
 successful `resp op=6 rc=0`, never substitutes the login server key, and
 rejects conflicting captured values as ambiguous.
 When a runtime password is supplied, the session derives field 1 by taking the
-middle 16 hexadecimal characters of the lowercase MD5 digest. This is a
-protocol compatibility rule, not a password-storage scheme.
+middle 16 hexadecimal characters of the lowercase MD5 digest. A caller that
+already has that 16-character hexadecimal login value may supply it as the
+protocol token; the session sends it unchanged and does not hash, normalize, or
+slice it again. This is a protocol compatibility rule, not a password-storage
+scheme.
 
 ## Diagnostic experiments
 

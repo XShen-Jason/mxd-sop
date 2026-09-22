@@ -7,6 +7,7 @@ export interface AutoEndpointConfig {
 }
 
 export type AutoAccountStatus = 'disabled' | 'offline' | 'connecting' | 'online' | 'reconnecting' | 'failed';
+export type AutoCredentialType = 'password' | 'md5';
 
 export interface AutoRole {
   id: string;
@@ -37,6 +38,7 @@ export interface AutoAccount {
   username: string;
   character_id: string;
   character_name?: string;
+  credential_type: AutoCredentialType;
   enabled: boolean;
   status: AutoAccountStatus;
   session_id?: string;
@@ -98,6 +100,7 @@ export interface AutoIntegrationRepository {
 export interface AutoLoginInput {
   account: string;
   password: string;
+  credential_type?: AutoCredentialType;
 }
 
 export interface AutoServerInput {
@@ -112,6 +115,7 @@ export interface AutoServerInput {
 export interface AutoAccountInput {
   username: string;
   password?: string;
+  credential_type?: AutoCredentialType;
   character_id: string;
   character_name?: string;
   enabled?: boolean;

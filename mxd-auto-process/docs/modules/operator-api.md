@@ -37,9 +37,11 @@ direct operator clients and use the same authentication boundary.
 - SQLite is authoritative for the server catalog, game accounts, operator
   state, and audit records. The JSON server file is only the first-run
   bootstrap when no catalog has been persisted.
-- Account passwords are encrypted at rest with the local AES-GCM key. Password
-  fields are accepted only on writes and never appear in account snapshots,
-  overviews, logs, or error responses.
+- Account credentials are encrypted at rest with the local AES-GCM key. Each
+  account records whether the write-only value is a raw password or an
+  already-derived 16-character MD5 login value. Raw passwords use the protocol
+  derivation; MD5 login values are sent unchanged. Credential values never
+  appear in account snapshots, overviews, logs, or error responses.
 - `POST /api/v1/servers/{serverId}/sessions` returns the authenticated session
   and its server-provided role list without persisting an account. The caller
   chooses a role through `POST /api/v1/sessions/{sessionId}/select-and-enter`;

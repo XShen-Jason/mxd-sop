@@ -50,10 +50,10 @@ export function ServerManagement({ onBack }: { onBack: () => void }) {
   const saveAccount = async (value: AccountFormValue) => {
     if (dialog?.kind !== 'account') return false;
     const { server, account } = dialog;
-    const input = { username: value.username, ...(value.password ? { password: value.password } : {}), character_id: value.character_id, character_name: value.character_name, enabled: value.enabled };
+    const input = { username: value.username, ...(value.password ? { password: value.password, credential_type: value.credential_type } : {}), character_id: value.character_id, character_name: value.character_name, enabled: value.enabled };
     const action = account
       ? () => api.updateAccount(server.id, account.id, input)
-      : () => api.createAccount(server.id, { ...input, password: value.password, session_id: value.session_id });
+      : () => api.createAccount(server.id, { ...input, password: value.password, credential_type: value.credential_type, session_id: value.session_id });
     const saved = await run('account', action, account ? '账号配置已更新' : '账号已添加');
     if (saved) setDialog(undefined);
     return Boolean(saved);
@@ -64,7 +64,7 @@ export function ServerManagement({ onBack }: { onBack: () => void }) {
   const toggleAccount = (server: ServerRecord, account: AccountSnapshot) => void run(`account-${account.id}`, () => account.enabled ? api.stopAccount(server.id, account.id) : api.startAccount(server.id, account.id), account.enabled ? '账号已停止' : '账号启动请求已发送');
   const reconnect = (server: ServerRecord, account: AccountSnapshot) => void run(`account-${account.id}`, () => api.reconnectAccount(server.id, account.id), '重连请求已发送');
   const sendMessage = (server: ServerRecord, account: AccountSnapshot, mode: string, message: string) => run(`message-${account.id}`, () => api.sendMessage(server.id, account.id, { mode, message }), '消息已发送');
-  const login = (serverId: string, username: string, password: string) => api.startSession(serverId, username, password);
+  const login = (serverId: string, username: string, password: string, credentialType: 'password' | 'md5') => api.startSession(serverId, username, password, credentialType);
   const enter = (sessionId: string, characterId: string) => api.selectAndEnter(sessionId, characterId);
   const cancelAccount = (sessionId?: string) => { setDialog(undefined); if (sessionId) void api.stopSession(sessionId).catch(() => undefined); };
 

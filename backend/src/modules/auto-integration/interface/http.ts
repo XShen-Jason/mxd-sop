@@ -25,6 +25,12 @@ function bool(value: unknown, name: string) {
   return value as boolean | undefined;
 }
 
+function credentialType(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value !== 'password' && value !== 'md5') throw new AutoIntegrationError('invalid-input', 'credential_type is invalid');
+  return value;
+}
+
 function serverInput(value: Body, partial: boolean): AutoServerInput | Partial<AutoServerInput> {
   only(value, ['id', 'name', 'address', 'version', 'map_id', 'enabled']);
   const result: Partial<AutoServerInput> = {};
@@ -38,11 +44,12 @@ function serverInput(value: Body, partial: boolean): AutoServerInput | Partial<A
 }
 
 function accountInput(value: Body, partial: boolean): AutoAccountInput | Partial<AutoAccountInput> {
-  only(value, ['username', 'password', 'character_id', 'character_name', 'enabled', 'session_id']);
+  only(value, ['username', 'password', 'credential_type', 'character_id', 'character_name', 'enabled', 'session_id']);
   const result: Partial<AutoAccountInput> = {};
   if (!partial || value.username !== undefined) result.username = text(value.username, 'username')!;
   if (!partial || value.character_id !== undefined) result.character_id = text(value.character_id, 'character_id')!;
   if (value.password !== undefined) result.password = text(value.password, 'password');
+  if (value.credential_type !== undefined) result.credential_type = credentialType(value.credential_type);
   if (value.character_name !== undefined) result.character_name = text(value.character_name, 'character_name', false);
   if (value.enabled !== undefined) result.enabled = bool(value.enabled, 'enabled');
   if (value.session_id !== undefined) result.session_id = text(value.session_id, 'session_id');
@@ -50,8 +57,8 @@ function accountInput(value: Body, partial: boolean): AutoAccountInput | Partial
 }
 
 function loginInput(value: Body): AutoLoginInput {
-  only(value, ['account', 'password']);
-  return { account: text(value.account, 'account')!, password: text(value.password, 'password')! };
+  only(value, ['account', 'password', 'credential_type']);
+  return { account: text(value.account, 'account')!, password: text(value.password, 'password')!, credential_type: credentialType(value.credential_type) };
 }
 
 function characterInput(value: Body) {

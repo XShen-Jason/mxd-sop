@@ -20,11 +20,16 @@ func (a *AccountManager) startLocked(ctx context.Context, account autostore.Acco
 		a.stopLocked(account.ID)
 	}
 	a.setRuntime(account.ID, AccountConnecting, "")
-	username, password, err := a.store.Credentials(account.ID)
+	username, credential, credentialType, err := a.store.Credentials(account.ID)
 	if err != nil {
 		return a.failed(account, err)
 	}
-	session, err := a.manager.Start(ctx, account.ServerID, Credentials{Account: username, Password: password})
+	credentials := Credentials{Account: username, Password: credential}
+	if credentialType == autostore.CredentialMD5 {
+		credentials.Password = ""
+		credentials.Token = credential
+	}
+	session, err := a.manager.Start(ctx, account.ServerID, credentials)
 	if err != nil {
 		return a.failed(account, err)
 	}

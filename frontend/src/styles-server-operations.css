@@ -211,6 +211,12 @@
 .setup-input:focus-within { border-color: #71b7a9; box-shadow: 0 0 0 3px rgba(23,124,112,.1); }
 .setup-input input { border: 0; box-shadow: none; background: transparent; padding-left: 0; }
 .setup-input input:focus { box-shadow: none; }
+.credential-type-field { min-width: 0; margin: 0; padding: 0; border: 0; }
+.credential-type-field legend { margin-bottom: 7px; color: #596864; font-size: 11px; font-weight: 700; }
+.credential-type-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.credential-type-option { min-height: 40px; border: 1px solid #d7e1dc; border-radius: 5px; color: #687771; background: #fbfcfb; font-size: 11px; font-weight: 700; }
+.credential-type-option:hover { border-color: #94c8bb; color: var(--ink); }
+.credential-type-option.selected { border-color: #82bcae; color: var(--teal); background: var(--teal-soft); box-shadow: inset 0 -2px var(--teal); }
 .account-step-panel { display: grid; gap: 15px; }
 .logged-account { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border: 1px solid #cfe2db; border-radius: 5px; background: #f2faf7; }
 .account-avatar { width: 28px; height: 28px; display: grid; place-items: center; color: var(--teal); border-radius: 5px; background: #dcefe8; }

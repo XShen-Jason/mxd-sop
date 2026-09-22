@@ -1,4 +1,4 @@
-import type { AutoAccount, AutoAccountStatus, AutoServer } from '../../types';
+import type { AutoAccount, AutoAccountStatus, AutoCredentialType, AutoServer } from '../../types';
 
 export type AccountState = AutoAccountStatus | 'unknown';
 export type ServiceDeploymentMode = 'local' | 'remote';
@@ -64,6 +64,7 @@ export function defaultGameProtocolVersion(serverId: string) {
 export interface AccountSetupValue {
   username: string;
   password: string;
+  credentialType: AutoCredentialType;
   characterId: string;
   characterName: string;
   enabled: boolean;

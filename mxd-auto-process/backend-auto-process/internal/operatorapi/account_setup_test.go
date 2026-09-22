@@ -15,6 +15,7 @@ import (
 )
 
 func TestAccountCreateAdoptsInteractiveSession(t *testing.T) {
+	const md5Token = "5AA765D61D8327DE"
 	directory := t.TempDir()
 	store, err := autostore.Open(filepath.Join(directory, "auto.sqlite"), filepath.Join(directory, "credentials.key"), "InitialAutoPass!")
 	if err != nil {
@@ -45,9 +46,12 @@ func TestAccountCreateAdoptsInteractiveSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	login := serviceRequest(t, handler, http.MethodPost, "/api/v1/servers/local/sessions", `{"account":"player","password":"game123"}`)
-	if login.Code != http.StatusCreated || strings.Contains(login.Body.String(), "game123") {
+	login := serviceRequest(t, handler, http.MethodPost, "/api/v1/servers/local/sessions", `{"account":"player","password":"`+md5Token+`","credential_type":"md5"}`)
+	if login.Code != http.StatusCreated || strings.Contains(login.Body.String(), md5Token) {
 		t.Fatalf("interactive login failed or leaked the password: %d %s", login.Code, login.Body.String())
+	}
+	if token, _ := dialer.client.sent[0].StringParam(1); token != md5Token {
+		t.Fatalf("MD5 login value changed before protocol send: got %q want %q", token, md5Token)
 	}
 	var loggedIn sessioncontrol.Snapshot
 	if err := json.Unmarshal(login.Body.Bytes(), &loggedIn); err != nil {
@@ -61,15 +65,15 @@ func TestAccountCreateAdoptsInteractiveSession(t *testing.T) {
 	if entered.Code != http.StatusOK || !strings.Contains(entered.Body.String(), `"state":"ready"`) {
 		t.Fatalf("interactive role entry failed: %d %s", entered.Code, entered.Body.String())
 	}
-	created := serviceRequest(t, handler, http.MethodPost, "/api/v1/servers/local/accounts", `{"username":"player","password":"game123","character_id":"role-1","character_name":"Fixture","session_id":"`+loggedIn.ID+`"}`)
-	if created.Code != http.StatusCreated || strings.Contains(created.Body.String(), "game123") {
+	created := serviceRequest(t, handler, http.MethodPost, "/api/v1/servers/local/accounts", `{"username":"player","password":"`+md5Token+`","credential_type":"md5","character_id":"role-1","character_name":"Fixture","session_id":"`+loggedIn.ID+`"}`)
+	if created.Code != http.StatusCreated || strings.Contains(created.Body.String(), md5Token) {
 		t.Fatalf("account creation failed or leaked the password: %d %s", created.Code, created.Body.String())
 	}
 	list, err := accounts.List("local")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 1 || list[0].Status != sessioncontrol.AccountOnline || list[0].SessionID != loggedIn.ID {
+	if len(list) != 1 || list[0].CredentialType != autostore.CredentialMD5 || list[0].Status != sessioncontrol.AccountOnline || list[0].SessionID != loggedIn.ID {
 		t.Fatalf("interactive session was not bound to the account: %+v", list)
 	}
 	if len(dialer.client.sent) != 3 {

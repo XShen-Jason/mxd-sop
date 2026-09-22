@@ -13,9 +13,10 @@ import (
 )
 
 type loginRequest struct {
-	Account  string `json:"account"`
-	Password string `json:"password"`
-	Token    string `json:"token"`
+	Account        string `json:"account"`
+	Password       string `json:"password"`
+	Token          string `json:"token"`
+	CredentialType string `json:"credential_type"`
 	// Deprecated compatibility fields. The backend ignores them and always
 	// sends the fixed heartbeat defined by the game-session module.
 	Heartbeat                *bool `json:"heartbeat"`

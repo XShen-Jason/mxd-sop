@@ -31,7 +31,7 @@ function makeServer(address = '45.117.11.230:12660', accounts = []) {
 function makeAccount(overrides = {}) {
   return {
     id: 'account-1', server_id: 'mushroom', username: 'ops-account',
-    character_id: '265', character_name: 'Galaxy', enabled: true,
+    character_id: '265', character_name: 'Galaxy', credential_type: 'password', enabled: true,
     status: 'online', updated_at: '2026-09-15T00:00:00Z', ...overrides,
   };
 }
@@ -134,7 +134,7 @@ async function runViewport(browser, width) {
       body = overview();
     } else if (pathname === '/api/v1/auto/servers/mushroom/sessions' && request.method() === 'POST') {
       const payload = request.postDataJSON();
-      assert.deepEqual(payload, { account: 'ops-account', password: 'secret' });
+      assert.deepEqual(payload, { account: 'ops-account', password: '5AA765D61D8327DE', credential_type: 'md5' });
       setupSession = makeSetupSession();
       body = setupSession;
     } else if (pathname === '/api/v1/auto/sessions/setup-session-1/select-and-enter' && request.method() === 'POST') {
@@ -177,7 +177,7 @@ async function runViewport(browser, width) {
         } else if (!accountId && request.method() === 'POST') {
           const payload = request.postDataJSON();
           assert.deepEqual(payload, {
-            username: 'ops-account', password: 'secret', character_id: '266',
+            username: 'ops-account', password: '5AA765D61D8327DE', credential_type: 'md5', character_id: '266',
             character_name: 'Nova', enabled: true, session_id: 'setup-session-1',
           });
           account = makeAccount({ character_id: '266', character_name: 'Nova', status: 'connecting', session_id: 'setup-session-1', session: setupSession });
@@ -186,7 +186,7 @@ async function runViewport(browser, width) {
         } else if (accountId === 'account-1' && !action && request.method() === 'PATCH') {
           const payload = request.postDataJSON();
           assert.deepEqual(payload, {
-            username: 'edited-account', password: 'new-secret', character_id: '266',
+            username: 'edited-account', password: 'new-secret', credential_type: 'password', character_id: '266',
             character_name: 'Edited', enabled: true,
           });
           account = { ...account, ...payload, status: 'connecting' };
@@ -299,8 +299,11 @@ async function runViewport(browser, width) {
 
   await page.locator('.server-add-account').click();
   const accountDialog = page.locator('.account-setup-dialog');
+  assert.deepEqual(await accountDialog.locator('.credential-type-option').allTextContents(), ['原始密码', 'MD5 登录值']);
+  await accountDialog.locator('.credential-type-option').nth(1).click();
   await accountDialog.locator('input').nth(0).fill('ops-account');
-  await accountDialog.locator('input').nth(1).fill('secret');
+  await accountDialog.locator('input').nth(1).fill('5AA765D61D8327DE');
+  await page.screenshot({ path: path.join(os.tmpdir(), `mxdcmd-md5-account-${width}.png`), fullPage: true });
   await accountDialog.locator('form .primary-button').click();
   await accountDialog.locator('.character-option').nth(1).waitFor();
   assert.equal(await accountDialog.locator('.character-option').count(), 2);
@@ -308,7 +311,7 @@ async function runViewport(browser, width) {
   await accountDialog.locator('.server-dialog-form').waitFor();
   assert.equal(setupSessionDeleteRequests, 1);
   await accountDialog.locator('input').nth(0).fill('ops-account');
-  await accountDialog.locator('input').nth(1).fill('secret');
+  await accountDialog.locator('input').nth(1).fill('5AA765D61D8327DE');
   await accountDialog.locator('form .primary-button').click();
   await accountDialog.locator('.character-option').nth(1).waitFor();
   await accountDialog.locator('.character-option').nth(1).click();
@@ -385,6 +388,7 @@ async function runViewport(browser, width) {
 
   await accountRow.locator('.server-account-row-actions > button').first().click();
   const editDialog = page.locator('.account-setup-dialog');
+  await editDialog.locator('.credential-type-option').first().click();
   await editDialog.locator('input').nth(0).fill('edited-account');
   await editDialog.locator('input').nth(1).fill('new-secret');
   await editDialog.locator('form .primary-button').click();

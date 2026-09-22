@@ -21,6 +21,8 @@ vulnerability scanning.
 - Selection uses the role opaque value, never the login server key.
 - A runtime password becomes the login token by taking the middle 16
   hexadecimal characters of its lowercase MD5 digest.
+- An already-derived 16-character MD5 login value is accepted as a protocol
+  token and sent unchanged.
 - Map entry uses the selected character's map ID from `resp op=6` when
   available, otherwise the configured map ID, and requires `resp op=7 rc=0`
   plus the configured initialization events by default.

@@ -5,6 +5,7 @@ export interface OperatorSession {
 }
 
 export type AccountStatus = 'disabled' | 'offline' | 'connecting' | 'online' | 'reconnecting' | 'failed';
+export type CredentialType = 'password' | 'md5';
 
 export interface AccountSnapshot {
   id: string;
@@ -12,6 +13,7 @@ export interface AccountSnapshot {
   username: string;
   character_id: string;
   character_name?: string;
+  credential_type: CredentialType;
   enabled: boolean;
   status: AccountStatus;
   last_error?: string;

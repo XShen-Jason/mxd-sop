@@ -2,6 +2,7 @@ package operatorapi
 
 import (
 	"embed"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"sync"
@@ -73,9 +74,23 @@ func (h *Handler) startSession(writer http.ResponseWriter, request *http.Request
 		writeJSON(writer, http.StatusBadRequest, apiError{Error: "missing_credential"})
 		return
 	}
-	snapshot, err := h.manager.Start(request.Context(), serverID, gamesession.Credentials{
-		Account: input.Account, Password: input.Password, Token: input.Token,
-	})
+	credentials := gamesession.Credentials{Account: input.Account, Password: input.Password, Token: input.Token}
+	if input.Password != "" {
+		switch input.CredentialType {
+		case "", autostore.CredentialPassword:
+		case autostore.CredentialMD5:
+			credentials.Password = ""
+			credentials.Token = input.Password
+			if _, err := hex.DecodeString(input.Password); len(input.Password) != 16 || err != nil {
+				writeJSON(writer, http.StatusBadRequest, apiError{Error: "invalid_password"})
+				return
+			}
+		default:
+			writeJSON(writer, http.StatusBadRequest, apiError{Error: "invalid_credential_type"})
+			return
+		}
+	}
+	snapshot, err := h.manager.Start(request.Context(), serverID, credentials)
 	if err != nil {
 		writeDomainError(writer, err)
 		return

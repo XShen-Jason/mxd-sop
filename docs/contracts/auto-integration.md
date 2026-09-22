@@ -33,6 +33,12 @@ and execution routes retain the mappings registered in `docs/CONTRACTS.md`.
 The adapter sends the configured service token and authenticated actor headers;
 credentials remain write-only.
 
+Setup-session login and account create/update accept `credential_type` with
+`password` (default) or `md5`. In `md5` mode the credential must be the final
+16-character hexadecimal login value; every layer forwards it unchanged to
+auto, which persists it encrypted and sends it unchanged to the game server.
+Account projections expose only `credential_type`, never the credential value.
+
 Server create accepts an optional `version`; auto persists `1.0.2` when it is
 omitted. Server update accepts `version` as an independent per-server override,
 and changing it restarts that server's managed account sessions.

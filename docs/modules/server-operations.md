@@ -41,6 +41,9 @@ also retains the existing `mxd-player` connection tab.
   connection. Starting it again requests the complete auto login flow.
 - Account passwords are write-only at the API boundary. Editing may leave the
   password blank to retain the encrypted value in auto.
+- Account setup selects either a raw password or an already-derived 16-character
+  MD5 login value. The latter is forwarded unchanged and remains encrypted and
+  write-only after persistence.
 - Adding an account is an interactive flow: the first step calls auto's
   session-login endpoint, the returned server role list is shown in the second
   step, and the selected role is sent to `select-and-enter`. Only after the
