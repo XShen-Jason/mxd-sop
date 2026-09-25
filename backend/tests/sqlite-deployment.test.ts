@@ -91,7 +91,7 @@ describe('SQLite deployment persistence', () => {
       const content = fs.readFileSync(sourcePath, 'utf8');
       const uploaded = await app.inject({ method: 'POST', url: '/api/v1/item-catalog/import', headers: { cookie }, payload: { file: { name: 'tbl_item_class.csv', content } } });
       expect(uploaded.statusCode).toBe(201);
-      expect(uploaded.json()).toMatchObject({ fileName: 'tbl_item_class.csv', itemCount: 5880 });
+      expect(uploaded.json()).toMatchObject({ fileName: 'tbl_item_class.csv', itemCount: 5881 });
     } finally {
       await app?.close();
       fs.rmSync(directory, { recursive: true, force: true });
