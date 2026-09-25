@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/local/mxd-auto-process/internal/autostore"
-	"github.com/local/mxd-auto-process/internal/gameprotocol"
 	"github.com/local/mxd-auto-process/internal/sessioncontrol"
 )
 
@@ -159,8 +158,22 @@ func (h *Handler) createAccount(writer http.ResponseWriter, request *http.Reques
 }
 
 func (h *Handler) updateAccount(writer http.ResponseWriter, request *http.Request, serverID string, current sessioncontrol.AccountSnapshot) {
-	account := autostore.Account{ID: current.ID, ServerID: serverID, Username: current.Username, CharacterID: current.CharacterID, CharacterName: current.CharacterName, CredentialType: current.CredentialType, Enabled: current.Enabled}
-	updated, password, sessionID, err := applyAccountRequest(request, serverID, current.ID, &account)
+	var input accountRequest
+	if err := decodeAndRead(request, &input); err != nil {
+		writeAccountError(writer, err)
+		return
+	}
+	if input.AutomationEnabled != nil && input.Username == nil && input.Password == nil && input.CredentialType == nil && input.CharacterID == nil && input.CharacterName == nil && input.Enabled == nil && input.SessionID == nil {
+		snapshot, err := h.accounts.SetAutomationEnabled(current.ID, *input.AutomationEnabled)
+		if err != nil {
+			writeAccountError(writer, err)
+			return
+		}
+		writeJSON(writer, http.StatusOK, snapshot)
+		return
+	}
+	account := autostore.Account{ID: current.ID, ServerID: serverID, Username: current.Username, CharacterID: current.CharacterID, CharacterName: current.CharacterName, CredentialType: current.CredentialType, Enabled: current.Enabled, AutomationEnabled: current.AutomationEnabled}
+	updated, password, sessionID, err := applyAccountInput(input, serverID, current.ID, &account)
 	if err != nil {
 		writeAccountError(writer, err)
 		return
@@ -185,70 +198,15 @@ func (h *Handler) deleteAccount(writer http.ResponseWriter, accountID string) {
 	writer.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) accountAction(writer http.ResponseWriter, request *http.Request, action string, account sessioncontrol.AccountSnapshot) {
-	var (
-		snapshot sessioncontrol.AccountSnapshot
-		err      error
-	)
-	switch action {
-	case "start":
-		snapshot, err = h.accounts.StartAsync(account.ID)
-	case "stop":
-		snapshot, err = h.accounts.Stop(account.ID)
-	case "reconnect":
-		snapshot, err = h.accounts.Reconnect(request.Context(), account.ID)
-	case "message":
-		h.accountMessage(writer, request, account)
-		return
-	default:
-		writeJSON(writer, http.StatusNotFound, apiError{Error: "not_found"})
-		return
-	}
-	if err != nil {
-		writeAccountError(writer, err)
-		return
-	}
-	writeJSON(writer, http.StatusOK, snapshot)
-}
-
-func (h *Handler) accountMessage(writer http.ResponseWriter, request *http.Request, account sessioncontrol.AccountSnapshot) {
-	var input chatRequest
-	if err := decodeAndRead(request, &input); err != nil {
-		writeAccountError(writer, err)
-		return
-	}
-	input.Message = strings.TrimSpace(input.Message)
-	if input.Message == "" {
-		writeJSON(writer, http.StatusBadRequest, apiError{Error: "missing_message"})
-		return
-	}
-	if len([]rune(input.Message)) > 512 {
-		writeJSON(writer, http.StatusBadRequest, apiError{Error: "message_too_long"})
-		return
-	}
-	if input.Mode == "" {
-		input.Mode = gameprotocol.PrivateChatChannel
-	}
-	if !gameprotocol.IsChatChannel(input.Mode) {
-		writeJSON(writer, http.StatusBadRequest, apiError{Error: "invalid_chat_mode"})
-		return
-	}
-	result, updated, err := h.accounts.Chat(request.Context(), account.ID, input.Mode, input.Message)
-	if err != nil {
-		writeAccountError(writer, err)
-		return
-	}
-	writeJSON(writer, http.StatusOK, map[string]any{
-		"result":  result,
-		"account": updated,
-	})
-}
-
 func applyAccountRequest(request *http.Request, serverID, accountID string, existing *autostore.Account) (autostore.Account, string, string, error) {
 	var input accountRequest
 	if err := decodeAndRead(request, &input); err != nil {
 		return autostore.Account{}, "", "", err
 	}
+	return applyAccountInput(input, serverID, accountID, existing)
+}
+
+func applyAccountInput(input accountRequest, serverID, accountID string, existing *autostore.Account) (autostore.Account, string, string, error) {
 	var account autostore.Account
 	if existing != nil {
 		account = *existing
@@ -270,6 +228,9 @@ func applyAccountRequest(request *http.Request, serverID, accountID string, exis
 	}
 	if input.CredentialType != nil {
 		account.CredentialType = strings.TrimSpace(*input.CredentialType)
+	}
+	if input.AutomationEnabled != nil {
+		account.AutomationEnabled = *input.AutomationEnabled
 	}
 	if input.Enabled != nil {
 		account.Enabled = *input.Enabled

@@ -23,7 +23,7 @@ func (a *AccountManager) snapshot(account autostore.Account) AccountSnapshot {
 	if updatedAt == "" {
 		updatedAt = account.UpdatedAt
 	}
-	return AccountSnapshot{ID: account.ID, ServerID: account.ServerID, Username: account.Username, CharacterID: account.CharacterID, CharacterName: account.CharacterName, CredentialType: account.CredentialType, Enabled: account.Enabled, Status: status, LastError: lastError, UpdatedAt: updatedAt}
+	return AccountSnapshot{ID: account.ID, ServerID: account.ServerID, Username: account.Username, CharacterID: account.CharacterID, CharacterName: account.CharacterName, CredentialType: account.CredentialType, Enabled: account.Enabled, AutomationEnabled: account.AutomationEnabled, Status: status, LastError: lastError, UpdatedAt: updatedAt}
 }
 
 func (a *AccountManager) snapshotWithSession(account autostore.Account, sessionID string, session Snapshot) AccountSnapshot {
@@ -31,7 +31,7 @@ func (a *AccountManager) snapshotWithSession(account autostore.Account, sessionI
 	if !account.Enabled {
 		status = AccountDisabled
 	}
-	return AccountSnapshot{ID: account.ID, ServerID: account.ServerID, Username: account.Username, CharacterID: account.CharacterID, CharacterName: account.CharacterName, CredentialType: account.CredentialType, Enabled: account.Enabled, Status: status, SessionID: sessionID, Session: &session, LastError: session.LastError, UpdatedAt: session.UpdatedAt.Format(time.RFC3339Nano)}
+	return AccountSnapshot{ID: account.ID, ServerID: account.ServerID, Username: account.Username, CharacterID: account.CharacterID, CharacterName: account.CharacterName, CredentialType: account.CredentialType, Enabled: account.Enabled, AutomationEnabled: account.AutomationEnabled, Status: status, SessionID: sessionID, Session: &session, LastError: session.LastError, UpdatedAt: session.UpdatedAt.Format(time.RFC3339Nano)}
 }
 
 func statusFromSession(state gamesession.State) AccountStatus {

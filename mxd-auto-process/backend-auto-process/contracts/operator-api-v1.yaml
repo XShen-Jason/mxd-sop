@@ -195,7 +195,7 @@ paths:
             schema: {$ref: '#/components/schemas/CreateAccountRequest'}
       responses:
         '201':
-          description: Account persisted; enabled accounts begin asynchronous login
+          description: Account persisted; login-enabled accounts begin asynchronous login; automation is independently disabled by default
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AccountSnapshot'}
@@ -213,7 +213,7 @@ paths:
             schema: {$ref: '#/components/schemas/ExecutionRequest'}
       responses:
         '200':
-          description: Persisted execution status; repeated execution_id requests do not duplicate completed commands. When no enabled online account exists, failure_reason is `no_online_accounts`.
+          description: Persisted execution status; repeated execution_id requests do not duplicate completed commands. When no automation-enabled online account exists, failure_reason is `no_online_accounts`.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ExecutionResponse'}
@@ -240,7 +240,7 @@ paths:
             schema: {$ref: '#/components/schemas/UpdateAccountRequest'}
       responses:
         '200':
-          description: Updated account; enabled accounts restart asynchronously
+          description: Updated account; connection changes restart logged-in accounts; automation-only changes preserve the session
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AccountSnapshot'}
@@ -258,7 +258,7 @@ paths:
         - {$ref: '#/components/parameters/AccountId'}
       responses:
         '200':
-          description: Account enabled and login flow scheduled; status may be connecting
+          description: Login flow scheduled without changing automation_enabled; status may be connecting
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AccountSnapshot'}
@@ -270,7 +270,7 @@ paths:
         - {$ref: '#/components/parameters/AccountId'}
       responses:
         '200':
-          description: Account disabled and its TCP session closed
+          description: Account logged out and its TCP session closed; automation_enabled is preserved
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AccountSnapshot'}
@@ -461,6 +461,12 @@ components:
         map_id: {type: string}
         enabled: {type: boolean}
         keyless_probe_enabled: {type: boolean}
+        spawn_rate: {type: integer, minimum: 1}
+        exp_rate: {type: integer, minimum: 1}
+        exp_max: {type: integer, format: int64, minimum: 1, description: EXP duration in minutes (legacy field name; not an experience cap)}
+        drop_rate: {type: integer, minimum: 1}
+        meso_rate: {type: integer, minimum: 1}
+        domain_times: {type: integer, minimum: 1}
     ServerRecord:
       allOf:
         - {$ref: '#/components/schemas/Server'}
@@ -489,7 +495,7 @@ components:
         enabled: {type: boolean}
     AccountSnapshot:
       type: object
-      required: [id, server_id, username, character_id, credential_type, enabled, status, updated_at]
+      required: [id, server_id, username, character_id, credential_type, enabled, automation_enabled, status, updated_at]
       properties:
         id: {type: string}
         server_id: {type: string}
@@ -497,7 +503,8 @@ components:
         character_id: {type: string}
         character_name: {type: string}
         credential_type: {type: string, enum: [password, md5], description: Indicates whether the encrypted credential is a raw password or an already-derived 16-character MD5 login value}
-        enabled: {type: boolean}
+        enabled: {type: boolean, description: Login intent and automatic reconnect; independent of automation eligibility}
+        automation_enabled: {type: boolean, description: Whether this account can be selected for automation}
         status: {type: string, enum: [disabled, offline, connecting, online, reconnecting, failed]}
         session_id: {type: string}
         session: {$ref: '#/components/schemas/Session'}
@@ -513,7 +520,8 @@ components:
         credential_type: {type: string, enum: [password, md5], default: password, description: md5 accepts the already-derived 16 hexadecimal login value and sends it unchanged}
         character_id: {type: string, minLength: 1}
         character_name: {type: string}
-        enabled: {type: boolean, default: true}
+        enabled: {type: boolean, default: true, description: Login intent and automatic reconnect}
+        automation_enabled: {type: boolean, default: false, description: Automation eligibility; changing it never logs in or out}
         session_id: {type: string, description: Bind this account to an already authenticated and game-ready setup session}
     UpdateAccountRequest:
       type: object
@@ -524,7 +532,8 @@ components:
         credential_type: {type: string, enum: [password, md5], description: Applied with a new password value; md5 is sent unchanged}
         character_id: {type: string, minLength: 1}
         character_name: {type: string}
-        enabled: {type: boolean}
+        enabled: {type: boolean, description: Login intent and automatic reconnect}
+        automation_enabled: {type: boolean, description: Automation eligibility; changing it preserves the current session}
     OperatorLoginRequest:
       type: object
       required: [username, password]

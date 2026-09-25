@@ -43,6 +43,7 @@ internals or database structures.
 | player-integration | Persisted mxd-player connection gate, active endpoint, health, switching, and source synchronization | `backend/src/modules/player-integration`; `frontend/src/modules/server-operations` | backend + frontend | `player-integration.*` | mxd-player HTTP contract, service token |
 | auto-integration | Persisted connection gate and HTTP-only adapter to independent mxd-auto-process; no auto database or Go package access | `backend/src/modules/auto-integration` | backend | `auto-integration.*` | auto `operator-api.v1`, service token |
 | server-operations | Live game-server/account configuration, complete account login, status, reconnect, and chat UI | `frontend/src/modules/server-operations`; `frontend/src/App.tsx` | frontend + backend adapter | `auto-integration.*`, `player-integration.*` | auth workspace permission, auto HTTP API |
+| potential-editor | Temporary super-admin sessions, potential list parsing, catalog mapping, and ordered potential resets | `backend/src/modules/potential`; `frontend/src/modules/potential` | backend + frontend | `potential-editor.*` | auto-integration, item-catalog, potential pool CSV |
 
 ## Contract registry
 
@@ -68,6 +69,7 @@ internals or database structures.
 | player-integration.connection | HTTP API | `docs/contracts/player-integration.md` | player-integration | v1 | server-operations, team-view |
 | auto-integration.* | HTTP API adapter | `docs/contracts/auto-integration.md` | auto-integration | v1 | server-operations, operation-groups |
 | auto-integration.connection | HTTP API | `docs/contracts/auto-integration.md` | auto-integration | v1 | server-operations |
+| potential-editor.* | HTTP API | `docs/contracts/potential-editor.md` | potential-editor | v1 | frontend |
 | player.verify, player.me, player.teams, player.teams.join | HTTP API | `mxd-player/CONTRACTS.md` | player-registration | v1 | player frontend |
 
 ## Game-server integration boundary
@@ -110,3 +112,7 @@ File-size/quality check: inspect `backend/src`, `frontend/src`, and `mxd-auto-pr
 When adding an application, module, contract, dependency, or performance
 constraint, update this map first and then its owning module/contract document.
 Keep detailed behavior in exactly one canonical module or contract document.
+
+Account control separates persisted login intent (`enabled`) from automation
+eligibility (`automation_enabled`); see the server-operations/operator-api module
+documents and operator-api.v1. This extends the existing modules and API schema.

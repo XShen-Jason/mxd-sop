@@ -7,7 +7,7 @@ import type {
   WorkspacePermissions,
 } from '../../../shared/types.js';
 
-export const WORKSPACES = ['request', 'records', 'reminders', 'queue', 'ready', 'reissue', 'archive', 'activities', 'player-directory', 'team-view', 'accounts', 'server-operations'] as const satisfies readonly WorkspaceId[];
+export const WORKSPACES = ['request', 'records', 'reminders', 'queue', 'ready', 'reissue', 'archive', 'activities', 'player-directory', 'team-view', 'accounts', 'server-operations', 'potential-editor'] as const satisfies readonly WorkspaceId[];
 export const UPLOAD_PERMISSIONS = ['player-directory', 'team-view', 'item-catalog'] as const satisfies readonly UploadPermissionId[];
 
 const ROLE_DEFAULT_WORKSPACES: Record<Role, readonly WorkspaceId[]> = {

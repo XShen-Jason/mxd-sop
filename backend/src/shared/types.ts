@@ -1,5 +1,5 @@
 export type Role = 'customer' | 'manager' | 'super_admin';
-export type WorkspaceId = 'request' | 'records' | 'reminders' | 'queue' | 'ready' | 'reissue' | 'archive' | 'activities' | 'player-directory' | 'team-view' | 'accounts' | 'server-operations';
+export type WorkspaceId = 'request' | 'records' | 'reminders' | 'queue' | 'ready' | 'reissue' | 'archive' | 'activities' | 'player-directory' | 'team-view' | 'accounts' | 'server-operations' | 'potential-editor';
 export type WorkspacePermissions = Record<WorkspaceId, boolean>;
 export type UploadPermissionId = 'player-directory' | 'team-view' | 'item-catalog';
 export type UploadPermissions = Record<UploadPermissionId, boolean>;

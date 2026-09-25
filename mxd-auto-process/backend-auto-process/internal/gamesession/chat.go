@@ -235,6 +235,9 @@ func (s *Session) lockHeartbeatTransport() (gameprotocol.Client, bool, bool) {
 		s.mu.Unlock()
 		return nil, true, false
 	}
+	// The monitor holds transportMu during a blocking Receive. Cancel that idle
+	// read while holding mu so it cannot start another read ahead of this send.
+	s.cancelMonitorRead()
 	s.transportMu.Lock()
 	transport := s.transport
 	s.mu.Unlock()

@@ -1,5 +1,5 @@
 import { AutoIntegrationError } from '../domain/errors.js';
-import type { AutoAccount, AutoAccountInput, AutoEndpointConfig, AutoExecutionInput, AutoExecutionResult, AutoIntegrationActor, AutoIntegrationClient, AutoLoginInput, AutoMessageInput, AutoMessageResult, AutoOverview, AutoServer, AutoServerInput, AutoSession } from '../domain/types.js';
+import type { AutoAccount, AutoAccountInput, AutoEndpointConfig, AutoExecutionInput, AutoExecutionResult, AutoIntegrationActor, AutoIntegrationClient, AutoLoginInput, AutoMessageInput, AutoMessageResult, AutoOverview, AutoServer, AutoServerInput, AutoSession, AutoSessionMessageResult } from '../domain/types.js';
 
 export class HttpAutoIntegrationClient implements AutoIntegrationClient {
   private readonly endpoint?: string;
@@ -19,8 +19,10 @@ export class HttpAutoIntegrationClient implements AutoIntegrationClient {
 
   overview(actor: AutoIntegrationActor, signal?: AbortSignal) { return this.request<AutoOverview>('/api/v1/overview?include_logs=false', { method: 'GET', signal, actor }); }
   startSession(actor: AutoIntegrationActor, serverId: string, input: AutoLoginInput) { return this.request<AutoSession>(`/api/v1/servers/${encodeURIComponent(serverId)}/sessions`, { method: 'POST', body: JSON.stringify(input), actor }); }
+  getSession(actor: AutoIntegrationActor, sessionId: string) { return this.request<AutoSession>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, { method: 'GET', actor }); }
   selectAndEnterSession(actor: AutoIntegrationActor, sessionId: string, characterId: string) { return this.request<AutoSession>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/select-and-enter`, { method: 'POST', body: JSON.stringify({ character_id: characterId }), actor }); }
   stopSession(actor: AutoIntegrationActor, sessionId: string) { return this.request<void>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE', actor }); }
+  sendSessionMessage(actor: AutoIntegrationActor, sessionId: string, input: AutoMessageInput) { return this.request<AutoSessionMessageResult>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/chat`, { method: 'POST', body: JSON.stringify(input), actor }); }
   createServer(actor: AutoIntegrationActor, input: AutoServerInput) { return this.request<AutoServer>('/api/v1/servers', { method: 'POST', body: JSON.stringify(input), actor }); }
   updateServer(actor: AutoIntegrationActor, id: string, input: Partial<AutoServerInput>) { return this.request<AutoServer>(`/api/v1/servers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input), actor }); }
   deleteServer(actor: AutoIntegrationActor, id: string) { return this.request<void>(`/api/v1/servers/${encodeURIComponent(id)}`, { method: 'DELETE', actor }); }

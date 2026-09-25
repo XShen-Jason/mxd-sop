@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Archive, Bell, CalendarDays, ClipboardList, ContactRound, Headphones, KeyRound, ListTree, LoaderCircle, LogIn, LogOut, Menu, PackageCheck, Server, ShieldCheck, SlidersHorizontal, UserRound, Wrench, X } from 'lucide-react';
+import { Archive, Bell, CalendarDays, ClipboardList, ContactRound, Headphones, KeyRound, ListTree, LoaderCircle, LogIn, LogOut, Menu, PackageCheck, Server, ShieldCheck, SlidersHorizontal, UserRound, Wrench, X, Sparkles } from 'lucide-react';
 import { ApiClient, ApiError, invalidateApiCache, OPERATION_GROUPS_LOCAL_CHANGE_EVENT, resetApiClientState } from './api/client';
 import { FloatingNotice } from './components/FloatingNotice';
 import { CustomerView } from './modules/customer/CustomerView';
@@ -8,6 +8,7 @@ import { ActivityView } from './modules/activities/ActivityView';
 import { PlayerDirectoryView } from './modules/player-directory/PlayerDirectoryView';
 import { TeamView } from './modules/team-view/TeamView';
 import { ServerOperationsView } from './modules/server-operations/ServerOperationsView';
+import { PotentialEditorView } from './modules/potential/PotentialEditorView';
 import type { AppOptions, Session, User, WorkspaceId } from './types';
 import { isUploadEnabled, isWorkspaceEnabled } from './permissions';
 import { GROUPS_CHANGED_EVENT, parseGroupChange } from './modules/operation-groups/live-refresh';
@@ -15,14 +16,14 @@ import { GROUPS_CHANGED_EVENT, parseGroupChange } from './modules/operation-grou
 type Workspace = WorkspaceId;
 type WorkspaceCounts = Partial<Record<Workspace, number>> & { reminderIssuance?: number; reminderRegular?: number; ownIssuance?: number; ownRegular?: number };
 type NavItem = { id: Workspace; label: string; icon: typeof Headphones };
-const workspacePaths: Record<Workspace, string> = { request: '/request', records: '/records', 'player-directory': '/player-directory', 'team-view': '/team-view', 'server-operations': '/server-operations', reminders: '/reminders', activities: '/activities', queue: '/queue', ready: '/ready', archive: '/archive', reissue: '/reissue', accounts: '/accounts' };
+const workspacePaths: Record<Workspace, string> = { request: '/request', records: '/records', 'player-directory': '/player-directory', 'team-view': '/team-view', 'server-operations': '/server-operations', 'potential-editor': '/potential-editor', reminders: '/reminders', activities: '/activities', queue: '/queue', ready: '/ready', archive: '/archive', reissue: '/reissue', accounts: '/accounts' };
 const allWorkspaceItems: NavItem[] = [
   { id: 'request', label: '申请操作', icon: Wrench }, { id: 'records', label: '我的申请', icon: ClipboardList },
   { id: 'reminders', label: '待提醒', icon: Bell }, { id: 'queue', label: '待审核', icon: Headphones },
   { id: 'ready', label: '待完成', icon: PackageCheck }, { id: 'reissue', label: '物资发放记录', icon: Archive },
   { id: 'archive', label: '常规操作记录', icon: Archive }, { id: 'activities', label: '活动与道具', icon: CalendarDays },
   { id: 'player-directory', label: '玩家列表', icon: ContactRound }, { id: 'team-view', label: '所有队伍', icon: ListTree },
-  { id: 'accounts', label: '账号管理', icon: ShieldCheck }, { id: 'server-operations', label: '服务器管理', icon: Server },
+  { id: 'accounts', label: '账号管理', icon: ShieldCheck }, { id: 'server-operations', label: '服务器管理', icon: Server }, { id: 'potential-editor', label: '潜能工作区', icon: Sparkles },
 ];
 const REMEMBER_LOGIN_KEY = 'ops-desk-remembered-login';
 
@@ -67,6 +68,7 @@ export default function App() {
   const managerPanel = workspace === 'ready' || workspace === 'archive' || workspace === 'reissue' ? workspace : workspace === 'accounts' ? 'users' : 'queue';
   const updateSessionUser = (next: User) => setSession((current) => current && current.user.id === next.id ? { ...current, user: next } : current);
   const content = workspace === 'server-operations' ? <ServerOperationsView options={options} userId={session.user.id} token={session.token} />
+    : workspace === 'potential-editor' ? <PotentialEditorView options={options} userId={session.user.id} token={session.token} />
     : workspace === 'player-directory' ? <PlayerDirectoryView options={options} userId={session.user.id} token={session.token} uploadEnabled={isUploadEnabled(session.user, 'player-directory')} />
     : workspace === 'team-view' ? <TeamView userId={session.user.id} token={session.token} uploadEnabled={isUploadEnabled(session.user, 'team-view')} />
     : workspace === 'activities' ? <ActivityView userId={session.user.id} token={session.token} uploadEnabled={isUploadEnabled(session.user, 'item-catalog')} />

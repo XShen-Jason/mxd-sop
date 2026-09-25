@@ -1,0 +1,13 @@
+.management-account-row .management-account-actions { --account-control-height: 36px; --account-control-width: 88px; flex-wrap: wrap; gap: 6px; }
+.management-account-actions > button.icon-button { width: var(--account-control-height); height: var(--account-control-height); min-height: var(--account-control-height); flex: 0 0 auto; padding: 0; }
+.management-account-actions .management-automation-toggle > span, .management-account-actions button.account-power { width: var(--account-control-width); height: var(--account-control-height); min-height: var(--account-control-height); padding: 0 8px; justify-content: center; font-size: 11px; line-height: 1; white-space: nowrap; }
+.management-automation-toggle { position: relative; display: flex; flex: 0 0 auto; }
+.management-automation-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.management-automation-toggle > span { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 9px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-muted-foreground); font-size: 11px; cursor: pointer; }
+.management-automation-toggle i { position: relative; width: 25px; height: 15px; border-radius: 10px; background: var(--color-muted-foreground); }
+.management-automation-toggle i::after { position: absolute; content: ''; top: 3px; left: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--color-background); }
+.management-automation-toggle input:checked + span { color: var(--color-accent-bright); border-color: var(--color-accent); }
+.management-automation-toggle input:checked + span i { background: var(--color-accent-bright); }
+.management-automation-toggle input:checked + span i::after { left: 13px; }
+.management-automation-toggle input:focus-visible + span { outline: 2px solid var(--color-accent-bright); outline-offset: 2px; }
+.management-automation-toggle input:disabled + span { opacity: .6; cursor: default; }

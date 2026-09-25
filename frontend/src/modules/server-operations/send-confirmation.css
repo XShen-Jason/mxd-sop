@@ -1,0 +1,8 @@
+dialog.server-send-confirmation { width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); margin: auto; overflow: auto; color: var(--ink); }
+.server-send-confirmation::backdrop { background: rgba(21, 39, 35, .48); }
+.server-send-confirmation p, .server-send-confirmation dt { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.server-send-confirmation dl { display: grid; gap: 8px; margin: 16px 0; font-size: 13px; }
+.server-send-confirmation dl > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
+.server-send-confirmation dd { margin: 0; overflow-wrap: anywhere; }
+.server-send-content-label { font-size: 12px; }
+.server-send-confirmation pre { max-height: 200px; margin: 8px 0 16px; padding: 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--canvas); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; }

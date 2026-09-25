@@ -14,7 +14,7 @@ const (
 )
 
 func (s *Store) Accounts(serverID string) ([]Account, error) {
-	query := "SELECT id, server_id, username, character_id, character_name, credential_type, password_cipher, enabled, created_at, updated_at FROM game_accounts"
+	query := "SELECT id, server_id, username, character_id, character_name, credential_type, password_cipher, enabled, automation_enabled, created_at, updated_at FROM game_accounts"
 	args := []any{}
 	if serverID != "" {
 		query += " WHERE server_id = ?"
@@ -29,11 +29,12 @@ func (s *Store) Accounts(serverID string) ([]Account, error) {
 	accounts := make([]Account, 0)
 	for rows.Next() {
 		var account Account
-		var enabled int
-		if err := rows.Scan(&account.ID, &account.ServerID, &account.Username, &account.CharacterID, &account.CharacterName, &account.CredentialType, &account.PasswordCipher, &enabled, &account.CreatedAt, &account.UpdatedAt); err != nil {
+		var enabled, automationEnabled int
+		if err := rows.Scan(&account.ID, &account.ServerID, &account.Username, &account.CharacterID, &account.CharacterName, &account.CredentialType, &account.PasswordCipher, &enabled, &automationEnabled, &account.CreatedAt, &account.UpdatedAt); err != nil {
 			return nil, err
 		}
 		account.Enabled = enabled != 0
+		account.AutomationEnabled = automationEnabled != 0
 		accounts = append(accounts, account)
 	}
 	return accounts, rows.Err()
@@ -41,8 +42,8 @@ func (s *Store) Accounts(serverID string) ([]Account, error) {
 
 func (s *Store) Account(id string) (Account, bool, error) {
 	var account Account
-	var enabled int
-	err := s.db.QueryRow("SELECT id, server_id, username, character_id, character_name, credential_type, password_cipher, enabled, created_at, updated_at FROM game_accounts WHERE id = ?", id).Scan(&account.ID, &account.ServerID, &account.Username, &account.CharacterID, &account.CharacterName, &account.CredentialType, &account.PasswordCipher, &enabled, &account.CreatedAt, &account.UpdatedAt)
+	var enabled, automationEnabled int
+	err := s.db.QueryRow("SELECT id, server_id, username, character_id, character_name, credential_type, password_cipher, enabled, automation_enabled, created_at, updated_at FROM game_accounts WHERE id = ?", id).Scan(&account.ID, &account.ServerID, &account.Username, &account.CharacterID, &account.CharacterName, &account.CredentialType, &account.PasswordCipher, &enabled, &automationEnabled, &account.CreatedAt, &account.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Account{}, false, nil
 	}
@@ -50,6 +51,7 @@ func (s *Store) Account(id string) (Account, bool, error) {
 		return Account{}, false, err
 	}
 	account.Enabled = enabled != 0
+	account.AutomationEnabled = automationEnabled != 0
 	return account, true, nil
 }
 
@@ -111,7 +113,7 @@ func (s *Store) UpdateAccount(account Account, password string) (Account, error)
 	}
 	account.CreatedAt = old.CreatedAt
 	account.UpdatedAt = timestamp()
-	result, err := s.db.Exec("UPDATE game_accounts SET server_id = ?, username = ?, character_id = ?, character_name = ?, credential_type = ?, password_cipher = ?, enabled = ?, updated_at = ? WHERE id = ?", account.ServerID, account.Username, account.CharacterID, account.CharacterName, account.CredentialType, account.PasswordCipher, boolInt(account.Enabled), account.UpdatedAt, account.ID)
+	result, err := s.db.Exec("UPDATE game_accounts SET server_id = ?, username = ?, character_id = ?, character_name = ?, credential_type = ?, password_cipher = ?, enabled = ?, automation_enabled = ?, updated_at = ? WHERE id = ?", account.ServerID, account.Username, account.CharacterID, account.CharacterName, account.CredentialType, account.PasswordCipher, boolInt(account.Enabled), boolInt(account.AutomationEnabled), account.UpdatedAt, account.ID)
 	if err != nil {
 		return Account{}, normalizeAccountError(err)
 	}
@@ -154,7 +156,7 @@ func (s *Store) SetEnabled(id string, enabled bool) error {
 }
 
 func (s *Store) insertAccount(account Account) error {
-	_, err := s.db.Exec("INSERT INTO game_accounts (id, server_id, username, character_id, character_name, credential_type, password_cipher, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", account.ID, account.ServerID, account.Username, account.CharacterID, account.CharacterName, account.CredentialType, account.PasswordCipher, boolInt(account.Enabled), account.CreatedAt, account.UpdatedAt)
+	_, err := s.db.Exec("INSERT INTO game_accounts (id, server_id, username, character_id, character_name, credential_type, password_cipher, enabled, automation_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", account.ID, account.ServerID, account.Username, account.CharacterID, account.CharacterName, account.CredentialType, account.PasswordCipher, boolInt(account.Enabled), boolInt(account.AutomationEnabled), account.CreatedAt, account.UpdatedAt)
 	return normalizeAccountError(err)
 }
 

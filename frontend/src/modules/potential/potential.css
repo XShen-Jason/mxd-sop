@@ -1,0 +1,116 @@
+.potential-workspace { display: grid; gap: 22px; }
+.potential-workspace .page-heading { margin-bottom: 0; }
+.potential-workspace h1 { font-size: 29px; }
+.potential-access-badge { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border-radius: 20px; background: var(--teal-soft); color: var(--teal); font-size: 12px; white-space: nowrap; }
+.potential-session-panel { padding: 24px; }
+.potential-panel-title { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.potential-panel-title h2 { font-size: 16px; }
+.potential-panel-title p { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 5px; }
+.potential-section-icon { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; color: var(--teal); background: var(--teal-soft); }
+.potential-session-state { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; white-space: nowrap; font-size: 12px; padding: 7px 10px; background: var(--canvas); color: var(--muted); border-radius: 6px; }
+.potential-session-state.state-ready { color: var(--teal); background: var(--teal-soft); }
+.potential-session-state.state-reconnecting, .potential-session-state.state-failed { color: var(--amber); }
+.potential-login-dialog { max-height: calc(100dvh - 40px); overflow-y: auto; }
+.potential-login-dialog:focus { outline: none; }
+.potential-login-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 22px; }
+.potential-login-form .dialog-actions { margin-top: 4px; }
+.potential-login-form label, .potential-role-select label { display: grid; gap: 8px; font-size: 12px; color: var(--muted); min-width: 0; }
+.potential-login-form input, .potential-login-form select { min-height: 42px; }
+.potential-login-form .primary-button { min-height: 42px; }
+.potential-session-content { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+.potential-account-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; flex: 1; min-width: 0; }
+.potential-account-summary strong { color: var(--ink); font-size: 16px; overflow-wrap: anywhere; }
+.potential-account-summary span { color: var(--muted); font-size: 12px; }
+.potential-role-select { display: flex; align-items: end; gap: 10px; }
+.potential-logout { margin-left: auto; }
+.potential-restoring { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 13px; }
+.potential-equipment-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: 4px; }
+.potential-equipment-toolbar h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; }
+.potential-equipment-toolbar h2 > svg { color: var(--teal); }
+.potential-equipment-toolbar h2 span { border-radius: 6px; padding: 3px 8px; background: var(--teal-soft); color: var(--teal); font-size: 12px; }
+.potential-equipment-toolbar p { color: var(--muted); font-size: 12px; margin-top: 7px; line-height: 1.6; }
+.potential-equipment-search { display: flex; align-items: center; gap: 10px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); }
+.potential-equipment-search input { border: 0; background: transparent; }
+.potential-equipment-search span { white-space: nowrap; font-size: 12px; }
+.potential-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 20px; }
+.potential-card { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+.potential-card.is-dirty { border-color: color-mix(in srgb, var(--teal) 45%, var(--line)); }
+.potential-card-heading { display: flex; align-items: center; gap: 12px; padding: 20px; border-bottom: 1px solid var(--line); }
+.potential-card-heading > div:nth-child(2) { min-width: 0; flex: 1; }
+.potential-card-heading h3 { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.potential-card-heading p { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.potential-card-heading code { color: var(--ink); font-size: 11px; }
+.potential-item-image { display: grid; place-items: center; width: 58px; height: 58px; flex-shrink: 0; border-radius: 8px; color: var(--muted); border: 1px solid var(--line); background: var(--canvas); }
+.potential-item-image img { width: 44px; height: 44px; object-fit: contain; image-rendering: pixelated; }
+.potential-count { white-space: nowrap; font-size: 11px; color: var(--teal); background: var(--teal-soft); padding: 5px 8px; border-radius: 5px; }
+.potential-count.is-empty { color: var(--muted); background: var(--canvas); }
+.potential-comparison { display: grid; gap: 16px; padding: 20px; }
+.potential-comparison-head, .potential-comparison-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+.potential-comparison-head { padding-bottom: 12px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 600; }
+.potential-comparison-head small { margin-left: 6px; font-weight: 400; color: var(--muted); font-size: 11px; }
+.potential-saved-slot { min-width: 0; }
+.potential-saved-label { display: flex; align-items: center; gap: 7px; font-size: 12px; margin-bottom: 8px; color: var(--muted); }
+.potential-saved-value { min-height: 44px; display: flex; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.potential-saved-value.is-empty { color: var(--muted); }
+.potential-comparison-row.is-modified .potential-combobox { background: var(--teal-soft); border-color: color-mix(in srgb, var(--teal) 45%, var(--line)); }
+.potential-slot > label > .potential-slot-hint.is-changed { color: var(--teal); font-weight: 600; }
+.potential-change-summary { font-size: 11px; color: var(--muted); margin-right: auto; }
+.potential-card.is-dirty .potential-change-summary { color: var(--teal); }
+.potential-slot { min-width: 0; position: relative; }
+.potential-slot:focus-within { z-index: 12; }
+.potential-slot > label { display: flex; align-items: center; gap: 7px; color: var(--ink); font-size: 12px; margin-bottom: 8px; }
+.potential-slot > label > span { margin: 0; }
+.potential-slot-number { display: grid; place-items: center; width: 21px; height: 21px; background: var(--canvas); border: 1px solid var(--line); border-radius: 5px; font-size: 11px; }
+.potential-slot > label > .potential-slot-hint { margin-left: auto; color: var(--muted); font-size: 11px; }
+.potential-combobox { display: flex; align-items: center; gap: 5px; padding: 0 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--canvas); }
+.potential-workspace input:focus, .potential-workspace select:focus { border-color: var(--muted); box-shadow: 0 0 0 2px color-mix(in srgb, var(--muted) 12%, transparent); outline: none; }
+.potential-combobox:focus-within, .potential-equipment-search:focus-within { border-color: var(--muted); box-shadow: 0 0 0 2px color-mix(in srgb, var(--muted) 12%, transparent); }
+.potential-combobox > svg { flex-shrink: 0; }
+.potential-combobox input { min-width: 0; padding: 10px 4px; min-height: 42px; border: 0; background: transparent; }
+.potential-workspace .potential-combobox input:focus, .potential-workspace .potential-equipment-search input:focus { box-shadow: none; outline: none; }
+.potential-dropdown { position: absolute; left: 0; right: 0; top: calc(100% + 5px); z-index: 15; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+.potential-result-count { padding: 9px 12px; background: var(--canvas); color: var(--muted); font-size: 11px; border-bottom: 1px solid var(--line); }
+.potential-results { max-height: 238px; overflow-y: auto; overscroll-behavior: contain; padding: 5px; }
+.potential-option { display: flex; align-items: center; gap: 9px; width: 100%; border: 0; border-radius: 5px; padding: 9px; background: transparent; color: var(--ink); text-align: left; }
+.potential-option > span:first-child { flex: 1; }
+.potential-option strong { display: block; font-size: 12px; font-weight: 600; }
+.potential-option small { display: block; font-size: 10px; color: var(--muted); margin-top: 3px; }
+.potential-option.is-active { background: var(--teal-soft); }
+.potential-grade { min-width: 25px; text-align: center; border-radius: 4px; padding: 3px 5px; font-size: 11px; color: var(--teal); background: var(--teal-soft); }
+.potential-no-results { padding: 14px 9px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.potential-card-note { padding: 0 20px 16px; min-height: 33px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+.potential-card-note[role=alert] { color: var(--coral); }
+.potential-card-actions { border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 14px 20px; flex-wrap: wrap; }
+.potential-empty { padding: 50px 20px; display: grid; justify-items: center; text-align: center; gap: 12px; color: var(--muted); }
+.potential-empty > svg { color: var(--teal); }
+.potential-empty h3 { color: var(--ink); font-size: 16px; }
+.potential-empty p { font-size: 12px; line-height: 1.7; }
+.potential-workspace .notice-stack .toast { animation: none; }
+.potential-footnote { font-size: 11px; color: var(--muted); line-height: 1.7; }
+@media (min-width: 1700px) {
+  .potential-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 540px) {
+  .potential-workspace { gap: 18px; }
+  .potential-workspace .page-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .potential-session-panel { padding: 17px; }
+  .potential-panel-title { flex-wrap: wrap; }
+  .potential-session-state { margin-left: 52px; }
+  .potential-login-form { grid-template-columns: minmax(0, 1fr); }
+  .potential-equipment-toolbar { align-items: flex-start; flex-direction: column; }
+  .potential-card-heading { padding: 15px; flex-wrap: wrap; }
+  .potential-comparison { padding: 15px; }
+  .potential-comparison-head, .potential-comparison-row { gap: 10px; }
+  .potential-comparison-head small { display: block; margin: 4px 0 0; }
+  .potential-slot > label, .potential-saved-label { font-size: 11px; gap: 4px; flex-wrap: wrap; }
+  .potential-slot-number { width: 18px; height: 18px; }
+  .potential-saved-value { font-size: 12px; padding: 8px; }
+  .potential-combobox { padding: 0 5px; gap: 0; }
+  .potential-combobox > svg:first-child { display: none; }
+  .potential-combobox input { font-size: 12px; }
+  .potential-combobox .icon-button { width: 24px; flex-shrink: 0; padding: 3px; }
+  .potential-dropdown { left: auto; min-width: min(290px, calc(100vw - 64px)); }
+  .potential-card-actions { padding: 12px 15px; gap: 8px; }
+  .potential-role-select { width: 100%; flex-wrap: wrap; }
+  .potential-role-select label { flex: 1; }
+}

@@ -33,12 +33,18 @@ also retains the existing `mxd-player` connection tab.
 - Auto's account status is authoritative. The page refreshes status and the
   server overview every two seconds while visible and cancels requests when
   the page is hidden or unmounted.
-- Creating, starting, or enabling an account returns a transitional state while
+- Creating or logging in an account returns a transitional state while
   auto performs login, character selection, and map entry asynchronously.
-  Auto's watcher retries enabled accounts after a lost session. A failed or
-  offline enabled account also has a manual reconnect action.
-- Closing an account disables it, exits the session, and closes the game TCP
-  connection. Starting it again requests the complete auto login flow.
+  Auto's watcher retries login-enabled accounts after a lost session. A failed
+  or offline login-enabled account also has a manual reconnect action.
+- Logging out clears login intent (`enabled`), exits the session, and closes
+  the game TCP connection. Logging in requests the complete auto login flow.
+  Neither changes the independent `automation_enabled` setting.
+- Each account exposes a login/logout button and an automation switch. Online
+  accounts can send manually with automation off. Only online accounts with
+  automation enabled are eligible for automatic command batches. Switching
+  automation does not start, stop, or reconnect a session. New accounts default
+  to manual-only; a one-time migration preserves legacy participation.
 - Account passwords are write-only at the API boundary. Editing may leave the
   password blank to retain the encrypted value in auto.
 - Account setup selects either a raw password or an already-derived 16-character
@@ -89,6 +95,52 @@ message content, the raw server response, and the complete response content.
 
 ## Implementation
 
+The GM quick-command forms keep editable drafts separate from the persisted
+server reference values. Overview polling updates references without overwriting
+drafts; selecting another server resets its form. Each command has its own
+send action, always using private chat, and a restore-reference action. Only
+positive safe integer parameters can be sent. Editing or sending a draft does
+not change the stored reference configuration; it is not a live game-server
+readback. The legacy `exp_max` field is the EXP duration in **minutes**, so
+`exp@2@60` means 2x EXP for 60 minutes, not an experience cap.
+
+Each quick-command card uses two compact rows: its name and saved reference
+values above, then inline numeric inputs with units, reset, and send below.
+The send tooltip retains the command preview; validation errors expand only
+the affected card. Both frontends retain full accessible control labels.
+
+Both UIs title this section `当前服务器配置` and show values with units without
+the `参考` prefix. The reset label is `恢复当前配置`. The automation switch
+always reads `自动化`; its checked state conveys eligibility. Account controls
+share a 36px height, with equal-width automation and login/logout controls.
+
+Both management server lists show each account's live status. Green requires
+a fresh overview, an enabled server, login intent, `status: online`, and
+`automation_enabled: true`. Online manual-only accounts and logged-out accounts
+are gray; connecting/reconnecting or unconfirmed snapshots are yellow;
+failed/offline accounts are red. The list renders only one aggregate status
+circle. It prioritizes pending or transitional accounts, then failures, then
+an automation-ready account, so a healthy account does not hide another
+account's reconnect. Selection uses a separate neutral accent. Main
+detail-header status uses the same projection;
+service-connection health keeps its independent meaning. Existing two-second
+polling supplies the data without per-account requests.
+
+Quick commands and custom messages require a second confirmation before the
+message request is submitted. The modal shows the selected server/address,
+account/character, channel, and full message from the pending-send snapshot.
+Cancel, close, and Escape preserve drafts and make no request. Confirmation
+revalidates the target's identity and online/enabled state, and in-flight
+submissions are locked against duplicate clicks. A retry requires a new
+confirmation. This is a frontend interaction; the HTTP contract is unchanged.
+
+UI boundary translations live in each independent frontend's
+`QuickCommandPanel.tsx`; they follow `operator-api.v1` and are checked together
+by `node frontend/tests/quick-commands.browser.cjs` (main frontend plus auto).
+Its `server-list-status-checks.cjs` helper covers automation eligibility,
+connection transitions, disabled servers, stale/recovered snapshots, mixed
+accounts, distinct rendered colors, and desktop/mobile layout.
+
 - `backend/src/modules/auto-integration/`
 - `frontend/src/modules/server-operations/`
 - `frontend/src/App.tsx`
@@ -107,3 +159,8 @@ The browser test mocks only the main application's auto adapter endpoints and
 covers online/offline status, two-second refresh, account/server CRUD,
 temporary login sessions, role selection, map entry, start/stop/reconnect,
 messaging, danger confirmations, and desktop/mobile overflow.
+
+The message result panel retains themed status cards, command classification,
+channel/content, raw server response, and complete response JSON. Main adapter
+and game-server latencies use their existing response fields; raw content wraps
+on mobile and does not grow beyond its bounded scroll region.

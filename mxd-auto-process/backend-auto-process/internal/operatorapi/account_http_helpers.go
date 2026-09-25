@@ -25,22 +25,29 @@ var (
 )
 
 type serverRequest struct {
-	ID      string  `json:"id"`
-	Name    *string `json:"name"`
-	Address *string `json:"address"`
-	Version *string `json:"version"`
-	MapID   *string `json:"map_id"`
-	Enabled *bool   `json:"enabled"`
+	ID          string  `json:"id"`
+	Name        *string `json:"name"`
+	Address     *string `json:"address"`
+	Version     *string `json:"version"`
+	MapID       *string `json:"map_id"`
+	Enabled     *bool   `json:"enabled"`
+	SpawnRate   *int    `json:"spawn_rate"`
+	ExpRate     *int    `json:"exp_rate"`
+	ExpMax      *int64  `json:"exp_max"`
+	DropRate    *int    `json:"drop_rate"`
+	MesoRate    *int    `json:"meso_rate"`
+	DomainTimes *int    `json:"domain_times"`
 }
 
 type accountRequest struct {
-	Username       *string `json:"username"`
-	Password       *string `json:"password"`
-	CredentialType *string `json:"credential_type"`
-	CharacterID    *string `json:"character_id"`
-	CharacterName  *string `json:"character_name"`
-	Enabled        *bool   `json:"enabled"`
-	SessionID      *string `json:"session_id"`
+	Username          *string `json:"username"`
+	Password          *string `json:"password"`
+	CredentialType    *string `json:"credential_type"`
+	CharacterID       *string `json:"character_id"`
+	CharacterName     *string `json:"character_name"`
+	Enabled           *bool   `json:"enabled"`
+	AutomationEnabled *bool   `json:"automation_enabled"`
+	SessionID         *string `json:"session_id"`
 }
 
 func decodeAndRead(request *http.Request, target any) error {

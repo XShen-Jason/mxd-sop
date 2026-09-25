@@ -32,6 +32,12 @@ type ServerConfig struct {
 	ServerKeyFieldID           int               `json:"server_key_field_id"`
 	RetentionMode              string            `json:"retention_mode"`
 	AllowKeylessProbe          bool              `json:"allow_keyless_probe"`
+	SpawnRate                  int               `json:"spawn_rate"`
+	ExpRate                    int               `json:"exp_rate"`
+	ExpMax                     int64             `json:"exp_max"` // EXP duration in minutes; legacy wire/storage name.
+	DropRate                   int               `json:"drop_rate"`
+	MesoRate                   int               `json:"meso_rate"`
+	DomainTimes                int               `json:"domain_times"`
 	Heartbeat                  HeartbeatSettings `json:"heartbeat"`
 }
 
@@ -83,6 +89,9 @@ func load(path string, persistence Persistence) (*Catalog, error) {
 				return nil, err
 			}
 			catalog.persistence = persistence
+			if err := persistence.SaveServerCatalog(catalog.listLocked()); err != nil {
+				return nil, fmt.Errorf("persist upgraded server catalog: %w", err)
+			}
 			return catalog, nil
 		}
 	}

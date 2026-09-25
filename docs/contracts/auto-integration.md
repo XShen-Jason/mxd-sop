@@ -39,6 +39,32 @@ Setup-session login and account create/update accept `credential_type` with
 auto, which persists it encrypted and sends it unchanged to the game server.
 Account projections expose only `credential_type`, never the credential value.
 
+Standalone sessions support GET /api/v1/auto/sessions/:sessionId for current
+state and POST /api/v1/auto/sessions/:sessionId/chat for {message, mode}.
+GET does not prolong or stop the game session. DELETE is explicit logout.
+Standalone sessions are not registered as automation accounts. Heartbeats run
+inside auto independently of browser requests. The potential editor restores
+a session reference only after server ID and creation timestamp also match.
+
 Server create accepts an optional `version`; auto persists `1.0.2` when it is
 omitted. Server update accepts `version` as an independent per-server override,
 and changing it restarts that server's managed account sessions.
+
+Server projections include saved reference values `spawn_rate`, `exp_rate`,
+`exp_max`, `drop_rate`, `meso_rate`, and `domain_times`. `exp_max` is the legacy
+wire name for EXP duration in minutes; it is not an EXP cap. Quick-command
+drafts use the existing account-message route with `mode: privateChat`.
+Sending a command does not update the saved reference values or prove they
+match the game server's current state.
+
+## Independent account login and automation
+
+Account snapshots and create/update bodies add `automation_enabled`. It defaults
+to false for new accounts. Existing accounts migrate this value from their old
+`enabled` value once, preserving prior automation participation. `enabled` now
+explicitly represents login intent and reconnect, not automation eligibility.
+`start`/`stop` log in/out without changing `automation_enabled`. A PATCH containing
+only `automation_enabled` does not reconnect or terminate the session. Manual
+messages require a logged-in account; automation additionally requires
+`automation_enabled`, checked before each command. Both independent frontends
+expose login/logout and an automation switch.

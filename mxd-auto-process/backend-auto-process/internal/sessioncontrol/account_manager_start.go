@@ -65,6 +65,14 @@ func (a *AccountManager) startAsyncWithParent(id string, parent context.Context)
 	go func() {
 		ctx, cancel := context.WithTimeout(parent, accountStartTimeout)
 		defer cancel()
-		_, _ = a.Start(ctx, id)
+		lock := a.accountLock(id)
+		lock.Lock()
+		defer lock.Unlock()
+		account, ok, err := a.store.Account(id)
+		// A logout may have happened after this job was queued.
+		if err != nil || !ok || !account.Enabled {
+			return
+		}
+		_, _ = a.startLocked(ctx, account)
 	}()
 }

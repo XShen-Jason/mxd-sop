@@ -6,6 +6,12 @@ import (
 )
 
 func (h *Handler) serveHTTP(writer http.ResponseWriter, request *http.Request) {
+	// Browsers can accidentally append a copied endpoint to the current auto URL.
+	// Keep that legacy address usable and land on the single operator root.
+	if strings.HasPrefix(request.URL.Path, "/http://") || strings.HasPrefix(request.URL.Path, "/https://") {
+		http.Redirect(writer, request, "/", http.StatusTemporaryRedirect)
+		return
+	}
 	if strings.HasPrefix(request.URL.Path, "/api/") {
 		h.serveAPI(writer, request)
 		return

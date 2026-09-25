@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const os = require('node:os');
 const path = require('node:path');
 
-const baseUrl = process.env.TEST_BASE_URL || 'http://127.0.0.1:5173';
+const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:5173';
 
 function makeUser() {
   return {
@@ -340,6 +340,7 @@ async function runViewport(browser, width) {
   await messagePanel.locator('.message-type-option').nth(3).click();
   await messagePanel.locator('textarea').fill('World announcement');
   await messagePanel.locator('.server-message-actions .primary-button').click();
+  await page.getByRole('dialog', { name: '确认发送？' }).getByRole('button', { name: '确认发送', exact: true }).click();
   await messagePanel.locator('.message-result-panel').waitFor();
   assert.equal(await messagePanel.locator('.message-command-label').textContent(), '普通消息');
   assert.equal(await messagePanel.getByText('server response for World announcement', { exact: true }).count(), 1);
@@ -361,14 +362,14 @@ async function runViewport(browser, width) {
     await messagePanel.locator('.message-type-option').first().click();
     await messagePanel.locator('textarea').fill(command);
     await messagePanel.locator('.server-message-actions .primary-button').click();
+  await page.getByRole('dialog', { name: '确认发送？' }).getByRole('button', { name: '确认发送', exact: true }).click();
     await messagePanel.getByText(`server response for ${command}`, { exact: true }).waitFor();
     assert.equal(await messagePanel.locator('.message-command-label').textContent(), label);
     assert.equal(await messagePanel.getByText(`server response for ${command}`, { exact: true }).count(), 1);
   }
   assert.equal(messageRequests, 5);
 
-  const toggle = accountRow.locator('.account-toggle input');
-  await toggle.click();
+  await accountRow.getByRole('button', { name: '退出 ops-account', exact: true }).click();
   const actionDialog = page.locator('.action-dialog');
   await actionDialog.waitFor();
   assert.equal(accountStopRequests, 0);
@@ -376,7 +377,7 @@ async function runViewport(browser, width) {
   await accountRow.locator('.state-disabled').waitFor();
   assert.equal(accountStopRequests, 1);
 
-  await toggle.click();
+  await accountRow.getByRole('button', { name: '登录 ops-account', exact: true }).click();
   await accountRow.locator('.state-online').waitFor({ timeout: 7_000 });
   assert.equal(accountStartRequests, 1);
 
@@ -437,7 +438,7 @@ async function runViewport(browser, width) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH });
+  const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : { channel: 'chrome' }) });
   try {
     for (const width of [1440, 390]) await runViewport(browser, width);
   } finally {

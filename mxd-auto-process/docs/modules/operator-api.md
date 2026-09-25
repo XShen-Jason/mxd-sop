@@ -50,12 +50,12 @@ direct operator clients and use the same authentication boundary.
 - Temporary setup sessions are closed through `DELETE /api/v1/sessions/{sessionId}`
   when setup is cancelled or restarted. Binding a ready session avoids a second
   password login and keeps the selected role on the same TCP connection.
-- `POST .../start` and enabled account creation/update return immediately with
+- `POST .../start` and login-enabled account creation/update return immediately with
   a transitional account snapshot. The account manager performs login,
   character selection, and map entry in the background. Enabled accounts are
   automatically reconciled after a disconnect; `.../reconnect` provides a
   manual trigger.
-- `.../stop` disables the account, stops its session, and closes the TCP
+- `.../stop` clears login intent, stops its session, and closes the TCP
   connection. Server changes that affect a live connection stop old sessions
   before they are reconciled against the new definition.
 - All request bodies are bounded and validated. Audit details retain method,
@@ -69,14 +69,14 @@ direct operator clients and use the same authentication boundary.
 ## Public surface
 
 `POST /api/v1/servers/{serverId}/executions` accepts an `execution_id` and an
-ordered command batch. It always sends `privateChat`, selects an enabled online
+ordered command batch. It always sends `privateChat`, selects an automation-enabled online
 account using a persisted round-robin cursor, and stores one execution record
 with per-command statuses. Reusing an ID with the same payload is idempotent;
 `retry: true` continues only commands not marked successful.
 Each command is one independent chat send. The batch transport never joins
 multiple command texts into one chat message.
 
-When the target server has no enabled online account, the response remains a
+When the target server has no automation-enabled online account, the response remains a
 normal persisted `failure` response and includes `failure_reason:
 no_online_accounts`. Consumers can distinguish this from a command delivery
 failure and tell the requester that no online GM account is available.
@@ -85,14 +85,14 @@ An execution keeps the selected account for all of its remaining commands;
 the next execution advances the round-robin cursor. The account is checked
 again immediately before each send. A stopped, disabled, or no-longer-ready
 account is removed from that execution before a chat frame is written, and the
-next enabled online account is tried. Errors that may have happened after a
+next automation-enabled online account is tried. Errors that may have happened after a
 write are not automatically replayed on another account, preventing duplicate
 item delivery.
 
 If the game server responds with `请输入正确的玩家姓名。`, the response is
 treated as an account-permission failure rather than a player-offline result.
 The current account is excluded for the remainder of that execution and the
-same command is retried on the next enabled online account. The switch is
+same command is retried on the next automation-enabled online account. The switch is
 bounded by the number of online accounts, so a permission failure cannot loop
 forever; ordinary offline or unknown responses keep the existing failure
 behavior and leave the execution retryable.
@@ -109,7 +109,8 @@ setup-session login/selection/cleanup routes, server/account CRUD, `start`,
 - `backend-auto-process/internal/operatorapi/auth.go` — operator login, password change, and logout
 - `backend-auto-process/internal/operatorapi/overview.go` — read-only snapshot, logs, and SSE
 - `backend-auto-process/internal/operatorapi/server_handlers.go` — server persistence/lifecycle
-- `backend-auto-process/internal/operatorapi/account_handlers.go` — account persistence/lifecycle
+- `backend-auto-process/internal/operatorapi/account_handlers.go` — account CRUD and automation setting
+- `backend-auto-process/internal/operatorapi/account_actions.go` — login/logout/reconnect and manual messages
 - `backend-auto-process/internal/operatorapi/audit.go` — bounded redacted request audit
 - `backend-auto-process/internal/operatorapi/assets/` — embedded read-only and operator pages
 
@@ -119,3 +120,56 @@ Go tests cover route authorization, default pages, full session compatibility,
 interactive role selection and account-session binding, operator
 initialization/password change, login throttling, SQLite persistence, audit
 redaction, account lifecycle, and reconnect behavior.
+
+Server records in the operator overview and server create/update responses include the persisted quick command settings (`spawn_rate`, `exp_rate`, `exp_max`, `drop_rate`, `meso_rate`, `domain_times`). The management UI sends the corresponding `spawnrate@`, `exp@`, `droprate@`, `mesorate@`, and `domaintimes@` strings through the existing private chat message route.
+
+`exp_max` is the legacy wire name for the EXP duration in minutes. The operator
+UI exposes it as duration, with independently editable quick-command drafts,
+per-command send/reset actions, and saved reference values beside the inputs.
+Polling does not overwrite drafts; switching servers resets form state.
+Quick commands and custom messages open a second-confirmation modal on submit.
+It shows the server/address, account/character, channel, and complete message
+snapshot. Only confirming dispatches the existing message API request; cancel,
+close, and Escape preserve drafts without sending. The target is revalidated
+before dispatch, duplicate in-flight clicks are ignored, and retries require
+a new confirmation. Editing, reset, and refresh never send commands.
+Saved references are not relabeled as live game state after delivery (including
+unknown/failed delivery). The main and auto frontends are independently built;
+their UI translations of this contract have a joint browser regression at
+`frontend/tests/quick-commands.browser.cjs` in the parent workspace.
+
+## Independent login and automation
+
+`enabled` retains persisted login/reconnect intent. `automation_enabled` is a
+separate persisted eligibility flag. New accounts default to false; the SQLite
+migration copies the old `enabled` value once for existing accounts, atomically
+with column creation. Restarting does not repeat that backfill.
+
+A PATCH with only `automation_enabled` updates eligibility under the account
+lock using current stored login intent. It cannot log in/out or reconnect even
+if another request changed the session since the HTTP snapshot. `start` and
+`stop` preserve eligibility. Manual message delivery does not check automation;
+execution selection and every `ChatIfOnline` call do. A command already being
+sent may finish before the toggle is acknowledged; subsequent commands see the
+new value. Existing two-second polling and bounded request sizes are unchanged.
+
+Both UIs expose login/logout separately from the automation switch and preserve
+message confirmation. The switch label is always `自动化`; all account-row
+actions share one height, with equal-width automation and login/logout controls.
+Configuration cards show their values without the `参考` prefix under
+`当前服务器配置`; this presentation does not change the saved-value semantics.
+Management server lists show each account's status from the existing overview.
+Only fresh, online, login-enabled accounts on enabled servers with automation
+enabled are green. Connecting/reconnecting and unconfirmed snapshots are yellow;
+failed/offline accounts are red, and manual-only or logged-out accounts are gray.
+The server list renders only the aggregate status circle; indicators prioritize
+transitions/unconfirmed state, failures, then automation availability. Refresh
+failures invalidate the status until a successful overview; management polling
+allows one in-flight overview and aborts it on unmount. It retains the existing
+two-second interval and introduces no extra account requests. These are client
+projections of the existing contract, verified together in the parent browser
+regression; each frontend keeps its own build boundary.
+Response panels display themed status cards, channel,
+content, raw server reply, timing, and complete JSON. Regression coverage is in
+`account_automation_test.go`, the account-manager and SQLite migration tests,
+and the parent workspace's mocked two-frontend browser regression.

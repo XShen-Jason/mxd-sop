@@ -118,9 +118,20 @@ func (a *AccountManager) Update(account autostore.Account, password string) (Acc
 	lock := a.accountLock(account.ID)
 	lock.Lock()
 	defer lock.Unlock()
+	previous, ok, err := a.store.Account(account.ID)
+	if err != nil {
+		return AccountSnapshot{}, err
+	}
+	if !ok {
+		return AccountSnapshot{}, autostore.ErrAccountNotFound
+	}
 	updated, err := a.store.UpdateAccount(account, password)
 	if err != nil {
 		return AccountSnapshot{}, err
+	}
+	connectionChanged := password != "" || previous.ServerID != updated.ServerID || previous.Username != updated.Username || previous.CharacterID != updated.CharacterID || previous.CredentialType != updated.CredentialType
+	if !connectionChanged && previous.Enabled == updated.Enabled {
+		return a.snapshot(updated), nil
 	}
 	a.stopLocked(account.ID)
 	if updated.Enabled {
@@ -147,6 +158,27 @@ func (a *AccountManager) Delete(id string) error {
 	return nil
 }
 
+// SetAutomationEnabled changes only eligibility under the same lock as chat
+// and login/logout, so a stale HTTP snapshot cannot restore login intent.
+func (a *AccountManager) SetAutomationEnabled(id string, enabled bool) (AccountSnapshot, error) {
+	lock := a.accountLock(id)
+	lock.Lock()
+	defer lock.Unlock()
+	account, ok, err := a.store.Account(id)
+	if err != nil {
+		return AccountSnapshot{}, err
+	}
+	if !ok {
+		return AccountSnapshot{}, autostore.ErrAccountNotFound
+	}
+	account.AutomationEnabled = enabled
+	updated, err := a.store.UpdateAccount(account, "")
+	if err != nil {
+		return AccountSnapshot{}, err
+	}
+	return a.snapshot(updated), nil
+}
+
 func (a *AccountManager) Start(ctx context.Context, id string) (AccountSnapshot, error) {
 	lock := a.accountLock(id)
 	lock.Lock()
@@ -168,7 +200,8 @@ func (a *AccountManager) Start(ctx context.Context, id string) (AccountSnapshot,
 	return a.startLocked(ctx, account)
 }
 
-// StartAsync enables an account and schedules the complete login, character
+// StartAsync logs an account in without changing automation participation.
+// It schedules the complete login, character
 // selection, and game-entry flow without holding the HTTP request open.
 func (a *AccountManager) StartAsync(id string) (AccountSnapshot, error) {
 	lock := a.accountLock(id)
@@ -251,50 +284,4 @@ func (a *AccountManager) Reconnect(ctx context.Context, id string) (AccountSnaps
 	snapshot := a.snapshot(account)
 	a.startAsync(id)
 	return snapshot, nil
-}
-
-func (a *AccountManager) Chat(ctx context.Context, id, mode, message string) (gamesession.ChatResult, AccountSnapshot, error) {
-	lock := a.accountLock(id)
-	lock.Lock()
-	defer lock.Unlock()
-	return a.chatLocked(ctx, id, mode, message, false)
-}
-
-// ChatIfOnline delivers a chat only when the account is enabled and its
-// session is currently ready. Unlike Chat, it never waits for reconnect. This
-// strict variant is used by batched automation so a stopped/reconnecting
-// account cannot hold a record before another online account is tried.
-func (a *AccountManager) ChatIfOnline(ctx context.Context, id, mode, message string) (gamesession.ChatResult, AccountSnapshot, error) {
-	lock := a.accountLock(id)
-	lock.Lock()
-	defer lock.Unlock()
-	return a.chatLocked(ctx, id, mode, message, true)
-}
-
-func (a *AccountManager) chatLocked(ctx context.Context, id, mode, message string, requireReady bool) (gamesession.ChatResult, AccountSnapshot, error) {
-	account, ok, err := a.store.Account(id)
-	if err != nil {
-		return gamesession.ChatResult{}, AccountSnapshot{}, err
-	}
-	if !ok {
-		return gamesession.ChatResult{}, AccountSnapshot{}, autostore.ErrAccountNotFound
-	}
-	if !account.Enabled {
-		return gamesession.ChatResult{}, a.snapshot(account), ErrAccountDisabled
-	}
-	sessionID := a.sessionID(id)
-	if sessionID == "" {
-		return gamesession.ChatResult{}, a.snapshot(account), ErrAccountOffline
-	}
-	if requireReady {
-		session, getErr := a.manager.Get(sessionID)
-		if getErr != nil || session.State != gamesession.StateReady {
-			return gamesession.ChatResult{}, a.snapshot(account), ErrAccountOffline
-		}
-	}
-	result, session, err := a.manager.ChatMode(ctx, sessionID, mode, message)
-	if err != nil && gamesession.ErrorCode(err) == "connection_lost" {
-		a.setRuntime(id, AccountReconnecting, gamesession.ErrorCode(err))
-	}
-	return result, a.snapshotWithSession(account, sessionID, session), err
 }

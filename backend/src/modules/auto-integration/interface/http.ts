@@ -44,7 +44,7 @@ function serverInput(value: Body, partial: boolean): AutoServerInput | Partial<A
 }
 
 function accountInput(value: Body, partial: boolean): AutoAccountInput | Partial<AutoAccountInput> {
-  only(value, ['username', 'password', 'credential_type', 'character_id', 'character_name', 'enabled', 'session_id']);
+  only(value, ['username', 'password', 'credential_type', 'character_id', 'character_name', 'enabled', 'automation_enabled', 'session_id']);
   const result: Partial<AutoAccountInput> = {};
   if (!partial || value.username !== undefined) result.username = text(value.username, 'username')!;
   if (!partial || value.character_id !== undefined) result.character_id = text(value.character_id, 'character_id')!;
@@ -52,6 +52,7 @@ function accountInput(value: Body, partial: boolean): AutoAccountInput | Partial
   if (value.credential_type !== undefined) result.credential_type = credentialType(value.credential_type);
   if (value.character_name !== undefined) result.character_name = text(value.character_name, 'character_name', false);
   if (value.enabled !== undefined) result.enabled = bool(value.enabled, 'enabled');
+  if (value.automation_enabled !== undefined) result.automation_enabled = bool(value.automation_enabled, 'automation_enabled');
   if (value.session_id !== undefined) result.session_id = text(value.session_id, 'session_id');
   return result as AutoAccountInput;
 }
@@ -99,11 +100,17 @@ export function registerAutoIntegrationRoutes(app: FastifyInstance, service: Aut
   app.post('/api/v1/auto/servers/:serverId/sessions', async (request, reply) => {
     try { const params = request.params as { serverId: string }; return reply.code(201).send(await service.startSession(identity(request), params.serverId, loginInput(body(request)))); } catch (error) { return sendError(reply, error); }
   });
+  app.get('/api/v1/auto/sessions/:sessionId', async (request, reply) => {
+    try { return reply.send(await service.getSession(identity(request), (request.params as { sessionId: string }).sessionId)); } catch (error) { return sendError(reply, error); }
+  });
   app.post('/api/v1/auto/sessions/:sessionId/select-and-enter', async (request, reply) => {
     try { const params = request.params as { sessionId: string }; return reply.send(await service.selectAndEnterSession(identity(request), params.sessionId, characterInput(body(request)))); } catch (error) { return sendError(reply, error); }
   });
   app.delete('/api/v1/auto/sessions/:sessionId', async (request, reply) => {
     try { await service.stopSession(identity(request), (request.params as { sessionId: string }).sessionId); return reply.code(204).send(); } catch (error) { return sendError(reply, error); }
+  });
+  app.post('/api/v1/auto/sessions/:sessionId/chat', async (request, reply) => {
+    try { const params = request.params as { sessionId: string }; return reply.send(await service.sendSessionMessage(identity(request), params.sessionId, messageInput(body(request)))); } catch (error) { return sendError(reply, error); }
   });
 
   app.post('/api/v1/auto/servers', async (request, reply) => {

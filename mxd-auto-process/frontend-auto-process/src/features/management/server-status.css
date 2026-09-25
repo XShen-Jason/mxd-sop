@@ -1,0 +1,48 @@
+.server-live-dot, .server-live-accounts small, .server-live-summary {
+  --live-ready: #4ade80;
+  --live-waiting: #fbbf24;
+  --live-error: #fca5a5;
+  --live-inactive: #94a3b8;
+}
+[data-status-tone="ready"] { --live-tone: var(--live-ready); }
+[data-status-tone="waiting"] { --live-tone: var(--live-waiting); }
+[data-status-tone="error"] { --live-tone: var(--live-error); }
+[data-status-tone="inactive"] { --live-tone: var(--live-inactive); }
+.server-live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--live-tone);
+  flex: 0 0 auto;
+}
+.server-live-dot[data-status-tone="ready"] {
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, .22), 0 0 10px rgba(74, 222, 128, .55);
+}
+.server-live-accounts {
+  display: grid;
+  gap: 4px;
+  margin-top: 7px;
+  text-align: left;
+}
+.server-live-accounts small {
+  display: block;
+  margin: 0;
+  color: var(--live-tone);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.server-live-summary { color: var(--live-tone); }
+.management-server-select .server-live-accounts small {
+  margin-top: 0;
+  color: var(--live-tone);
+  white-space: normal;
+}
+.management-server-select > .server-live-dot { margin-top: 4px; }
+.management-server-list .management-server-row.selected {
+  border-left-color: rgba(74, 222, 128, .6);
+  background: rgba(20, 83, 45, .32);
+  box-shadow: inset 4px 0 #4ade80;
+}

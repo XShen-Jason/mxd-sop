@@ -128,6 +128,23 @@ func TestCreateWithSessionBindsTheAlreadyReadySetupSession(t *testing.T) {
 	if len(dialer.clients[0].sent) != 3 {
 		t.Fatalf("adopting a session caused a duplicate login: %d frames", len(dialer.clients[0].sent))
 	}
+	// A batch may already have selected this account before the toggle changes.
+	stored, _, _ := store.Account(created.ID)
+	stored.AutomationEnabled = true
+	if _, err := accounts.Update(stored, ""); err != nil {
+		t.Fatal(err)
+	}
+	stored.AutomationEnabled = false
+	updated, err := accounts.Update(stored, "")
+	if err != nil || updated.SessionID != session.ID || updated.Status != AccountOnline {
+		t.Fatalf("toggle interrupted manual session: %+v %v", updated, err)
+	}
+	if _, _, err := accounts.ChatIfOnline(context.Background(), created.ID, gameprotocol.PrivateChatChannel, "must-not-send"); !errors.Is(err, ErrAccountDisabled) {
+		t.Fatalf("automation did not recheck eligibility: %v", err)
+	}
+	if len(dialer.clients[0].sent) != 3 {
+		t.Fatal("disabled automation wrote a game frame")
+	}
 }
 
 func boolPointer(value bool) *bool { return &value }

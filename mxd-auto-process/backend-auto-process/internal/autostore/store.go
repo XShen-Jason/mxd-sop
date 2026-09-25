@@ -24,16 +24,17 @@ var (
 )
 
 type Account struct {
-	ID             string `json:"id"`
-	ServerID       string `json:"server_id"`
-	Username       string `json:"username"`
-	CharacterID    string `json:"character_id"`
-	CharacterName  string `json:"character_name,omitempty"`
-	CredentialType string `json:"credential_type"`
-	PasswordCipher string `json:"-"`
-	Enabled        bool   `json:"enabled"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
+	ID                string `json:"id"`
+	ServerID          string `json:"server_id"`
+	Username          string `json:"username"`
+	CharacterID       string `json:"character_id"`
+	CharacterName     string `json:"character_name,omitempty"`
+	CredentialType    string `json:"credential_type"`
+	PasswordCipher    string `json:"-"`
+	Enabled           bool   `json:"enabled"`
+	AutomationEnabled bool   `json:"automation_enabled"`
+	CreatedAt         string `json:"created_at"`
+	UpdatedAt         string `json:"updated_at"`
 }
 
 type AuditEntry struct {
@@ -106,6 +107,7 @@ CREATE TABLE IF NOT EXISTS game_accounts (
   credential_type TEXT NOT NULL DEFAULT 'password' CHECK (credential_type IN ('password', 'md5')),
   password_cipher TEXT NOT NULL,
   enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+  automation_enabled INTEGER NOT NULL DEFAULT 0 CHECK (automation_enabled IN (0, 1)),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE (server_id, username COLLATE NOCASE)
@@ -152,6 +154,9 @@ CREATE TABLE IF NOT EXISTS automation_round_robin (
 	}
 	if err := ensureCredentialTypeColumn(s.db); err != nil {
 		return fmt.Errorf("migrate account credential type: %w", err)
+	}
+	if err := ensureAccountAutomationColumn(s.db); err != nil {
+		return fmt.Errorf("migrate account automation: %w", err)
 	}
 	var count int
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM operator").Scan(&count); err != nil {

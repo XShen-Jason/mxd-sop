@@ -1,5 +1,5 @@
 export type Role = 'customer' | 'manager' | 'super_admin';
-export type WorkspaceId = 'request' | 'records' | 'reminders' | 'queue' | 'ready' | 'reissue' | 'archive' | 'activities' | 'player-directory' | 'team-view' | 'accounts' | 'server-operations';
+export type WorkspaceId = 'request' | 'records' | 'reminders' | 'queue' | 'ready' | 'reissue' | 'archive' | 'activities' | 'player-directory' | 'team-view' | 'accounts' | 'server-operations' | 'potential-editor';
 export type WorkspacePermissions = Record<WorkspaceId, boolean>;
 export type UploadPermissionId = 'player-directory' | 'team-view' | 'item-catalog';
 export type UploadPermissions = Record<UploadPermissionId, boolean>;
@@ -120,13 +120,15 @@ export interface AutoAccount {
   character_name?: string;
   credential_type: AutoCredentialType;
   enabled: boolean;
+  automation_enabled: boolean;
   status: AutoAccountStatus;
   session_id?: string;
   session?: AutoSession;
   last_error?: string;
   updated_at: string;
 }
-export interface AutoServer { id: string; name: string; address: string; version: string; map_id: string; enabled: boolean; keyless_probe_enabled?: boolean; accounts: AutoAccount[] }
+/** exp_max is the legacy wire field for EXP duration in minutes. */
+export interface AutoServer { id: string; name: string; address: string; version: string; map_id: string; enabled: boolean; keyless_probe_enabled?: boolean; spawn_rate: number; exp_rate: number; exp_max: number; drop_rate: number; meso_rate: number; domain_times: number; accounts: AutoAccount[] }
 export interface AutoAuditEntry { id: string; created_at: string; request_id?: string; method: string; path: string; actor?: string; action?: string; status: number; duration_ms: number; detail?: Record<string, unknown> }
 export interface AutoOverview { fetched_at: string; servers: AutoServer[]; sessions: AutoSession[]; logs: AutoAuditEntry[] }
 export interface AutoServiceStatus { enabled: boolean; endpoint: string | null; configured: boolean; available: boolean | null; checkedAt: string }
@@ -151,3 +153,6 @@ export interface AutoMessageResult {
     status: 'success' | 'failure' | 'unknown';
   };
 }
+export interface PotentialOption { statType: string; statName: string; value: string; showValue: string; grade: string; pool: string }
+export interface PotentialEntry { slot: number; statType: string; statName: string; value: string; grade: string }
+export interface PotentialEquipment { instanceId: string; templateId: string; name?: string; image?: string; potentials: PotentialEntry[] }

@@ -58,3 +58,7 @@ Frontend build: `cd frontend-auto-process; npm run build`
 Frontend test/lint: `cd frontend-auto-process; npm test; npm run lint`
 File-size/quality check: `Get-ChildItem -Recurse -File -Include *.go,*.ts,*.tsx | ForEach-Object { if ((Get-Content $_.FullName).Count -gt 300) { $_.FullName } }`
 ```
+
+Account control separates persisted login intent (`enabled`) from automation
+eligibility (`automation_enabled`); see the server-operations/operator-api module
+documents and operator-api.v1. This extends the existing modules and API schema.

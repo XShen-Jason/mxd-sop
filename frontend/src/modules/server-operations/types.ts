@@ -83,18 +83,8 @@ export function automationEndpoint(draft: ServiceDraft) {
   return draft.mode === 'local' ? draft.localEndpoint : draft.remoteEndpoint;
 }
 
-export function serverHealth(server: ConfiguredServer): ServerHealth {
-  if (!server.address.trim() || !server.accounts.length) return 'not-configured';
-  if (server.accounts.some((account) => account.status === 'unknown')) return 'pending';
-  return server.accounts.some((account) => ['online', 'connecting', 'reconnecting'].includes(account.status)) ? 'healthy' : 'unavailable';
-}
-
-export function serverHealthLabel(health: ServerHealth) {
-  return health === 'healthy' ? '在线' : health === 'unavailable' ? '离线' : health === 'pending' ? '状态待确认' : '待配置';
-}
-
 export function accountStatusLabel(status: AccountState) {
-  return status === 'unknown' ? '状态待确认' : status === 'online' ? '在线' : status === 'connecting' ? '连接中' : status === 'reconnecting' ? '自动重连中' : status === 'failed' ? '连接失败' : status === 'disabled' ? '已关闭' : '离线';
+  return status === 'unknown' ? '状态待确认' : status === 'online' ? '在线' : status === 'connecting' ? '连接中' : status === 'reconnecting' ? '自动重连中' : status === 'failed' ? '连接失败' : status === 'disabled' ? '未登录' : '离线';
 }
 
 export function accountIsActive(account: ServerAccount) {

@@ -15,6 +15,7 @@ export interface AccountSnapshot {
   character_name?: string;
   credential_type: CredentialType;
   enabled: boolean;
+  automation_enabled: boolean;
   status: AccountStatus;
   last_error?: string;
   updated_at: string;
@@ -41,6 +42,13 @@ export interface ServerRecord {
   map_id: string;
   enabled: boolean;
   keyless_probe_enabled?: boolean;
+  spawn_rate: number;
+  exp_rate: number;
+  /** Legacy wire name: EXP duration in minutes, not an experience cap. */
+  exp_max: number;
+  drop_rate: number;
+  meso_rate: number;
+  domain_times: number;
   accounts: AccountSnapshot[];
 }
 

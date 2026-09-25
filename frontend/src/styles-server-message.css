@@ -24,7 +24,7 @@
 .message-command-label.command-cashid { color: #356b92; border-color: #b9d5e7; background: #eef8ff; }
 .message-command-label.command-herwarp { color: #70588f; border-color: #d1c1e2; background: #f7f1fc; }
 .message-command-label.command-ban { color: #a54136; border-color: #edbcb3; background: #fff0ed; }
-.message-command-label.command-message { color: #536860; border-color: #d5e1db; background: #f1f6f3; }
+.message-command-label:is(.command-message, .command-spawnrate, .command-exp, .command-droprate, .command-mesorate, .command-domaintimes) { color: #536860; border-color: #d5e1db; background: #f1f6f3; }
 .message-result-full-content { max-height: 190px; margin-bottom: 0; }
 .message-result-metric { min-height: 42px; height: 42px; box-sizing: border-box; padding: 8px 10px; }
 .message-result-metric-value { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }

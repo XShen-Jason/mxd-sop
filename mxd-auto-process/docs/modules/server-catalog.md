@@ -44,3 +44,15 @@ The JSON catalog remains a local bootstrap format. Add fields
 backward-compatibly, keep server IDs stable when endpoints change, and use the
 operator API for runtime changes so the database and in-memory catalog remain
 consistent.
+
+## Server quick command settings
+
+Each persisted server record stores positive integer reference values for
+`spawn_rate`, `exp_rate`, `exp_max`, `drop_rate`, `meso_rate`, and `domain_times`.
+Defaults for older records remain `2`, `13`, `99999999`, `3`, `5`, and `2`.
+`exp_max` is retained for wire/storage compatibility and means EXP duration in
+minutes, not an experience cap. Existing saved values are not migrated or
+overwritten by a UI label correction. The operator overview exposes the saved
+configuration as a reference, not an authoritative game-server readback.
+Server configuration updates persist through the SQLite catalog transaction;
+sending a draft quick command through chat does not change this reference.

@@ -110,7 +110,7 @@ func TestExecutionSwitchesAccountsAfterPlayerNamePermissionFailure(t *testing.T)
 			t.Fatal(err)
 		}
 		serviceRequest(t, handler, http.MethodPost, "/api/v1/sessions/"+session.ID+"/select-and-enter", `{"character_id":"role-1"}`)
-		account := serviceRequest(t, handler, http.MethodPost, "/api/v1/servers/local/accounts", `{"username":"player-`+string(rune('1'+index))+`","password":"game123","character_id":"role-1","session_id":"`+session.ID+`"}`)
+		account := serviceRequest(t, handler, http.MethodPost, "/api/v1/servers/local/accounts", `{"username":"player-`+string(rune('1'+index))+`","password":"game123","character_id":"role-1","automation_enabled":true,"session_id":"`+session.ID+`"}`)
 		var snapshot sessioncontrol.AccountSnapshot
 		if err := json.Unmarshal(account.Body.Bytes(), &snapshot); err != nil {
 			t.Fatal(err)
@@ -180,7 +180,7 @@ func TestExecutionSendsEachCommandAsAnIndependentPrivateChat(t *testing.T) {
 	if entered.Code != http.StatusOK {
 		t.Fatalf("select and enter failed: %d %s", entered.Code, entered.Body.String())
 	}
-	created := serviceRequest(t, handler, http.MethodPost, "/api/v1/servers/local/accounts", `{"username":"player","password":"game123","character_id":"role-1","session_id":"`+loggedIn.ID+`"}`)
+	created := serviceRequest(t, handler, http.MethodPost, "/api/v1/servers/local/accounts", `{"username":"player","password":"game123","character_id":"role-1","automation_enabled":true,"session_id":"`+loggedIn.ID+`"}`)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("account creation failed: %d %s", created.Code, created.Body.String())
 	}

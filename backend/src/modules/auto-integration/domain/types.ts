@@ -40,6 +40,7 @@ export interface AutoAccount {
   character_name?: string;
   credential_type: AutoCredentialType;
   enabled: boolean;
+  automation_enabled: boolean;
   status: AutoAccountStatus;
   session_id?: string;
   session?: AutoSession;
@@ -55,6 +56,13 @@ export interface AutoServer {
   map_id: string;
   enabled: boolean;
   keyless_probe_enabled?: boolean;
+  spawn_rate: number;
+  exp_rate: number;
+  /** Legacy wire name: EXP duration in minutes, not an experience cap. */
+  exp_max: number;
+  drop_rate: number;
+  meso_rate: number;
+  domain_times: number;
   accounts: AutoAccount[];
 }
 
@@ -110,6 +118,12 @@ export interface AutoServerInput {
   version?: string;
   map_id: string;
   enabled?: boolean;
+  spawn_rate?: number;
+  exp_rate?: number;
+  exp_max?: number;
+  drop_rate?: number;
+  meso_rate?: number;
+  domain_times?: number;
 }
 
 export interface AutoAccountInput {
@@ -119,6 +133,7 @@ export interface AutoAccountInput {
   character_id: string;
   character_name?: string;
   enabled?: boolean;
+  automation_enabled?: boolean;
   session_id?: string;
 }
 
@@ -153,6 +168,19 @@ export interface AutoMessageResult {
   auto_process?: AutoProcessResponse;
 }
 
+export interface AutoSessionMessageResult {
+  status: string;
+  message: string;
+  delivery_status: string;
+  server_response?: string;
+  server_response_type?: string;
+  server_response_observed?: boolean;
+  server_response_code?: number;
+  server_event?: number;
+  game_server_status?: AutoResponseStatus;
+  session: AutoSession;
+}
+
 export interface AutoExecutionCommand { id: string; text: string; }
 export interface AutoExecutionInput { execution_id: string; commands: AutoExecutionCommand[]; retry?: boolean; }
 export interface AutoExecutionCommandResult extends AutoExecutionCommand { status: string; account_id?: string; delivery_status?: string; message?: string; }
@@ -164,8 +192,10 @@ export interface AutoIntegrationClient {
   health(signal?: AbortSignal): Promise<boolean>;
   overview(actor: AutoIntegrationActor, signal?: AbortSignal): Promise<AutoOverview>;
   startSession(actor: AutoIntegrationActor, serverId: string, input: AutoLoginInput): Promise<AutoSession>;
+  getSession?(actor: AutoIntegrationActor, sessionId: string): Promise<AutoSession>;
   selectAndEnterSession(actor: AutoIntegrationActor, sessionId: string, characterId: string): Promise<AutoSession>;
   stopSession(actor: AutoIntegrationActor, sessionId: string): Promise<void>;
+  sendSessionMessage?(actor: AutoIntegrationActor, sessionId: string, input: AutoMessageInput): Promise<AutoSessionMessageResult>;
   createServer(actor: AutoIntegrationActor, input: AutoServerInput): Promise<AutoServer>;
   updateServer(actor: AutoIntegrationActor, serverId: string, input: Partial<AutoServerInput>): Promise<AutoServer>;
   deleteServer(actor: AutoIntegrationActor, serverId: string): Promise<void>;

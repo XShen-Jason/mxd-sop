@@ -8,7 +8,7 @@
 - Account login and reconnect run asynchronously behind the HTTP request. The
   API returns `connecting` or `reconnecting`; the overview is the source of
   truth for completion and failure.
-- Enabled accounts are reconciled every two seconds. The watcher does not
+- Login-enabled accounts are reconciled every two seconds. The watcher does not
   start disabled accounts and retries a disconnected enabled account with the
   complete login, character-selection, and map-entry flow.
 - The embedded read-only page receives a bounded overview snapshot every two
@@ -24,3 +24,7 @@
 - No game-account password, service token, server key, role opaque, or raw TCP
   payload is included in an audit detail. Request bodies are redacted before
   persistence.
+
+Automation eligibility adds one boolean to account snapshots and is rechecked
+inside the existing per-account chat lock. A toggle uses one authenticated PATCH
+and the existing overview refresh; it adds no polling or game-server call.

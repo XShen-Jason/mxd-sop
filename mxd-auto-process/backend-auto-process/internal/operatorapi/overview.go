@@ -17,6 +17,12 @@ type overviewServer struct {
 	MapID        string                           `json:"map_id"`
 	Enabled      bool                             `json:"enabled"`
 	KeylessProbe bool                             `json:"keyless_probe_enabled"`
+	SpawnRate    int                              `json:"spawn_rate"`
+	ExpRate      int                              `json:"exp_rate"`
+	ExpMax       int64                            `json:"exp_max"`
+	DropRate     int                              `json:"drop_rate"`
+	MesoRate     int                              `json:"meso_rate"`
+	DomainTimes  int                              `json:"domain_times"`
 	Accounts     []sessioncontrol.AccountSnapshot `json:"accounts"`
 }
 
@@ -114,7 +120,7 @@ func (h *Handler) buildOverview(includeLogs bool) (overviewResponse, error) {
 				return overviewResponse{}, err
 			}
 		}
-		servers = append(servers, overviewServer{ID: entry.ID, Name: entry.Name, Address: entry.Address, Version: entry.Version, MapID: entry.MapID, Enabled: entry.Enabled, KeylessProbe: entry.AllowKeylessProbe, Accounts: accounts})
+		servers = append(servers, overviewServer{ID: entry.ID, Name: entry.Name, Address: entry.Address, Version: entry.Version, MapID: entry.MapID, Enabled: entry.Enabled, KeylessProbe: entry.AllowKeylessProbe, SpawnRate: entry.SpawnRate, ExpRate: entry.ExpRate, ExpMax: entry.ExpMax, DropRate: entry.DropRate, MesoRate: entry.MesoRate, DomainTimes: entry.DomainTimes, Accounts: accounts})
 	}
 	logs := any([]any{})
 	if includeLogs && h.store != nil {

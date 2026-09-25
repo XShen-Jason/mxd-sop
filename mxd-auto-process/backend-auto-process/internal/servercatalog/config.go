@@ -75,6 +75,9 @@ func validate(entry ServerConfig) error {
 	if entry.RetentionMode != "" && entry.RetentionMode != string(gamesession.RetainSessionData) && entry.RetentionMode != string(gamesession.RetainMinimal) {
 		return fmt.Errorf("server %q has an invalid retention_mode", entry.ID)
 	}
+	if entry.SpawnRate < 1 || entry.ExpRate < 1 || entry.ExpMax < 1 || entry.DropRate < 1 || entry.MesoRate < 1 || entry.DomainTimes < 1 {
+		return fmt.Errorf("server %q has invalid quick command settings", entry.ID)
+	}
 	return nil
 }
 
@@ -96,6 +99,24 @@ func withDefaults(entry ServerConfig) ServerConfig {
 	}
 	if entry.MapReadyTimeoutSeconds <= 0 {
 		entry.MapReadyTimeoutSeconds = 8
+	}
+	if entry.SpawnRate <= 0 {
+		entry.SpawnRate = 2
+	}
+	if entry.ExpRate <= 0 {
+		entry.ExpRate = 13
+	}
+	if entry.ExpMax <= 0 {
+		entry.ExpMax = 99999999
+	}
+	if entry.DropRate <= 0 {
+		entry.DropRate = 3
+	}
+	if entry.MesoRate <= 0 {
+		entry.MesoRate = 5
+	}
+	if entry.DomainTimes <= 0 {
+		entry.DomainTimes = 2
 	}
 	entry.Heartbeat = HeartbeatSettings{
 		Enabled:         true,

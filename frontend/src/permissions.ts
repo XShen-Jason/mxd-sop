@@ -1,6 +1,6 @@
 import type { Role, UploadPermissionId, UploadPermissions, User, WorkspaceId, WorkspacePermissions } from './types';
 
-export const WORKSPACES: readonly WorkspaceId[] = ['request', 'records', 'reminders', 'queue', 'ready', 'reissue', 'archive', 'activities', 'player-directory', 'team-view', 'accounts', 'server-operations'];
+export const WORKSPACES: readonly WorkspaceId[] = ['request', 'records', 'reminders', 'queue', 'ready', 'reissue', 'archive', 'activities', 'player-directory', 'team-view', 'accounts', 'server-operations', 'potential-editor'];
 export const VISIBLE_WORKSPACES: readonly WorkspaceId[] = WORKSPACES;
 export const UPLOAD_PERMISSIONS: readonly UploadPermissionId[] = ['player-directory', 'team-view', 'item-catalog'];
 export const uploadPermissionDefinitions: Record<UploadPermissionId, { label: string; description: string }> = {
@@ -21,13 +21,14 @@ export const workspaceDefinitions: Record<WorkspaceId, { label: string; descript
   'player-directory': { label: '玩家列表', description: '查询玩家账号信息' },
   'team-view': { label: '所有队伍', description: '查看每日队伍名单' },
   accounts: { label: '账号管理', description: '维护客服和管理账号' },
-  'server-operations': { label: '服务器管理', description: '管理服务连接和游戏服务器' }
+  'server-operations': { label: '服务器管理', description: '管理服务连接和游戏服务器' },
+  'potential-editor': { label: '潜能工作区', description: '登录临时账号并修改装备潜能' }
 };
 
 const roleDefaults: Record<Role, readonly WorkspaceId[]> = {
   customer: ['request', 'records', 'reminders', 'player-directory', 'team-view'],
   manager: ['request', 'records', 'reminders', 'queue', 'reissue', 'archive', 'activities', 'player-directory', 'team-view', 'accounts'],
-  super_admin: WORKSPACES
+  super_admin: WORKSPACES,
 };
 
 export function defaultWorkspacePermissions(role: Role): WorkspacePermissions {

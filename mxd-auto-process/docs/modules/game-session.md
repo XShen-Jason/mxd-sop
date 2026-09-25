@@ -55,6 +55,10 @@ vulnerability scanning.
   another business operation is in flight, the scheduled heartbeat is skipped;
   asynchronous `evt=18` messages are ignored while the chat waits for its
   command-specific terminal result.
+- A scheduled heartbeat cancels the idle monitor's pending read before acquiring
+  the transport lock. This prevents a silent server from blocking op=19 forever.
+  EnterGame starts the fixed 10-second heartbeat; explicit Close stops it.
+  heartbeat_idle_test.go covers this idle-monitor regression and close behavior.
 - When a login response supplies a role opaque, the session automatically
   carries it into the matching `op=6` request. No separate opaque-fetch
   operation is implemented until a successful capture identifies its wire

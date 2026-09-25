@@ -18,14 +18,21 @@ describe('auto integration boundary', () => {
   let executionStatus: 'success' | 'failure' = 'success';
   let executionFailureReason: AutoExecutionResult['failure_reason'];
   let healthCalls = 0;
-  const server: AutoServer = { id: 'fairyland-main', name: 'Fairyland', address: '127.0.0.1:12660', version: '1.0.2', map_id: '211000000', enabled: true, accounts: [] };
-  const account: AutoAccount = { id: 'account-1', server_id: server.id, username: 'ops-account', character_id: '265', character_name: 'Galaxy', credential_type: 'md5', enabled: true, status: 'online', updated_at: '2026-09-15T00:00:00Z' };
+  const tokens = new Map<string, string>();
+  const server: AutoServer = { id: 'fairyland-main', name: 'Fairyland', address: '127.0.0.1:12660', version: '1.0.2', map_id: '211000000', enabled: true, spawn_rate: 2, exp_rate: 13, exp_max: 999999, drop_rate: 3, meso_rate: 5, domain_times: 2, accounts: [] };
+  const account: AutoAccount = { id: 'account-1', server_id: server.id, username: 'ops-account', character_id: '265', character_name: 'Galaxy', credential_type: 'md5', enabled: true, automation_enabled: true, status: 'online', updated_at: '2026-09-15T00:00:00Z' };
   const session: AutoSession = { id: 'session-1', server_id: server.id, state: 'logged_in', roles: [{ id: '265', name: 'Galaxy', opaque_available: true }], sent_messages: 0, chat_success_count: 0, chat_failure_count: 0, chat_unknown_count: 0, created_at: '2026-09-15T00:00:00Z', updated_at: '2026-09-15T00:00:00Z' };
   const record = (name: string, actor: { id: string }, input?: unknown) => calls.push({ name, actor: actor.id, input });
   const client: AutoIntegrationClient = {
     health: async () => { healthCalls += 1; return true; },
     overview: async (actor) => { record('overview', actor); return overview(); },
     startSession: async (actor, serverId, input) => { record('startSession', actor, { serverId, input }); return { ...session, server_id: serverId }; },
+    getSession: async (actor, id) => { record('getSession', actor, id); return { ...session, id }; },
+    sendSessionMessage: async (actor, id, input) => {
+      record('sessionMessage', actor, { id, input });
+      return { status: 'server_response_received', message: 'observed', delivery_status: 'unknown',
+        server_response: '可洗练装备(实例ID / 模板ID):\n558106 / 01302120  [无潜能]', session: { ...session, id } };
+    },
     selectAndEnterSession: async (actor, sessionId, characterId) => { record('selectAndEnterSession', actor, { sessionId, characterId }); return { ...session, id: sessionId, state: 'ready', character_id: characterId }; },
     stopSession: async (actor, sessionId) => { record('stopSession', actor, sessionId); },
     createServer: async (actor, input) => { record('createServer', actor, input); return { ...server, ...input, id: input.id ?? server.id, accounts: [] }; },
@@ -61,7 +68,11 @@ describe('auto integration boundary', () => {
     expect((await app.inject({ method: 'POST', url: '/api/v1/auto/servers', headers, payload: { id: server.id, name: server.name, address: server.address, version: server.version, map_id: server.map_id, enabled: server.enabled } })).statusCode).toBe(201);
     expect((await app.inject({ method: 'PATCH', url: `/api/v1/auto/servers/${server.id}`, headers, payload: { address: '127.0.0.1:12661' } })).statusCode).toBe(200);
     expect((await app.inject({ method: 'POST', url: `/api/v1/auto/servers/${server.id}/accounts`, headers, payload: { username: account.username, password: '5AA765D61D8327DE', credential_type: 'md5', character_id: account.character_id, character_name: account.character_name, enabled: true } })).statusCode).toBe(201);
-    const edited = await app.inject({ method: 'PATCH', url: `/api/v1/auto/servers/${server.id}/accounts/${account.id}`, headers, payload: { username: 'edited-account', password: 'new-account-secret', character_id: '266' } });
+    const edited = await app.inject({ method: 'PATCH', url: `/api/v1/auto/servers/${server.id}/accounts/${account.id}`, headers, payload: { username: 'edited-account', password: 'new-account-secret', character_id: '266', automation_enabled: false } });
+    expect(edited.json()).toMatchObject({ enabled: true, automation_enabled: false, status: 'online' });
+    expect(calls.find((call) => call.name === 'updateAccount')?.input).toMatchObject({ input: { automation_enabled: false } });
+    const invalidAutomation = await app.inject({ method: 'PATCH', url: `/api/v1/auto/servers/${server.id}/accounts/${account.id}`, headers, payload: { automation_enabled: 'false' } });
+    expect(invalidAutomation.statusCode).toBe(400);
     expect(edited.statusCode).toBe(200);
     expect(edited.body).not.toContain('new-account-secret');
     expect(calls.find((call) => call.name === 'startSession')?.input).toMatchObject({ input: { password: '5AA765D61D8327DE', credential_type: 'md5' } });
@@ -77,6 +88,34 @@ describe('auto integration boundary', () => {
     expect(calls.map((call) => call.name)).toEqual([
       'overview', 'startSession', 'selectAndEnterSession', 'stopSession', 'createServer', 'updateServer', 'createAccount', 'updateAccount', 'startAccount', 'stopAccount', 'reconnectAccount', 'sendMessage', 'deleteAccount', 'deleteServer',
     ]);
+  });
+
+  it('reads a dedicated session and adds potentials without creating an automation account', async () => {
+    const token = await login('integration-admin', 'Admin12345!');
+    const headers = { authorization: `Bearer ${token}` };
+    const before = calls.length;
+    expect((await app.inject({ method: 'GET', url: '/api/v1/auto/sessions/potential-session', headers })).json().id).toBe('potential-session');
+    const listed = await app.inject({ method: 'POST', url: '/api/v1/potentials/list', headers, payload: { session_id: 'potential-session' } });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json().equipment).toMatchObject([{ instanceId: '558106', potentials: [] }]);
+    const saved = await app.inject({ method: 'POST', url: '/api/v1/potentials/set', headers,
+      payload: { session_id: 'potential-session', instance_id: '558106', potentials: [{ stat_type: 'equipatk', value: '0.07' }] } });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json().result.delivery_status).toBe('unknown');
+    expect(calls.slice(before).map((call) => call.name)).toEqual(['getSession', 'sessionMessage', 'sessionMessage']);
+    expect(calls.at(-1)?.input).toEqual({ id: 'potential-session', input: { message: 'potentialset@558106@equipatk:0.07', mode: 'privateChat' } });
+  });
+
+  it('requires authentication and super-admin permission on potential mutations', async () => {
+    expect((await app.inject({ method: 'GET', url: '/api/v1/potential-pool' })).statusCode).toBe(401);
+    const token = await login('integration-admin', 'Admin12345!');
+    const created = await app.inject({ method: 'POST', url: '/api/v1/auth/users', headers: { authorization: `Bearer ${token}` },
+      payload: { username: 'potential-manager', displayName: 'Potential Manager', password: 'Manager12345!', role: 'manager' } });
+    expect(created.statusCode).toBe(201);
+    const managerToken = await login('potential-manager', 'Manager12345!');
+    const denied = await app.inject({ method: 'POST', url: '/api/v1/potentials/set', headers: { authorization: `Bearer ${managerToken}` },
+      payload: { session_id: 'potential-session', instance_id: '558106', potentials: [{ stat_type: 'str', value: '5' }] } });
+    expect(denied.statusCode).toBe(403);
   });
 
   it('enforces the server-operations permission before calling auto', async () => {
@@ -255,9 +294,13 @@ describe('auto integration boundary', () => {
   }
 
   async function login(username: string, password: string) {
+    const existing = tokens.get(username);
+    if (existing) return existing;
     const response = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username, password } });
     expect(response.statusCode).toBe(200);
-    return response.json().token as string;
+    const token = response.json().token as string;
+    tokens.set(username, token);
+    return token;
   }
 });
 

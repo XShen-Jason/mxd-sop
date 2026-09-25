@@ -30,6 +30,7 @@ import { loadEnvironment } from './config/environment.js';
 import { AutoIntegrationService, HttpAutoIntegrationClient, loadAutoEndpointConfig, MemoryAutoIntegrationRepository, SqliteAutoIntegrationRepository, type AutoEndpointConfig, type AutoIntegrationClient } from './modules/auto-integration/public/index.js';
 import { registerAutoIntegrationRoutes } from './modules/auto-integration/interface/http.js';
 import { OperationAutomationWorkflow } from './modules/operation-groups/application/automation-workflow.js';
+import { registerPotentialRoutes, potentialPoolPath } from './modules/potential/index.js';
 
 loadEnvironment();
 
@@ -142,6 +143,7 @@ export async function createApp(config: AppConfig = {}) {
   registerPlayerDirectoryRoutes(app, playerDirectory, auth);
   registerPlayerIntegrationRoutes(app, integration, auth);
   registerAutoIntegrationRoutes(app, autoIntegration, auth);
+  registerPotentialRoutes(app, autoIntegration, auth, catalog, potentialPoolPath(projectRoot));
   const teamClears = testPersistence
     ? new JsonTeamClearRepository(`${config.teamViewPath ?? config.dataPath ?? projectPath('data/generated/operation-groups.json')}.clears.json`)
     : new SqliteTeamClearRepository(db!);

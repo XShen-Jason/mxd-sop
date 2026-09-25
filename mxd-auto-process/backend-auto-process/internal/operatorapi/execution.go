@@ -107,7 +107,7 @@ func (h *Handler) runExecution(ctx context.Context, serverID, executionID string
 	}
 	ids := make([]string, 0, len(accounts))
 	for _, account := range accounts {
-		if account.Enabled && account.Status == sessioncontrol.AccountOnline {
+		if account.Enabled && account.AutomationEnabled && account.Status == sessioncontrol.AccountOnline {
 			ids = append(ids, account.ID)
 		}
 	}

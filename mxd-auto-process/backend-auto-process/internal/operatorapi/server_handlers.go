@@ -90,7 +90,7 @@ func (h *Handler) serverRecord(serverID string) (overviewServer, error) {
 	if err != nil {
 		return overviewServer{}, err
 	}
-	return overviewServer{ID: entry.ID, Name: entry.Name, Address: entry.Address, Version: entry.Version, MapID: entry.MapID, Enabled: entry.Enabled, KeylessProbe: entry.AllowKeylessProbe, Accounts: accounts}, nil
+	return overviewServer{ID: entry.ID, Name: entry.Name, Address: entry.Address, Version: entry.Version, MapID: entry.MapID, Enabled: entry.Enabled, KeylessProbe: entry.AllowKeylessProbe, SpawnRate: entry.SpawnRate, ExpRate: entry.ExpRate, ExpMax: entry.ExpMax, DropRate: entry.DropRate, MesoRate: entry.MesoRate, DomainTimes: entry.DomainTimes, Accounts: accounts}, nil
 }
 
 func serverConfigFromRequest(request *http.Request, existing *servercatalog.ServerConfig) (servercatalog.ServerConfig, error) {
@@ -110,6 +110,7 @@ func serverConfigFromRequest(request *http.Request, existing *servercatalog.Serv
 		if input.Enabled != nil {
 			entry.Enabled = *input.Enabled
 		}
+		applyQuickCommandSettings(&entry, input)
 		return entry, nil
 	}
 	entry := *existing
@@ -131,5 +132,27 @@ func serverConfigFromRequest(request *http.Request, existing *servercatalog.Serv
 	if input.Enabled != nil {
 		entry.Enabled = *input.Enabled
 	}
+	applyQuickCommandSettings(&entry, input)
 	return entry, nil
+}
+
+func applyQuickCommandSettings(entry *servercatalog.ServerConfig, input serverRequest) {
+	if input.SpawnRate != nil {
+		entry.SpawnRate = *input.SpawnRate
+	}
+	if input.ExpRate != nil {
+		entry.ExpRate = *input.ExpRate
+	}
+	if input.ExpMax != nil {
+		entry.ExpMax = *input.ExpMax
+	}
+	if input.DropRate != nil {
+		entry.DropRate = *input.DropRate
+	}
+	if input.MesoRate != nil {
+		entry.MesoRate = *input.MesoRate
+	}
+	if input.DomainTimes != nil {
+		entry.DomainTimes = *input.DomainTimes
+	}
 }

@@ -42,3 +42,15 @@ operation delegation, keyless-probe routing, and cleanup behavior.
 
 The manager can be reused by another frontend or CLI without changing the TCP
 module.
+
+## Account login and automation
+
+The managed account `enabled` flag controls login intent and watcher reconnect.
+`automation_enabled` controls automatic execution eligibility independently.
+Start/stop only change login intent; toggling automation preserves the session.
+Manual chat requires login; strict automation chat additionally rechecks the
+automation flag under the account lock for each command. Delayed asynchronous
+login jobs re-read login intent under that lock and cannot undo a later logout.
+
+Account changes that affect connection credentials/identity restart a logged-in
+account; automation-only or display-name changes do not restart it.
