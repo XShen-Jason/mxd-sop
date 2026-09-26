@@ -69,7 +69,16 @@ func (h *Handler) execute(writer http.ResponseWriter, request *http.Request, ser
 		writeJSON(writer, http.StatusInternalServerError, apiError{Error: "execution_unavailable"})
 		return
 	}
-	writeJSON(writer, responseStatus, executeResponse{ExecutionID: execution.ID, Status: execution.Status, Attempts: execution.Attempts, SelectedAccountID: execution.SelectedAccountID, FailureReason: executionFailureReason(execution), Commands: execution.Commands})
+	writeJSON(writer, responseStatus, executeResponse{ExecutionID: execution.ID, Status: executionResponseStatus(execution), Attempts: execution.Attempts, SelectedAccountID: execution.SelectedAccountID, FailureReason: executionFailureReason(execution), Commands: execution.Commands})
+}
+
+func executionResponseStatus(execution autostore.Execution) string {
+	for _, command := range execution.Commands {
+		if command.Status == "unknown" {
+			return "unknown"
+		}
+	}
+	return execution.Status
 }
 
 func executionFailureReason(execution autostore.Execution) string {
@@ -92,7 +101,10 @@ func (h *Handler) runExecution(ctx context.Context, serverID, executionID string
 		if execution.ServerID != serverID || execution.RequestHash != hash {
 			return autostore.Execution{}, 0, autostore.ErrExecutionConflict
 		}
-		if execution.Status == "success" || (!retry && execution.Attempts > 0) {
+		// An unknown result means the frame was written but no matching game
+		// response was observed. Never resend it implicitly: the player may
+		// already have received the reward.
+		if execution.Status == "success" || hasUnknownCommand(execution) || (!retry && execution.Attempts > 0) {
 			return execution, http.StatusOK, nil
 		}
 	} else {
@@ -157,6 +169,9 @@ func (h *Handler) runExecution(ctx context.Context, serverID, executionID string
 				command.Message = chatErr.Error()
 			} else if result.DeliveryStatus == gamesession.ChatDeliverySuccess {
 				command.Status = "success"
+			} else if result.DeliveryStatus == gamesession.ChatDeliveryUnknown {
+				command.Status = "unknown"
+				command.Message = "chat frame written; game-server response was not observed; delivery must be verified before retry"
 			} else if gamesession.IsPlayerNamePermissionResponse(result.ServerResponse) {
 				// A valid game response with this text means the current GM account
 				// lacks permission for the command. Remove it from this execution and
@@ -187,6 +202,12 @@ func (h *Handler) runExecution(ctx context.Context, serverID, executionID string
 	}
 	execution.Status = "success"
 	for _, command := range execution.Commands {
+		if command.Status == "unknown" {
+			// The SQLite execution status remains failure for compatibility with
+			// existing databases; the response projection exposes unknown.
+			execution.Status = "failure"
+			break
+		}
 		if command.Status != "success" {
 			execution.Status = "failure"
 			break
@@ -197,6 +218,15 @@ func (h *Handler) runExecution(ctx context.Context, serverID, executionID string
 		return autostore.Execution{}, 0, err
 	}
 	return execution, http.StatusOK, nil
+}
+
+func hasUnknownCommand(execution autostore.Execution) bool {
+	for _, command := range execution.Commands {
+		if command.Status == "unknown" {
+			return true
+		}
+	}
+	return false
 }
 
 func removeAccountID(ids []string, excluded string) []string {

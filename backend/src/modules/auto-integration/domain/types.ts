@@ -184,7 +184,7 @@ export interface AutoSessionMessageResult {
 export interface AutoExecutionCommand { id: string; text: string; }
 export interface AutoExecutionInput { execution_id: string; commands: AutoExecutionCommand[]; retry?: boolean; }
 export interface AutoExecutionCommandResult extends AutoExecutionCommand { status: string; account_id?: string; delivery_status?: string; message?: string; }
-export interface AutoExecutionResult { execution_id: string; status: 'running' | 'success' | 'failure'; attempts: number; selected_account_id?: string; failure_reason?: 'no_online_accounts' | 'execution_failed'; commands: AutoExecutionCommandResult[]; }
+export interface AutoExecutionResult { execution_id: string; status: 'running' | 'success' | 'failure' | 'unknown'; attempts: number; selected_account_id?: string; failure_reason?: 'no_online_accounts' | 'execution_failed'; commands: AutoExecutionCommandResult[]; }
 
 export type AutoIntegrationActor = Pick<Identity, 'id' | 'role' | 'displayName' | 'workspacePermissions'>;
 

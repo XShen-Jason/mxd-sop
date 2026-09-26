@@ -323,6 +323,10 @@ button.primary-button, button.secondary-button, button.complete-button, .server-
 .record-action-button:hover { background: #e5f4ef; }
 .record-action-button.primary { color: #176f5d; border-color: #9ecfbd; background: #e5f4ef; }
 .record-action-button.danger { color: #a54136; border-color: #e7b8b0; background: #fff4f1; }
+.record-action-button.delivery-unknown-action { color: #8a5b14; border-color: #e6c98f; background: #fff8e7; cursor: not-allowed; }
+.record-delivery-warning { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; border-top: 1px solid #f0d9a6; padding: 8px 12px; color: #76551e; background: #fffaf0; font-size: 11px; }
+.record-delivery-warning strong { font-size: 11px; }
+.record-delivery-warning span { overflow-wrap: anywhere; }
 .record-expand-button { color: #526f64; background: transparent; min-width: 28px; padding-inline: 5px; }
 
 /* Reissue table layout with extra columns. */

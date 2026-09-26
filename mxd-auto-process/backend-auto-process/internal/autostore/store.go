@@ -13,7 +13,6 @@ const (
 	OperatorUsername        = "admin"
 	minOperatorPasswordSize = 6
 	minAccountPasswordSize  = 1
-	maxAuditEntries         = 5000
 )
 
 var (

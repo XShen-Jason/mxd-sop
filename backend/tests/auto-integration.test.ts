@@ -15,7 +15,7 @@ describe('auto integration boundary', () => {
   const dataPath = path.join(os.tmpdir(), `ops-auto-integration-${randomUUID()}.json`);
   const usersPath = path.join(os.tmpdir(), `ops-auto-integration-users-${randomUUID()}.json`);
   const calls: Array<{ name: string; actor: string; input?: unknown }> = [];
-  let executionStatus: 'success' | 'failure' = 'success';
+  let executionStatus: 'success' | 'failure' | 'unknown' = 'success';
   let executionFailureReason: AutoExecutionResult['failure_reason'];
   let healthCalls = 0;
   const tokens = new Map<string, string>();
@@ -287,6 +287,21 @@ describe('auto integration boundary', () => {
     expect(approved.json()).toMatchObject({ status: 'approved', reminderCount: 1, automationFailureReason: 'no-online-accounts' });
     executionStatus = 'success';
     executionFailureReason = undefined;
+  });
+
+  it('does not create a reminder when auto wrote the command but delivery is unknown', async () => {
+    const token = await login('integration-admin', 'Admin12345!');
+    const headers = { authorization: `Bearer ${token}` };
+    executionStatus = 'unknown';
+    const submit = await app.inject({
+      method: 'POST', url: '/api/v1/operation-groups', headers,
+      payload: { serverId: 'mushroom', account: 'player', characterId: '507', playerQQ: '1', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '02000000', quantity: 1 }] },
+    });
+    const approved = await app.inject({ method: 'POST', url: `/api/v1/manager/operation-groups/${submit.json().id}/approve`, headers });
+    expect(approved.statusCode).toBe(200);
+    expect(approved.json()).toMatchObject({ status: 'approved', executionNote: expect.stringContaining('未收到游戏服回执') });
+    expect(approved.json()).not.toHaveProperty('reminderCount');
+    executionStatus = 'success';
   });
 
   function overview(): AutoOverview {

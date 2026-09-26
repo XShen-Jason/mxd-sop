@@ -46,6 +46,7 @@ export class OperationAutomationWorkflow {
       return this.groups.automationProjection(id);
     }
     if (result.status === 'success') return this.groups.recordAutomationSuccess(id);
+    if (result.status === 'unknown') return this.groups.recordAutomationUnknown(id);
     this.groups.recordAutomationFailure(id, automationFailureReason(result.failure_reason));
     return this.groups.automationProjection(id);
   }

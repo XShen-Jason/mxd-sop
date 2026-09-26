@@ -319,6 +319,18 @@ export class OperationGroupsService {
     return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
+  recordAutomationUnknown(id: string) {
+    const group = this.getGroup(id);
+    if (group.status !== 'approved') return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
+    const before = groupChangeState(group);
+    const note = 'auto 已写入指令但未收到游戏服回执，请核实后再处理，禁止直接重发';
+    group.executionNote = note;
+    clearReminder(group);
+    this.deps.repository.replace(group);
+    this.changed(group, before);
+    return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
+  }
+
   private applyReminder(identity: Identity, id: string, action: 'remind' | 'online'): CustomerGroupProjection {
     this.requireAuthenticated(identity);
     this.requireWorkspace(identity, action === 'online' ? 'reminders' : 'ready');

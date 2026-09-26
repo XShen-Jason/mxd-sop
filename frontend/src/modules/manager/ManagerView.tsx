@@ -225,9 +225,12 @@ function RequestCard({ index, panel, group, options, expanded, onToggle, onActio
   // request exposes its generated commands, including regular operations.
   const expandable = panel === 'ready' || issuance || panel === 'archive' || panel === 'reissue';
   const canReview = panel === 'queue' && group.status === 'pending';
+  const deliveryUnknown = group.executionNote?.includes('未收到游戏服回执') ?? false;
   const canIssue = panel === 'ready' && group.status === 'approved' && issuance;
   const canRemind = panel === 'ready' && group.status === 'approved';
-  const remindButton = canRemind ? <button type="button" className={`record-action-button ${group.reminderCount ? 'reminded' : 'primary'}`} title={group.reminderCount ? '已提醒，可再次提醒上线' : undefined} onClick={(event) => { event.stopPropagation(); onAction('remind', group); }}><Bell size={13} />{group.reminderCount ? '再次提醒' : '提醒上线'}</button> : null;
+  const remindButton = canRemind ? deliveryUnknown
+    ? <button type="button" className="record-action-button delivery-unknown-action" disabled title="指令可能已经发送成功，核实前禁止重发"><Bell size={13} />待核实，禁止重发</button>
+    : <button type="button" className={`record-action-button ${group.reminderCount ? 'reminded' : 'primary'}`} title={group.reminderCount ? '已提醒，可再次提醒上线' : undefined} onClick={(event) => { event.stopPropagation(); onAction('remind', group); }}><Bell size={13} />{group.reminderCount ? '再次提醒' : '提醒上线'}</button> : null;
   const canComplete = (panel === 'ready' || panel === 'archive') && group.status === 'approved' && !issuance;
   const isReissuePanel = panel === 'reissue' || panel === 'queue';
   return <article className={`manager-card record-card manager-record status-card-${group.status} ${expanded ? 'is-expanded' : ''}`}>
@@ -246,6 +249,7 @@ function RequestCard({ index, panel, group, options, expanded, onToggle, onActio
       <div className="record-status-cell" data-label="状态" role="cell"><StatusBadge status={group.status} /></div>
       <div className="record-operation" data-label="操作" role="cell" onKeyDown={(event) => event.stopPropagation()}>{canReview && <><button type="button" className="record-action-button danger" onClick={(event) => { event.stopPropagation(); onAction('reject', group); }}><X size={13} />驳回</button><button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('approve', group); }}><Check size={13} />通过</button></>}{remindButton}{canIssue && <button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('issue', group); }}><PackageCheck size={14} />确认完成</button>}{canComplete && <button type="button" className="record-action-button primary" onClick={(event) => { event.stopPropagation(); onAction('complete', group); }}><Check size={14} />确认完成</button>}{expandable && <button type="button" className="record-action-button record-expand-button" title={expanded ? '收起详情' : '展开详情'} aria-label={expanded ? '收起详情' : '展开详情'} onClick={(event) => { event.stopPropagation(); onToggle(); }}>{expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</button>}</div>
     </div>
+    {panel === 'ready' && deliveryUnknown && <div className="record-delivery-warning" role="status"><strong>自动化结果待核实</strong><span>{group.executionNote}</span></div>}
     {expanded && <div className="record-card-content">
         {panel === 'archive' ? <WorkflowTimeline group={group} /> : panel === 'reissue' ? <><WorkflowTimeline group={group} /><IssuanceItemsDisplay group={group} /></> : panel === 'queue' ? <IssuanceItemsDisplay group={group} /> : <CommandDetails group={group} commands={displayCommands} copiedCommands={copiedCommands} onCommandCopied={onCommandCopied} />}
     </div>}

@@ -626,7 +626,7 @@ components:
       required: [execution_id, status, attempts, commands]
       properties:
         execution_id: {type: string}
-        status: {type: string, enum: [running, success, failure]}
+        status: {type: string, enum: [running, success, failure, unknown], description: unknown means the chat frame was written but no matching game-server response was observed; do not retry automatically}
         attempts: {type: integer, minimum: 1}
         selected_account_id: {type: string}
         failure_reason: {type: string, enum: [no_online_accounts, execution_failed]}

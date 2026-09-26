@@ -76,8 +76,9 @@ func (s *Store) Record(entry AuditEntry) error {
 	if _, err := s.db.Exec("INSERT INTO audit_logs (id, created_at, request_id, method, path, actor, action, status, duration_ms, detail_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", entry.ID, entry.CreatedAt, entry.RequestID, entry.Method, entry.Path, entry.Actor, entry.Action, entry.Status, entry.DurationMS, string(detail)); err != nil {
 		return err
 	}
-	_, err = s.db.Exec("DELETE FROM audit_logs WHERE id NOT IN (SELECT id FROM audit_logs ORDER BY created_at DESC, id DESC LIMIT ?)", maxAuditEntries)
-	return err
+	// Audit entries are historical evidence for delivery and troubleshooting.
+	// Keep them in SQLite; list endpoints remain bounded by their LIMIT.
+	return nil
 }
 
 func timestamp() string { return time.Now().UTC().Format(time.RFC3339Nano) }
