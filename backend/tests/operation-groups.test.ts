@@ -27,6 +27,30 @@ function service() {
 }
 
 describe('operation-groups lifecycle and projections', () => {
+  it.each(['cash', 'kick'] as const)('verifies offline %s requests with scoped reminders and clears proof on edit', (type) => {
+    const instance = service();
+    const input = { serverId: 'mushroom', account: 'acc', characterId: '1852', playerQQ: '456',
+      reason: { code: type === 'cash' ? 'compensation' : 'corpse' },
+      operations: type === 'cash' ? [{ type, quantity: 10 }] : [{ type }] };
+    const group = instance.submit(customer, input);
+    if (type === 'cash') instance.approve(manager, group.id);
+    instance.recordAutomationUnknown(group.id);
+    expect(() => instance.remind(customer, group.id, true)).toThrowError(expect.objectContaining({ code: 'forbidden' }));
+    const verified = instance.remind(superAdmin, group.id, true);
+    expect(verified).toMatchObject({ executionNote: '已核实玩家不在线', reminderCount: 1,
+      lastRemindedBy: { id: superAdmin.id }, automationOfflineVerificationId: expect.any(String) });
+    const repeated = instance.remind(superAdmin, group.id, true);
+    expect(repeated.automationOfflineVerificationId).toBe(verified.automationOfflineVerificationId);
+    expect(instance.listReminders(customer).groups.map((item) => item.id)).toContain(group.id);
+    expect(instance.listReminders({ ...customer, id: 'another-owner' }).groups).toHaveLength(0);
+    expect(instance.workspaceCounts(customer).reminders).toBe(1);
+    expect(instance.markOnline(customer, group.id).automationOfflineVerificationId).toBe(verified.automationOfflineVerificationId);
+    const updated = instance.update(customer, group.id, input);
+    expect(updated).not.toHaveProperty('automationOfflineVerificationId');
+    expect(updated).not.toHaveProperty('executionNote');
+    expect(updated).not.toHaveProperty('reminderCount');
+  });
+
   it('publishes the configured reason presets in default order', () => {
     const options = service().getOptions();
     expect(options.reasons.map((reason) => reason.displayName)).toEqual(['BUG补发', '活动奖励', '补偿', '自己人', '其他']);

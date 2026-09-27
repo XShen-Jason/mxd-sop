@@ -39,7 +39,7 @@ var (
 	dropOfflineMessage    = regexp.MustCompile(`^目标玩家\[([^\]]+)\]不在线，无法发送物品。$`)
 	dropSelfNotification  = regexp.MustCompile(`^GM赠送您[^\[\]]+\[([^\]]+)\](?:×)?([0-9]+)。$`)
 	cashIDSuccessMessage  = regexp.MustCompile(`^已给角色\[[^\]]+\(([^)]+)\)\]发放点券 ([0-9]+)$`)
-	cashIDOfflineMessage  = regexp.MustCompile(`^角色id\[([^\]]+)\]不在线。给账号发点券\(支持离线\)请使用: zzdd@账号@数量$`)
+	cashIDOfflineMessage  = regexp.MustCompile(`^角色id\[([^\]]+)\]不在线。给账号发点券\(支持离线\)请(?:使)?用: zzdd@账号@数量$`)
 	cashIDNotification    = regexp.MustCompile(`^GM\[[^\]]+\]给你发放点券: ([0-9]+)$`)
 	herwarpSuccessMessage = regexp.MustCompile(`^已将玩家([^\s]+)传送到您身边。$`)
 	herwarpOfflineMessage = regexp.MustCompile(`^玩家不在线无法传送。$`)

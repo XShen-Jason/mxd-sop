@@ -39,7 +39,9 @@ still match the outstanding command.
 `cashid` matches the character/quantity success form
 `已给角色[<name>(<characterId>)]发放点券 <quantity>` or the offline form
 `角色id[<characterId>]不在线。给账号发点券(支持离线)请使用: zzdd@账号@数量`.
-The latter means the original credit was not issued and is `failure`.
+The equivalent wording `请用: zzdd@账号@数量` is also accepted. Both require
+the outstanding command's character ID and mean the original credit was not
+issued (`failure`). The suggested `zzdd` command is never sent automatically.
 `cashid`'s intermediate `evt=63` `WalletBalance` event is not a terminal
 response. `herwarp@<characterId>` matches `已将玩家<name>传送到您身边。`
 as `success` and `玩家不在线无法传送。` as `failure`; the observed herwarp

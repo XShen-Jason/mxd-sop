@@ -120,8 +120,9 @@ export function ManagerView({ options, userId, token, panel = 'queue', actorId, 
     if (action === 'reject') { setRejectTarget(group); return; }
     if (action === 'remind') {
       try {
-        await client.remind(group.id);
-        setNotice({ kind: 'success', text: '已提醒客服' });
+        const verifiedOffline = group.executionNote?.includes('未收到游戏服回执') ?? false;
+        await client.remind(group.id, verifiedOffline);
+        setNotice({ kind: 'success', text: verifiedOffline ? '已核实玩家不在线，已放入待提醒' : '已提醒客服' });
         await load();
       } catch (err) { setError(err instanceof ApiError ? err.message : '提醒失败'); }
       return;
@@ -229,7 +230,7 @@ function RequestCard({ index, panel, group, options, expanded, onToggle, onActio
   const canIssue = panel === 'ready' && group.status === 'approved' && issuance;
   const canRemind = panel === 'ready' && group.status === 'approved';
   const remindButton = canRemind ? deliveryUnknown
-    ? <button type="button" className="record-action-button delivery-unknown-action" disabled title="指令可能已经发送成功，核实前禁止重发"><Bell size={13} />待核实，禁止重发</button>
+    ? <button type="button" className="record-action-button primary" title="已核实玩家不在线且未收到物资，放入待提醒" onClick={(event) => { event.stopPropagation(); onAction('remind', group); }}><Bell size={13} />已核实玩家不在线</button>
     : <button type="button" className={`record-action-button ${group.reminderCount ? 'reminded' : 'primary'}`} title={group.reminderCount ? '已提醒，可再次提醒上线' : undefined} onClick={(event) => { event.stopPropagation(); onAction('remind', group); }}><Bell size={13} />{group.reminderCount ? '再次提醒' : '提醒上线'}</button> : null;
   const canComplete = (panel === 'ready' || panel === 'archive') && group.status === 'approved' && !issuance;
   const isReissuePanel = panel === 'reissue' || panel === 'queue';

@@ -46,6 +46,7 @@ export interface Group {
   updatedBy?: { id: string; displayName: string };
   executionNote?: string;
   automationFailureReason?: 'no-online-accounts' | 'execution-failed';
+  automationOfflineVerificationId?: string;
   reminderCount?: number;
   lastRemindedAt?: string;
   lastRemindedBy?: { id: string; displayName: string };

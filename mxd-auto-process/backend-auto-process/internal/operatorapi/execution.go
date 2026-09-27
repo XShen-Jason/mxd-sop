@@ -14,9 +14,10 @@ import (
 )
 
 type executeRequest struct {
-	ExecutionID string                       `json:"execution_id"`
-	Commands    []autostore.ExecutionCommand `json:"commands"`
-	Retry       bool                         `json:"retry"`
+	ExecutionID           string                       `json:"execution_id"`
+	Commands              []autostore.ExecutionCommand `json:"commands"`
+	Retry                 bool                         `json:"retry"`
+	OfflineVerificationID string                       `json:"offline_verification_id"`
 }
 
 type executeResponse struct {
@@ -31,6 +32,10 @@ type executeResponse struct {
 func (h *Handler) execute(writer http.ResponseWriter, request *http.Request, serverID string) {
 	var input executeRequest
 	if err := decodeJSON(writer, request, &input); err != nil {
+		return
+	}
+	if len(input.OfflineVerificationID) > 128 || (input.OfflineVerificationID != "" && (!input.Retry || strings.TrimSpace(input.OfflineVerificationID) == "")) {
+		writeJSON(writer, http.StatusBadRequest, apiError{Error: "invalid_offline_verification"})
 		return
 	}
 	if strings.TrimSpace(input.ExecutionID) == "" || len(input.Commands) == 0 || len(input.Commands) > 10000 {
@@ -55,12 +60,11 @@ func (h *Handler) execute(writer http.ResponseWriter, request *http.Request, ser
 			return
 		}
 		seen[command.ID] = struct{}{}
-		command.Status = "pending"
-		commands[index] = command
+		commands[index] = autostore.ExecutionCommand{ID: command.ID, Text: command.Text, Status: "pending"}
 	}
 	h.executionMu.Lock()
 	defer h.executionMu.Unlock()
-	execution, responseStatus, err := h.runExecution(request.Context(), serverID, input.ExecutionID, commands, input.Retry)
+	execution, responseStatus, err := h.runExecution(request.Context(), serverID, input.ExecutionID, commands, input.Retry, input.OfflineVerificationID)
 	if err != nil {
 		if errors.Is(err, autostore.ErrExecutionConflict) {
 			writeJSON(writer, http.StatusConflict, apiError{Error: "execution_conflict"})
@@ -88,7 +92,7 @@ func executionFailureReason(execution autostore.Execution) string {
 	return ""
 }
 
-func (h *Handler) runExecution(ctx context.Context, serverID, executionID string, commands []autostore.ExecutionCommand, retry bool) (autostore.Execution, int, error) {
+func (h *Handler) runExecution(ctx context.Context, serverID, executionID string, commands []autostore.ExecutionCommand, retry bool, verificationID string) (autostore.Execution, int, error) {
 	if h.store == nil || h.accounts == nil {
 		return autostore.Execution{}, http.StatusServiceUnavailable, errors.New("execution storage unavailable")
 	}
@@ -102,10 +106,18 @@ func (h *Handler) runExecution(ctx context.Context, serverID, executionID string
 			return autostore.Execution{}, 0, autostore.ErrExecutionConflict
 		}
 		// An unknown result means the frame was written but no matching game
-		// response was observed. Never resend it implicitly: the player may
-		// already have received the reward.
-		if execution.Status == "success" || hasUnknownCommand(execution) || (!retry && execution.Attempts > 0) {
+		// response was observed. Retrying it requires explicit operator
+		// verification that the player was offline and did not receive it.
+		if execution.Status == "success" || (!retry && execution.Attempts > 0) {
 			return execution, http.StatusOK, nil
+		}
+		if hasUnknownCommand(execution) {
+			if !retry || !verifyOfflineCommands(&execution, verificationID) {
+				return execution, http.StatusOK, nil
+			}
+			if err := h.store.SaveExecution(execution); err != nil {
+				return autostore.Execution{}, 0, err
+			}
 		}
 	} else {
 		now := time.Now().UTC().Format(time.RFC3339Nano)
@@ -140,6 +152,9 @@ func (h *Handler) runExecution(ctx context.Context, serverID, executionID string
 		command := &execution.Commands[index]
 		if command.Status == "success" {
 			continue
+		}
+		if verificationID != "" {
+			command.OfflineVerificationID = verificationID
 		}
 		for {
 			command.AccountID = accountID

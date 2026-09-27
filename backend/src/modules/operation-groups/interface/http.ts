@@ -192,7 +192,11 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
     try { const body = bodyObject(request); if (Object.keys(body).some((key) => key !== 'executionNote')) throw new GroupError('invalid-input'); if (body.executionNote !== undefined && typeof body.executionNote !== 'string') throw new GroupError('invalid-input'); return reply.send(service.issue(identity(request), (request.params as { groupId: string }).groupId, body.executionNote as string | undefined)); } catch (error) { return sendError(reply, error); }
   });
   const remind = async (request: FastifyRequest, reply: FastifyReply) => {
-    try { return reply.send(service.remind(identity(request), (request.params as { groupId: string }).groupId)); } catch (error) { return sendError(reply, error); }
+    try {
+      const body = bodyObject(request);
+      if (Object.keys(body).some((key) => key !== 'verifiedOffline') || (body.verifiedOffline !== undefined && typeof body.verifiedOffline !== 'boolean')) throw new GroupError('invalid-input');
+      return reply.send(service.remind(identity(request), (request.params as { groupId: string }).groupId, body.verifiedOffline === true));
+    } catch (error) { return sendError(reply, error); }
   };
   app.post('/api/v1/operation-groups/:groupId/remind', remind);
   // Compatibility alias for clients released before workspace permissions.

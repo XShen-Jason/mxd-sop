@@ -33,6 +33,13 @@ and execution routes retain the mappings registered in `docs/CONTRACTS.md`.
 The adapter sends the configured service token and authenticated actor headers;
 credentials remain write-only.
 
+Execution retries accept the additive `offline_verification_id` field defined
+by operator-api.v1. Operation-groups supplies this only after a ready-workspace
+operator has explicitly verified offline non-delivery. It uses the original
+execution ID, preserves successful commands, and never dispatches during the
+verification/reminder action itself. An ordinary retry cannot release unknown
+delivery; the same verification cannot release a later unknown result.
+
 Setup-session login and account create/update accept `credential_type` with
 `password` (default) or `md5`. In `md5` mode the credential must be the final
 16-character hexadecimal login value; every layer forwards it unchanged to

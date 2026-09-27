@@ -64,10 +64,36 @@ func TestCashIDRequiresMatchingCharacterAndQuantity(t *testing.T) {
 	for _, text := range []string{
 		"已给角色[REF(315)]发放点券 10",
 		"已给角色[REF(265)]发放点券 1",
+		"角色id[1852]不在线。给账号发点券(支持离线)请用: zzdd@账号@数量",
+		"角色id[1852]不在线。给账号发点券(支持离线)请使用: zzdd@账号@数量",
 	} {
 		if status := classifyCashIDSystemMessage(text, command); status != ChatDeliveryUnknown {
 			t.Fatalf("mismatched cashid result was classified as %s: %q", status, text)
 		}
+	}
+}
+
+func TestCashIDOfflineReceiptWordingVariants(t *testing.T) {
+	for _, wording := range []string{"请用", "请使用"} {
+		t.Run(wording, func(t *testing.T) {
+			response := "角色id[1852]不在线。给账号发点券(支持离线)" + wording + ": zzdd@账号@数量"
+			client := &scriptedClient{responses: []gameprotocol.Message{systemEvent(response)}}
+			session, err := New(client, Config{ChatResponseTimeout: 20 * time.Millisecond})
+			if err != nil {
+				t.Fatal(err)
+			}
+			session.state = StateReady
+			result, err := session.SendPrivateChat(context.Background(), "cashid@1852@10")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.DeliveryStatus != ChatDeliveryFailure || result.ServerResponse != response {
+				t.Fatalf("offline receipt must be a definite failure: %+v", result)
+			}
+			if snapshot := session.Snapshot(); snapshot.ChatFailureCount != 1 || snapshot.ChatUnknownCount != 0 {
+				t.Fatalf("unexpected counters: %+v", snapshot)
+			}
+		})
 	}
 }
 

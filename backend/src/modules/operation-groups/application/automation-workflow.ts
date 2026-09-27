@@ -37,7 +37,8 @@ export class OperationAutomationWorkflow {
     const executionId = automationExecutionId(group, commands);
     let result: AutoExecutionResult;
     try {
-      result = await this.auto.execute(AUTO_ACTOR, group.server.id, { execution_id: executionId, commands, retry });
+      result = await this.auto.execute(AUTO_ACTOR, group.server.id, { execution_id: executionId, commands, retry,
+        ...(retry && group.automationOfflineVerificationId ? { offline_verification_id: group.automationOfflineVerificationId } : {}) });
     } catch (error) {
       // The connection may be switched off after the preflight check. This is
       // an intentional manual fallback, not an automation delivery failure.

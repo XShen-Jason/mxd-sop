@@ -333,6 +333,17 @@ not query the game server for presence before dispatch.
 
 `POST /api/v1/super-admin/operation-groups/{groupId}/remind` 需要 `ready` 工作区，对 approved 申请调用。调用不改变 status，递增 `reminderCount` 并记录 `lastRemindedAt/lastRemindedBy`；重复调用表示再次提醒，发物资和常规操作均可提醒。
 
+同样适用于 `/api/v1/operation-groups/{groupId}/remind`。可选请求体
+`{ "verifiedOffline": true }` 表示操作者已核实玩家不在线且未收到本次未确认的发放。
+后端保存 `executionNote=已核实玩家不在线` 和不透明的
+`automationOfflineVerificationId`，并写入上述提醒字段；此操作不发送游戏指令。
+未传该字段的旧客户端仍走普通提醒；非布尔值或未知字段返回 400。
+该记录随后可在提交者本人的待提醒列表中处理。提交者确认上线时，后端将核实 ID
+随原执行 ID 传给 auto，仅重试未成功的指令。重复核实请求复用当前核实 ID，
+重复提交同一核实 ID 不得放行重试后新出现的未知回执。重试再次未知、自动完成、
+或编辑申请时清除核实 ID；再次未知时清除提醒并要求重新核实。编辑同时清除旧执行说明。
+auto 关闭时核实记录照常进入待提醒，直到显式上线重试且 auto 开启才执行。
+
 `GET /api/v1/operation-groups/reminders?cursor={opaque-cursor}&limit={n}&kind={issuance|regular}` 需要 `reminders` 工作区；customer、manager、super_admin 均可调用，但只返回当前登录用户提交者本人、仍为 approved、已被提醒的记录。`kind` 可筛选发物资或常规操作，省略时返回两类；使用与 list-own 相同的客服投影和倒序游标分页，绝不返回 commands。
 
 `GET /api/v1/operation-groups/workspace-counts` 返回当前账号已授权工作区的小标计数：拥有 `reminders` 时返回提醒计数，拥有 `records` 时返回自己的申请计数，拥有 `queue` 时返回 pending 计数，拥有 `ready` 时返回 approved 计数；未授权的计数键省略。

@@ -97,6 +97,8 @@
   .record-table-row.record-table-without-actor { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "index index" "server status" "character type" "reason reason" "time operation"; }
   .record-table-row.record-table-reissue { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "index index" "server status" "account account" "qq qq" "character type" "reason reason" "time operation"; }
   .record-table-row.record-table-with-reviewer { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "index index" "server status" "character type" "reason reason" "actor actor" "time operation"; }
+  .manager-record .record-table-row.record-table-with-reviewer { grid-template-areas: "index index" "server status" "character type" "reason reason" "actor actor" "time time" "operation operation"; }
+  .manager-record .record-table-with-reviewer .record-operation::before { display: none; }
   .record-index { grid-area: index; text-align: left; font-size: 10px; }
   .record-server { grid-area: server; }
   .record-account { grid-area: account; }

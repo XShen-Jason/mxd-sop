@@ -301,7 +301,27 @@ describe('auto integration boundary', () => {
     expect(approved.statusCode).toBe(200);
     expect(approved.json()).toMatchObject({ status: 'approved', executionNote: expect.stringContaining('未收到游戏服回执') });
     expect(approved.json()).not.toHaveProperty('reminderCount');
+    const executionCount = calls.filter((call) => call.name === 'execute').length;
+    const url = `/api/v1/operation-groups/${submit.json().id}/remind`;
+    const invalid = await app.inject({ method: 'POST', url, headers, payload: { verifiedOffline: 'true' } });
+    expect(invalid.statusCode).toBe(400);
+    const verified = await app.inject({ method: 'POST', url, headers, payload: { verifiedOffline: true } });
+    expect(verified.statusCode).toBe(200);
+    expect(verified.json()).toMatchObject({ status: 'approved', reminderCount: 1, executionNote: '已核实玩家不在线', automationOfflineVerificationId: expect.any(String) });
+    expect(calls.filter((call) => call.name === 'execute')).toHaveLength(executionCount);
+    const reminders = await app.inject({ method: 'GET', url: '/api/v1/operation-groups/reminders', headers });
+    expect(reminders.json().groups.some((group: { id: string }) => group.id === submit.json().id)).toBe(true);
+    const retriedUnknown = await app.inject({ method: 'POST', url: `/api/v1/operation-groups/${submit.json().id}/online`, headers });
+    expect(calls.filter((call) => call.name === 'execute').at(-1)?.input).toMatchObject({ input: { execution_id: submit.json().id, retry: true, offline_verification_id: verified.json().automationOfflineVerificationId } });
+    expect(retriedUnknown.json()).not.toHaveProperty('automationOfflineVerificationId');
+    expect(retriedUnknown.json()).not.toHaveProperty('reminderCount');
+    await app.inject({ method: 'POST', url, headers, payload: { verifiedOffline: true } });
     executionStatus = 'success';
+    const completed = await app.inject({ method: 'POST', url: `/api/v1/operation-groups/${submit.json().id}/online`, headers });
+    expect(completed.json().status).toBe('issued');
+    expect(completed.json()).not.toHaveProperty('automationOfflineVerificationId');
+    const terminal = await app.inject({ method: 'POST', url, headers, payload: { verifiedOffline: true } });
+    expect(terminal.statusCode).toBe(409);
   });
 
   function overview(): AutoOverview {

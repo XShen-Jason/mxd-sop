@@ -116,6 +116,7 @@ export interface OperationGroup {
   lastRemindedBy?: { id: string; displayName: string };
   executionNote?: string;
   automationFailureReason?: AutomationFailureReason;
+  automationOfflineVerificationId?: string;
   commandRuleVersion: string;
   idempotencyKey?: string;
   requestFingerprint?: string;
@@ -165,6 +166,7 @@ export interface CustomerGroupProjection {
   lastRemindedBy?: { id: string; displayName: string };
   executionNote?: string;
   automationFailureReason?: AutomationFailureReason;
+  automationOfflineVerificationId?: string;
 }
 
 export interface ManagerGroupProjection extends CustomerGroupProjection {

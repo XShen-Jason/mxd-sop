@@ -169,6 +169,8 @@ export class OperationGroupsService {
     delete group.rejectionReason;
     delete group.issuedAt;
     delete group.issuedBy;
+    delete group.automationOfflineVerificationId;
+    delete group.executionNote;
     clearReminder(group);
     this.deps.repository.replace(group);
     this.changed(group, before);
@@ -269,7 +271,7 @@ export class OperationGroupsService {
     return { groups: page.groups.map((group) => managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName)), nextCursor: page.nextCursor };
   }
 
-  remind(identity: Identity, id: string) { return this.applyReminder(identity, id, 'remind'); }
+  remind(identity: Identity, id: string, verifiedOffline = false) { return this.applyReminder(identity, id, verifiedOffline ? 'verify-offline' : 'remind'); }
   markOnline(identity: Identity, id: string) { return this.applyReminder(identity, id, 'online'); }
 
   /** Internal execution boundary used by the auto-process workflow. */
@@ -308,6 +310,7 @@ export class OperationGroupsService {
     const before = groupChangeState(group);
     if (executionNote) group.executionNote = safeText(executionNote, 'executionNote', 500);
     const actor = { id: 'auto-process', role: 'super_admin' as const, displayName: 'auto-process' };
+    delete group.automationOfflineVerificationId;
     if (isIssuanceGroup(group)) {
       group.status = 'issued'; group.issuedAt = this.now().toISOString(); group.issuedBy = actor;
     } else {
@@ -325,13 +328,14 @@ export class OperationGroupsService {
     const before = groupChangeState(group);
     const note = 'auto 已写入指令但未收到游戏服回执，请核实后再处理，禁止直接重发';
     group.executionNote = note;
+    delete group.automationOfflineVerificationId;
     clearReminder(group);
     this.deps.repository.replace(group);
     this.changed(group, before);
     return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
-  private applyReminder(identity: Identity, id: string, action: 'remind' | 'online'): CustomerGroupProjection {
+  private applyReminder(identity: Identity, id: string, action: 'remind' | 'online' | 'verify-offline'): CustomerGroupProjection {
     this.requireAuthenticated(identity);
     this.requireWorkspace(identity, action === 'online' ? 'reminders' : 'ready');
     const group = this.getGroup(id);

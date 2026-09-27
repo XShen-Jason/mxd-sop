@@ -10,12 +10,13 @@ import (
 )
 
 type ExecutionCommand struct {
-	ID             string `json:"id"`
-	Text           string `json:"text"`
-	Status         string `json:"status"`
-	AccountID      string `json:"account_id,omitempty"`
-	DeliveryStatus string `json:"delivery_status,omitempty"`
-	Message        string `json:"message,omitempty"`
+	ID                    string `json:"id"`
+	Text                  string `json:"text"`
+	Status                string `json:"status"`
+	AccountID             string `json:"account_id,omitempty"`
+	DeliveryStatus        string `json:"delivery_status,omitempty"`
+	Message               string `json:"message,omitempty"`
+	OfflineVerificationID string `json:"offline_verification_id,omitempty"`
 }
 
 type Execution struct {

@@ -145,6 +145,16 @@ Reloads and additional pages derive the presentation from persisted reminder fie
 Archive API ordering and cursor semantics remain unchanged.
 Browser coverage: `frontend/tests/ready-reminders.browser.cjs`.
 
+Unknown automation results offer the enabled `已核实玩家不在线` action in
+the ready workspace. It uses the remind contract's explicit verification flag,
+persists the operator/time through reminder metadata, clears the unknown warning,
+and adds the request to its submitter's reminders without dispatching commands.
+The online retry forwards the saved verification ID to auto so existing unknown
+records can recover without resending successful commands. See the canonical
+remind contract for reset and replay semantics. Regression coverage includes
+`backend/tests/auto-integration.test.ts` and
+`frontend/tests/verified-offline.browser.cjs` (desktop and mobile).
+
 模块 ID 和 group/operation 字段语义必须保持稳定。更换数据库或 API 框架时只替换适配器和接口层；若增加 processing 等状态，先升级契约并记录迁移。
 
 工作流扩展使用 `pending`、`approved`、`rejected`、`issued` 和 `cancelled`；旧 `completed` 记录继续可读。提交者可编辑/取消 pending 物资或 approved 常规操作记录；拥有 `queue` 工作区可审核物资，拥有 `ready` 工作区可发放物资、完成常规操作并提醒，拥有 `archive` 工作区也可完成常规操作。

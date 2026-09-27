@@ -34,6 +34,14 @@ direct operator clients and use the same authentication boundary.
 
 ## Ownership and invariants
 
+- Execution retries may include `offline_verification_id` after an operator
+  verifies the unresolved delivery was not received because the player was
+  offline. The execution lock protects verification and retry. Only unknown
+  commands are resolved to failure; successful commands remain skipped. The
+  verification ID is retained in command JSON, so replaying it cannot release a
+  new unknown result from that retry. No schema migration or new worker is needed.
+  See operator-api.v1 and `execution_verification_test.go`.
+
 - SQLite is authoritative for the server catalog, game accounts, operator
   state, and audit records. The JSON server file is only the first-run
   bootstrap when no catalog has been persisted.

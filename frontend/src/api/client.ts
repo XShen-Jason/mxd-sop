@@ -228,7 +228,7 @@ export class ApiClient {
   approve(id: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/approve`, { method: 'POST' }); }
   reject(id: string, reason?: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/reject`, { method: 'POST', body: JSON.stringify(reason ? { reason } : {}) }); }
   issue(id: string, executionNote?: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/issue`, { method: 'POST', body: JSON.stringify(executionNote ? { executionNote } : {}) }); }
-  remind(id: string) { return this.request<Group>(`/api/v1/operation-groups/${encodeURIComponent(id)}/remind`, { method: 'POST' }); }
+  remind(id: string, verifiedOffline = false) { return this.request<Group>(`/api/v1/operation-groups/${encodeURIComponent(id)}/remind`, { method: 'POST', ...(verifiedOffline ? { body: JSON.stringify({ verifiedOffline: true }) } : {}) }); }
   markOnline(id: string) { return this.request<Group>(`/api/v1/operation-groups/${encodeURIComponent(id)}/online`, { method: 'POST' }); }
   complete(id: string, executionNote?: string) { return this.request<ManagerGroup>(`/api/v1/manager/operation-groups/${encodeURIComponent(id)}/complete`, { method: 'POST', body: JSON.stringify(executionNote ? { executionNote } : {}) }); }
 }
