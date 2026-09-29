@@ -106,7 +106,7 @@ describe('auto integration boundary', () => {
     expect(calls.at(-1)?.input).toEqual({ id: 'potential-session', input: { message: 'potentialset@558106@equipatk:0.07', mode: 'privateChat' } });
   });
 
-  it('requires authentication and super-admin permission on potential mutations', async () => {
+  it('requires authentication and the potential-editor workspace on potential mutations', async () => {
     expect((await app.inject({ method: 'GET', url: '/api/v1/potential-pool' })).statusCode).toBe(401);
     const token = await login('integration-admin', 'Admin12345!');
     const created = await app.inject({ method: 'POST', url: '/api/v1/auth/users', headers: { authorization: `Bearer ${token}` },
@@ -116,6 +116,12 @@ describe('auto integration boundary', () => {
     const denied = await app.inject({ method: 'POST', url: '/api/v1/potentials/set', headers: { authorization: `Bearer ${managerToken}` },
       payload: { session_id: 'potential-session', instance_id: '558106', potentials: [{ stat_type: 'str', value: '5' }] } });
     expect(denied.statusCode).toBe(403);
+
+    const granted = await app.inject({ method: 'PATCH', url: `/api/v1/auth/users/${created.json().id}`, headers: { authorization: `Bearer ${token}` },
+      payload: { workspacePermissions: { 'potential-editor': true } } });
+    expect(granted.statusCode).toBe(200);
+    const permittedToken = await login('potential-manager', 'Manager12345!');
+    expect((await app.inject({ method: 'GET', url: '/api/v1/potential-pool', headers: { authorization: `Bearer ${permittedToken}` } })).statusCode).toBe(200);
   });
 
   it('enforces the server-operations permission before calling auto', async () => {

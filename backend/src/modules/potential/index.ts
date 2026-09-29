@@ -8,7 +8,7 @@ import { parseResponse } from './parser.js';
 
 function actor(request: FastifyRequest, auth: AuthService) {
   const identity = auth.requestIdentity(request.headers as Record<string, unknown>);
-  if (identity.role !== 'super_admin' || !hasWorkspaceAccess(identity, 'potential-editor')) throw new AuthError('forbidden');
+  if (!hasWorkspaceAccess(identity, 'potential-editor')) throw new AuthError('forbidden');
   return identity;
 }
 function body(request: FastifyRequest) {
