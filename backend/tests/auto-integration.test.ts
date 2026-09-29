@@ -379,9 +379,9 @@ describe('auto HTTP client deployment boundary', () => {
   });
 
   it('uses the configured URL and service token without sharing auto internals', async () => {
-    const requests: Array<{ path: string; authorization: string; actor: string }> = [];
+    const requests: Array<{ path: string; authorization: string; actor: string; actorName: string }> = [];
     server = createServer((request, response) => {
-      requests.push({ path: request.url ?? '', authorization: request.headers.authorization ?? '', actor: String(request.headers['x-ops-actor-id'] ?? '') });
+      requests.push({ path: request.url ?? '', authorization: request.headers.authorization ?? '', actor: String(request.headers['x-ops-actor-id'] ?? ''), actorName: String(request.headers['x-ops-actor-name'] ?? '') });
       response.setHeader('content-type', 'application/json');
       response.end(JSON.stringify({ fetched_at: new Date().toISOString(), servers: [], sessions: [], logs: [] }));
     });
@@ -389,8 +389,8 @@ describe('auto HTTP client deployment boundary', () => {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('test server did not expose a port');
     const client = new HttpAutoIntegrationClient({ localUrl: `http://127.0.0.1:${address.port}`, serviceToken: 'separate-deployment-token' });
-    await client.overview({ id: 'operator-1', role: 'super_admin', displayName: 'Operator' });
-    expect(requests).toEqual([{ path: '/api/v1/overview?include_logs=false', authorization: 'Bearer separate-deployment-token', actor: 'operator-1' }]);
+    await client.overview({ id: 'operator-1', role: 'super_admin', displayName: '中文客服' });
+    expect(requests).toEqual([{ path: '/api/v1/overview?include_logs=false', authorization: 'Bearer separate-deployment-token', actor: 'operator-1', actorName: 'base64url:5Lit5paH5a6i5pyN' }]);
   });
 });
 

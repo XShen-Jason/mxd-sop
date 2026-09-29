@@ -46,7 +46,10 @@ export class HttpAutoIntegrationClient implements AutoIntegrationClient {
     const headers = new Headers(init.headers);
     headers.set('accept', 'application/json');
     headers.set('authorization', `Bearer ${this.token}`);
-    if (init.actor) { headers.set('x-ops-actor-id', init.actor.id); headers.set('x-ops-actor-name', init.actor.displayName); }
+    if (init.actor) {
+      headers.set('x-ops-actor-id', init.actor.id);
+      headers.set('x-ops-actor-name', encodeHeaderValue(init.actor.displayName));
+    }
     if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
     try {
       const response = await fetch(new URL(path, `${this.endpoint}/`), { ...init, headers, signal: controller.signal });
@@ -77,4 +80,9 @@ function normalizeEndpoint(value: string | undefined) {
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return undefined;
     return url.toString().replace(/\/$/u, '');
   } catch { return undefined; }
+}
+
+function encodeHeaderValue(value: string) {
+  if ([...value].every((character) => character.charCodeAt(0) <= 0xff)) return value;
+  return `base64url:${Buffer.from(value, 'utf8').toString('base64url')}`;
 }
