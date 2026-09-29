@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createApp } from '../src/app.js';
-import { HttpAutoIntegrationClient, type AutoAccount, type AutoExecutionResult, type AutoIntegrationClient, type AutoOverview, type AutoServer, type AutoSession } from '../src/modules/auto-integration/public/index.js';
+import { AutoIntegrationError, HttpAutoIntegrationClient, type AutoAccount, type AutoExecutionResult, type AutoIntegrationClient, type AutoOverview, type AutoServer, type AutoSession } from '../src/modules/auto-integration/public/index.js';
 
 const catalogPath = path.resolve(process.cwd(), '..', 'data/item-catalog/source/items.json');
 
@@ -127,6 +127,31 @@ describe('auto integration boundary', () => {
     const response = await app.inject({ method: 'GET', url: '/api/v1/auto/overview', headers: { authorization: `Bearer ${token}` } });
     expect(response.statusCode).toBe(403);
     expect(calls.length).toBe(before);
+  });
+
+  it('allows a manager with explicit server-operations access to use auto overview', async () => {
+    const adminToken = await login('integration-admin', 'Admin12345!');
+    const created = await app.inject({ method: 'POST', url: '/api/v1/auth/users', headers: { authorization: `Bearer ${adminToken}` }, payload: {
+      username: 'auto-manager', displayName: 'Auto Manager', password: 'AutoManager1!', role: 'manager', workspacePermissions: { 'server-operations': true },
+    } });
+    expect(created.statusCode).toBe(201);
+    const token = await login('auto-manager', 'AutoManager1!');
+    const before = calls.length;
+    const response = await app.inject({ method: 'GET', url: '/api/v1/auto/overview', headers: { authorization: `Bearer ${token}` } });
+    expect(response.statusCode).toBe(200);
+    expect(calls.slice(before)).toEqual([{ name: 'overview', actor: created.json().id }]);
+  });
+
+  it('returns a gateway error when auto cannot build its overview', async () => {
+    const originalOverview = client.overview;
+    client.overview = async () => { throw new AutoIntegrationError('overview_unavailable'); };
+    try {
+      const token = await login('integration-admin', 'Admin12345!');
+      const response = await app.inject({ method: 'GET', url: '/api/v1/auto/overview', headers: { authorization: `Bearer ${token}` } });
+      expect(response.statusCode).toBe(502);
+    } finally {
+      client.overview = originalOverview;
+    }
   });
 
   it('does not health-check or forward requests while the auto connection is disabled', async () => {
