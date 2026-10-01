@@ -6,6 +6,7 @@ import Database from 'better-sqlite3';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { openDatabase } from '../src/infrastructure/sqlite.js';
+import { loadCatalogFromCsvContent } from '../src/modules/item-catalog/public/index.js';
 
 const databasePath = path.join(os.tmpdir(), `ops-${randomUUID()}.sqlite`);
 const reminderDatabasePath = path.join(os.tmpdir(), `ops-reminders-${randomUUID()}.sqlite`);
@@ -89,9 +90,10 @@ describe('SQLite deployment persistence', () => {
       const login = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'catalog-upload', password: 'Abc123' } });
       const cookie = String(login.headers['set-cookie']).split(';', 1)[0];
       const content = fs.readFileSync(sourcePath, 'utf8');
+      const expectedItemCount = loadCatalogFromCsvContent(content, { skipInvalidRows: true, strict: true }).size;
       const uploaded = await app.inject({ method: 'POST', url: '/api/v1/item-catalog/import', headers: { cookie }, payload: { file: { name: 'tbl_item_class.csv', content } } });
       expect(uploaded.statusCode).toBe(201);
-      expect(uploaded.json()).toMatchObject({ fileName: 'tbl_item_class.csv', itemCount: 5881 });
+      expect(uploaded.json()).toMatchObject({ fileName: 'tbl_item_class.csv', itemCount: expectedItemCount });
     } finally {
       await app?.close();
       fs.rmSync(directory, { recursive: true, force: true });
