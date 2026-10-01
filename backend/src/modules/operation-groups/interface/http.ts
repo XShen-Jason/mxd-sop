@@ -6,6 +6,7 @@ import type { GroupStatus, Identity, Role, SubmitGroupInput, ManagerGroupProject
 import { normalizeArchiveSearchField } from '../domain/archive-search.js';
 import { projectGroupChanges } from '../domain/changes.js';
 import type { OperationAutomationWorkflow } from '../application/automation-workflow.js';
+import { issuanceWorkbook } from '../infrastructure/issuance-excel.js';
 
 type Query = Record<string, unknown>;
 export { AuthError };
@@ -253,9 +254,9 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
       const searchField = query.searchField === undefined ? undefined : normalizeArchiveSearchField(query.searchField);
       const includeRelated = query.includeRelated === 'true';
       const groups = service.listIssuanceExport(identity(request), normalizedStatus, query.serverId ? String(query.serverId) : undefined, query.q as string | undefined, searchField, includeRelated);
-      reply.header('content-type', 'text/csv; charset=utf-8');
-      reply.header('content-disposition', `attachment; filename="material-issuance-${new Date().toISOString().slice(0, 10)}.csv"`);
-      return reply.send(issuanceCsv(groups));
+      reply.header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      reply.header('content-disposition', `attachment; filename="material-issuance-${new Date().toISOString().slice(0, 10)}.xlsx"`);
+      return reply.send(issuanceWorkbook(groups));
     } catch (error) { return sendError(reply, error); }
   });
 }

@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createApp } from '../src/app.js';
 import { openDatabase } from '../src/infrastructure/sqlite.js';
+import XLSX from '@e965/xlsx';
 import { JsonGroupRepository } from '../src/modules/operation-groups/infrastructure/json-store.js';
 import { SqliteGroupRepository } from '../src/modules/operation-groups/infrastructure/sqlite-store.js';
 import { readGroupPage } from '../src/modules/operation-groups/domain/pagination.js';
@@ -17,7 +18,7 @@ function record(id: string, overrides: Partial<OperationGroup> = {}): OperationG
     operations: [item], status: 'issued', submittedAt: '2026-09-01T00:00:00.000Z',
     submittedBy: { id: 'customer', displayName: 'Customer' }, commandRuleVersion: 'v1', ...overrides };
 }
-const records = [record('a'), record('b'), record('c', { status: 'pending' }),
+const records = [record('a'), record('b'), record('c', { status: 'pending', submittedAt: '2026-09-03T00:00:00.000Z' }),
   record('d', { server: { id: 'yeti', displayName: '雪人' } }),
   record('regular', { characterId: '005678', status: 'completed', operations: [{ type: 'kick' }] }),
   record('cash', { characterId: '777', operations: [{ type: 'cash', quantity: 1 }] }),
@@ -61,7 +62,10 @@ describe.each(['sqlite', 'json'] as const)('archive search HTTP (%s)', (adapter)
     const params = new URLSearchParams({ kind: 'issuance', q, ...extra });
     const response = await app.inject({ method: 'GET', url: `/api/v1/manager/operation-groups/issuance-export?${params}`, headers: { cookie } });
     expect(response.statusCode).toBe(200);
-    return response.body;
+    expect(response.headers['content-type']).toContain('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const workbook = XLSX.read(response.rawPayload, { type: 'buffer', cellDates: true });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    return { rows: XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true }), sheet };
   }
 
   it.each(['9988', '00123', '历史面巾', '01012190_2', ' abc_50% ', '%', '_'])('matches snapshot field: %s', async (query) => {
@@ -90,8 +94,13 @@ describe.each(['sqlite', 'json'] as const)('archive search HTTP (%s)', (adapter)
     expect((await search('998877', { searchField: 'playerQQ', status: 'issued', serverId: 'mushroom' })).groups.map((group: OperationGroup) => group.id)).toEqual(['cash', 'b', 'a']);
     const direct = await exportCsv('历史面巾', { searchField: 'itemName', serverId: 'mushroom' });
     const related = await exportCsv('历史面巾', { searchField: 'itemName', serverId: 'mushroom', includeRelated: 'true' });
-    expect(direct.split('\r\n').filter(Boolean)).toHaveLength(5);
-    expect(related.split('\r\n').filter(Boolean)).toHaveLength(6);
+    expect(direct.rows).toHaveLength(5);
+    expect(related.rows).toHaveLength(6);
+    expect(direct.rows[0]).toEqual(['服务器', '游戏账号', '玩家 QQ', '角色 ID', '物品代码', '物品名称', '物品类型', '数量', '申请理由', '记录状态', '提交时间', '审核时间', '发放时间', '完成时间', '提交人', '审核人', '发放人', '异常提示']);
+    expect(direct.sheet['!autofilter']).toEqual({ ref: 'A1:R5' });
+    expect(direct.rows.slice(1).every((row) => row[10] instanceof Date)).toBe(true);
+    const submittedTimes = direct.rows.slice(1).map((row) => (row[10] as Date).getTime());
+    expect(submittedTimes).toEqual([...submittedTimes].sort((left, right) => right - left));
   });
   it('rejects oversized/repeated queries and unauthenticated access', async () => {
     for (const query of [`q=${'a'.repeat(101)}`, 'q=one&q=two']) {

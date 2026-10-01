@@ -308,11 +308,15 @@ do not change historical name/code matches. Existing authorization is unchanged.
 `GET /api/v1/manager/operation-groups/issuance-export` is available only to
 callers with the `reissue` workspace. It accepts the same `status`, `serverId`,
 `q`, and `searchField` filters as the material archive view, plus
-`includeRelated=true`. The response is UTF-8 CSV and contains every matching
-record, independent of archive pagination. When related records are enabled,
-the server first finds matching records and then includes all material records
-for the same server and character ID, applying the current status/server
-filters and removing duplicates.
+`includeRelated=true`. The response is an XLSX workbook and contains every
+matching record, independent of archive pagination. Each item or cash operation
+is one row, with Excel date values, a default descending submission-time order,
+and an auto-filter over the header row. When related records are enabled, the
+server first finds matching records and then includes all material records for
+the same server and character ID, applying the current status/server filters
+and removing duplicates. The workbook includes status, reminders, execution
+notes, and automation failures in an anomaly column so a manager can inspect a
+player's full issuance history.
 
 ## v1 workflow extension
 

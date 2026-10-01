@@ -163,7 +163,7 @@ export function ManagerView({ options, userId, token, panel = 'queue', actorId, 
     setExporting(true); setError('');
     try {
       const blob = await client.exportIssuance(expandCompletedStatuses(statusFilter), serverFilter || undefined, search, searchField, includeRelated);
-      const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `material-issuance-${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(anchor); anchor.click(); anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `material-issuance-${new Date().toISOString().slice(0, 10)}.xlsx`; document.body.append(anchor); anchor.click(); anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       setExportDialogOpen(false);
       setNotice({ kind: 'success', text: '导出已开始' });
     } catch (err) { setError(err instanceof ApiError ? err.message : '导出失败'); }
