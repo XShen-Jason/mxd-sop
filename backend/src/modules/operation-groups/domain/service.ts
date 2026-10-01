@@ -19,7 +19,8 @@ import { fingerprint, safeText } from './helpers.js';
 import { GroupError } from './errors.js';
 import { normalizeSubmission } from './normalization.js';
 import { readGroupPage } from './pagination.js';
-import { normalizeArchiveSearch } from './archive-search.js';
+import { normalizeArchiveSearch, normalizeArchiveSearchField, type ArchiveSearchField } from './archive-search.js';
+import { listIssuanceExport } from './issuance-export.js';
 import { customerProjection, managerProjection } from './projections.js';
 import { readOverview, readWorkspaceCounts } from './workspace-summary.js';
 import { canCustomerModify, isIssuanceGroup, isNoReviewGroup } from './workflow-rules.js';
@@ -260,15 +261,23 @@ export class OperationGroupsService {
     return managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName);
   }
 
-  listArchive(identity: Identity, limit = 20, cursor?: string, status?: GroupStatus | GroupStatus[], serverId?: string, kind?: 'issuance' | 'regular', search = '') {
+  listArchive(identity: Identity, limit = 20, cursor?: string, status?: GroupStatus | GroupStatus[], serverId?: string, kind?: 'issuance' | 'regular', search = '', searchField?: ArchiveSearchField) {
     this.requireAuthenticated(identity);
     if (serverId && !this.options.servers.some((server) => server.id === serverId)) throw new GroupError('unknown-server');
     const statuses = status ? (Array.isArray(status) ? status : [status]) : [];
     if (statuses.some((value) => !['pending', 'approved', 'rejected', 'issued', 'completed', 'cancelled'].includes(value))) throw new GroupError('invalid-status');
     if (kind !== undefined && kind !== 'issuance' && kind !== 'regular') throw new GroupError('invalid-input', 'invalid kind');
     this.requireArchiveAccess(identity, kind, statuses);
-    const page = readGroupPage(this.deps.repository, { status, serverId, kind, search: normalizeArchiveSearch(search), limit, order: 'desc' }, cursor);
+    const page = readGroupPage(this.deps.repository, { status, serverId, kind, search: normalizeArchiveSearch(search), searchField: normalizeArchiveSearchField(searchField), limit, order: 'desc' }, cursor);
     return { groups: page.groups.map((group) => managerProjection(group, this.deps.catalog, this.deps.resolveDisplayName)), nextCursor: page.nextCursor };
+  }
+
+  listIssuanceExport(identity: Identity, status?: GroupStatus | GroupStatus[], serverId?: string, search = '', searchField?: ArchiveSearchField, includeRelated = false) {
+    this.requireAuthenticated(identity);
+    this.requireWorkspace(identity, 'reissue');
+    return listIssuanceExport({ repository: this.deps.repository, catalog: this.deps.catalog, options: this.options,
+      resolveDisplayName: this.deps.resolveDisplayName, status, serverId, query: normalizeArchiveSearch(search),
+      field: normalizeArchiveSearchField(searchField), includeRelated });
   }
 
   remind(identity: Identity, id: string, verifiedOffline = false) { return this.applyReminder(identity, id, verifiedOffline ? 'verify-offline' : 'remind'); }

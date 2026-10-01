@@ -20,7 +20,7 @@ function fallbackList(repository: GroupRepository, query: GroupPageQuery) {
     if (query.reminded && !(group.reminderCount && group.reminderCount > 0)) return false;
     if (query.status && (Array.isArray(query.status) ? !query.status.includes(group.status) : group.status !== query.status)) return false;
     if (query.serverId && group.server.id !== query.serverId) return false;
-    if (!matchesArchiveSearch(group, query.search)) return false;
+    if (!matchesArchiveSearch(group, query.search, query.searchField)) return false;
     if (query.kind) {
       const issuance = group.operations.some((operation) => operation.type === 'item' || operation.type === 'cash');
       if ((query.kind === 'issuance') !== issuance) return false;

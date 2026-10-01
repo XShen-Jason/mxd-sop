@@ -290,7 +290,11 @@ unauthorized（401）、forbidden（403）、invalid-cursor（400）、invalid-s
 
 `list-archive` accepts optional repeatable/comma-separated `status` values and `kind=issuance|regular`; filtering occurs before keyset pagination.
 
-Optional `q` searches literal substrings in saved snapshots: issuance records match
+Optional `q` searches literal substrings in saved snapshots. `searchField` may be
+`characterId`, `playerQQ`, `itemName`, or `itemCode`; when omitted, the legacy
+multi-field behavior remains available. The material-record UI always sends an
+explicit field so operators can distinguish QQ, character ID, item name, and
+item code searches. Issuance records match
 `playerQQ`, `characterId`, item `itemName`, or item `itemCode`; regular records
 match only `characterId`. Matching ignores ASCII letter case, trims surrounding
 whitespace, and treats `%` and `_` literally. Empty queries disable search;
@@ -298,6 +302,17 @@ queries longer than 100 UTF-16 code units or repeated `q` parameters return
 `invalid-input` (400). Search combines with status/server/kind filters before
 pagination; clients reset the cursor when changing a filter. Item catalog changes
 do not change historical name/code matches. Existing authorization is unchanged.
+
+## operation-groups.export-issuance
+
+`GET /api/v1/manager/operation-groups/issuance-export` is available only to
+callers with the `reissue` workspace. It accepts the same `status`, `serverId`,
+`q`, and `searchField` filters as the material archive view, plus
+`includeRelated=true`. The response is UTF-8 CSV and contains every matching
+record, independent of archive pagination. When related records are enabled,
+the server first finds matching records and then includes all material records
+for the same server and character ID, applying the current status/server
+filters and removing duplicates.
 
 ## v1 workflow extension
 

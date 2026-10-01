@@ -21,6 +21,8 @@ const records = [record('a'), record('b'), record('c', { status: 'pending' }),
   record('d', { server: { id: 'yeti', displayName: '雪人' } }),
   record('regular', { characterId: '005678', status: 'completed', operations: [{ type: 'kick' }] }),
   record('cash', { characterId: '777', operations: [{ type: 'cash', quantity: 1 }] }),
+  record('target', { characterId: '4242', playerQQ: '111111', status: 'pending' }),
+  record('target-related', { characterId: '4242', playerQQ: '111111', status: 'pending', operations: [{ ...item, itemName: '其他物品', itemCode: '02000000' }] }),
   ...Array.from({ length: 25 }, (_, index) => record(`noise-${index}`, {
     characterId: '900', playerQQ: '800', operations: [{ ...item, itemName: '其他物品', itemCode: '02000000' }],
     submittedAt: '2026-09-02T00:00:00.000Z'
@@ -55,6 +57,12 @@ describe.each(['sqlite', 'json'] as const)('archive search HTTP (%s)', (adapter)
     expect(response.statusCode).toBe(200);
     return response.json();
   }
+  async function exportCsv(q: string, extra: Record<string, string> = {}) {
+    const params = new URLSearchParams({ kind: 'issuance', q, ...extra });
+    const response = await app.inject({ method: 'GET', url: `/api/v1/manager/operation-groups/issuance-export?${params}`, headers: { cookie } });
+    expect(response.statusCode).toBe(200);
+    return response.body;
+  }
 
   it.each(['9988', '00123', '历史面巾', '01012190_2', ' abc_50% ', '%', '_'])('matches snapshot field: %s', async (query) => {
     const result = await search(query, { status: 'issued', serverId: 'mushroom' });
@@ -76,7 +84,14 @@ describe.each(['sqlite', 'json'] as const)('archive search HTTP (%s)', (adapter)
   it('ignores other fields, handles misses, and restores results on clearing', async () => {
     expect((await search('not-searchable')).groups).toEqual([]);
     expect((await search('no-match')).nextCursor).toBeNull();
-    expect((await search('   ', { limit: '100' })).groups).toHaveLength(30);
+    expect((await search('   ', { limit: '100' })).groups).toHaveLength(32);
+  });
+  it('supports explicit fields and exports all filtered rows with optional related records', async () => {
+    expect((await search('998877', { searchField: 'playerQQ', status: 'issued', serverId: 'mushroom' })).groups.map((group: OperationGroup) => group.id)).toEqual(['cash', 'b', 'a']);
+    const direct = await exportCsv('历史面巾', { searchField: 'itemName', serverId: 'mushroom' });
+    const related = await exportCsv('历史面巾', { searchField: 'itemName', serverId: 'mushroom', includeRelated: 'true' });
+    expect(direct.split('\r\n').filter(Boolean)).toHaveLength(5);
+    expect(related.split('\r\n').filter(Boolean)).toHaveLength(6);
   });
   it('rejects oversized/repeated queries and unauthenticated access', async () => {
     for (const query of [`q=${'a'.repeat(101)}`, 'q=one&q=two']) {

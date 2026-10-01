@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, Check, ChevronDown, ChevronUp, Copy, Filter, Layers3, LoaderCircle, PackageCheck, RefreshCw, X } from 'lucide-react';
+import { Bell, Check, ChevronDown, ChevronUp, Copy, Download, LoaderCircle, PackageCheck, RefreshCw, X } from 'lucide-react';
 import { ApiClient, ApiError } from '../../api/client';
 import { CopyButton } from '../../components/CopyButton';
 import { ConfirmDialog, TextPromptDialog } from '../../components/Dialog';
@@ -7,7 +7,9 @@ import { FloatingNotice } from '../../components/FloatingNotice';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatRecordTime, isIssuanceGroup, IssuanceItemsDisplay, reasonLabel, recordType, RecordTableHeader, WorkflowTimeline } from '../operation-groups/RecordPresentation';
 import { UserAdminView } from './UserAdminView';
-import { ArchiveSearch } from './ArchiveSearch';
+import { ArchiveSearch, type ArchiveSearchField } from './ArchiveSearch';
+import { IssuanceExportDialog } from './IssuanceExportDialog';
+import { ServerFilters, StatusFilters, type FilterStatus } from './ManagerFilters';
 import type { AppOptions, GeneratedCommand, ManagerGroup } from '../../types';
 import { expandCompletedStatuses } from '../operation-groups/pagination';
 import { useOperationGroupRefresh } from '../operation-groups/live-refresh';
@@ -15,8 +17,6 @@ import { CursorPagination } from '../../components/CursorPagination';
 
 type Panel = 'queue' | 'ready' | 'archive' | 'reissue' | 'users';
 type PaginatablePanel = Exclude<Panel, 'users'>;
-type FilterStatus = 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled';
-const statusEntries: Array<[FilterStatus, string]> = [['pending', '\u5f85\u5ba1\u6838'], ['approved', '\u5f85\u5b8c\u6210'], ['completed', '\u5df2\u5b8c\u6210'], ['rejected', '\u5df2\u9a73\u56de'], ['cancelled', '\u5df2\u53d6\u6d88']];
 const defaultStatuses: FilterStatus[] = ['pending', 'approved', 'completed', 'rejected'];
 const COPIED_COMMANDS_KEY = 'game-support-copied-commands';
 
@@ -46,8 +46,12 @@ export function ManagerView({ options, userId, token, panel = 'queue', actorId, 
   const [pageIndex, setPageIndex] = useState<Record<PaginatablePanel, number>>({ queue: 0, ready: 0, archive: 0, reissue: 0 });
   const [statusFilter, setStatusFilter] = useState<FilterStatus[]>(defaultStatuses);
   const [serverFilter, setServerFilter] = useState('');
-  const [searches, setSearches] = useState({ archive: '', reissue: '' });
-  const search = panel === 'archive' || panel === 'reissue' ? searches[panel] : '';
+  const [searches, setSearches] = useState<{ archive: { value: string; field: ArchiveSearchField }; reissue: { value: string; field: ArchiveSearchField } }>({ archive: { value: '', field: 'characterId' }, reissue: { value: '', field: 'playerQQ' } });
+  const search = panel === 'archive' || panel === 'reissue' ? searches[panel].value : '';
+  const searchField = panel === 'archive' || panel === 'reissue' ? searches[panel].field : undefined;
+  const [includeRelated, setIncludeRelated] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [rejectTarget, setRejectTarget] = useState<ManagerGroup | null>(null);
@@ -84,7 +88,7 @@ export function ManagerView({ options, userId, token, panel = 'queue', actorId, 
           updatePageMeta(panel, undefined, 0, null);
           return;
         }
-        const result = await client.archive(statuses, serverFilter || undefined, requestedCursor, 20, kind, search);
+        const result = await client.archive(statuses, serverFilter || undefined, requestedCursor, 20, kind, search, searchField);
         if (requestId !== loadRequest.current) return;
         if (panel === 'reissue') { setReissue(result.groups); setReissueCursor(result.nextCursor); updatePageMeta('reissue', requestedCursor, requestedPageIndex, result.nextCursor); }
         else { setArchive(result.groups); setArchiveCursor(result.nextCursor); updatePageMeta('archive', requestedCursor, requestedPageIndex, result.nextCursor); }
@@ -100,7 +104,7 @@ export function ManagerView({ options, userId, token, panel = 'queue', actorId, 
       return { ...current, [target]: cursors };
     });
   };
-  useEffect(() => { void load(); }, [client, panel, serverFilter, statusFilter.join(','), search]);
+  useEffect(() => { void load(); }, [client, panel, serverFilter, statusFilter.join(','), search, searchField]);
   useOperationGroupRefresh({ view: panel, serverId: serverFilter,
     statuses: panel === 'archive' || panel === 'reissue' ? expandCompletedStatuses(statusFilter) : undefined }, load);
   useEffect(() => { setNotice(null); }, [panel]);
@@ -155,6 +159,16 @@ export function ManagerView({ options, userId, token, panel = 'queue', actorId, 
     } catch (err) { setError(err instanceof ApiError ? err.message : '驳回失败'); }
     finally { setRejectSaving(false); }
   };
+  const exportIssuance = async () => {
+    setExporting(true); setError('');
+    try {
+      const blob = await client.exportIssuance(expandCompletedStatuses(statusFilter), serverFilter || undefined, search, searchField, includeRelated);
+      const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `material-issuance-${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(anchor); anchor.click(); anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExportDialogOpen(false);
+      setNotice({ kind: 'success', text: '导出已开始' });
+    } catch (err) { setError(err instanceof ApiError ? err.message : '导出失败'); }
+    finally { setExporting(false); }
+  };
   const changePage = (direction: -1 | 1) => {
     if (panel === 'users' || loadingMore.current) return;
     const currentPage = pageIndex[panel];
@@ -181,24 +195,16 @@ export function ManagerView({ options, userId, token, panel = 'queue', actorId, 
   const countGroups = panel === 'queue' ? queue : panel === 'ready' ? ready : panel === 'reissue' ? reissue : archive;
   return <section className="workspace manager-workspace"><div className="page-heading manager-heading"><div><p className="eyebrow">管理工作台</p><h1>{panel === 'users' ? '账号管理' : panel === 'archive' ? '常规操作记录' : panel === 'reissue' ? '物资发放记录' : panel === 'ready' ? '待完成' : '待审核'}</h1></div>{panel !== 'users' && <div className="manager-metrics"><div><span>待审核</span><strong>{pendingCount}</strong></div><div><span>待完成</span><strong>{approvedCount}</strong></div><div><span>已完成</span><strong>{issuedCount}</strong></div></div>}</div>
     {panel !== 'users' && <div className={`manager-toolbar ${(panel === 'archive' || panel === 'reissue') ? 'archive-toolbar' : ''}`}>
-      {(panel === 'archive' || panel === 'reissue') && <ArchiveSearch key={panel} issuance={panel === 'reissue'} value={search} onSearch={(value) => setSearches((current) => ({ ...current, [panel]: value }))} />}
-      <div className="filter-row"><ServerFilters options={options} value={serverFilter} onChange={setServerFilter} counts={Object.fromEntries(options.servers.map((server) => [server.id, countGroups.filter((group) => group.server.id === server.id).length]))} />{(panel === 'archive' || panel === 'reissue') && <StatusFilters value={statusFilter} onChange={setStatusFilter} />}<button type="button" className="icon-button refresh-button" title="刷新" aria-label="刷新" onClick={() => void load()}><RefreshCw size={16} /></button></div>
+      {(panel === 'archive' || panel === 'reissue') && <ArchiveSearch key={panel} issuance={panel === 'reissue'} value={search} field={searchField ?? 'characterId'} onSearch={(value, field) => setSearches((current) => ({ ...current, [panel]: { value, field } }))} />}
+      {panel === 'reissue' && <button type="button" className="secondary-button archive-export-button" disabled={exporting} onClick={() => { setIncludeRelated(false); setExportDialogOpen(true); }}>{exporting ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}导出全部结果</button>}
+      <div className="filter-row"><ServerFilters options={options} value={serverFilter} onChange={setServerFilter} dropdown={panel === 'reissue'} counts={Object.fromEntries(options.servers.map((server) => [server.id, countGroups.filter((group) => group.server.id === server.id).length]))} />{(panel === 'archive' || panel === 'reissue') && <StatusFilters value={statusFilter} onChange={setStatusFilter} />}<button type="button" className="icon-button refresh-button" title="刷新" aria-label="刷新" onClick={() => void load()}><RefreshCw size={16} /></button></div>
     </div>}
     {panel === 'users' ? <UserAdminView token={token} actorId={actorId} onRequireRelogin={onRequireRelogin} onUserUpdated={onUserUpdated} /> : loading ? <div className="empty-state"><LoaderCircle className="spin" size={24} /></div> : <><RequestList panel={panel} groups={panel === 'queue' ? visibleQueue : panel === 'ready' ? visibleReady : panel === 'reissue' ? visibleReissue : visibleArchive} options={options} onAction={mutate} copiedCommands={copiedCommands} onCommandCopied={markCommandCopied} onCopyNotice={notifyCommandCopied} />{error && <FloatingNotice kind="error" text={error} onDismiss={() => setError('')} actionLabel="重试" onAction={() => void load()} />}{notice && <FloatingNotice kind={notice.kind} text={notice.text} onDismiss={() => setNotice(null)} />}</>}
     {panel !== 'users' && !loading && <CursorPagination page={pageIndex[panel] + 1} hasNext={Boolean(panel === 'queue' ? queueCursor : panel === 'ready' ? readyCursor : panel === 'reissue' ? reissueCursor : archiveCursor)} disabled={loading || loadingMore.current} onPrevious={() => changePage(-1)} onNext={() => changePage(1)} label="申请列表分页" />}
     {rejectTarget && <TextPromptDialog title="填写驳回原因" description="原因会保存在申请审计记录中，留空也可以直接驳回。" label="驳回原因（可选）" placeholder="输入原因" inputType="text" submitLabel="确认驳回" busy={rejectSaving} onCancel={() => setRejectTarget(null)} onSubmit={(value) => void reject(value)} />}
+    {exportDialogOpen && <IssuanceExportDialog includeRelated={includeRelated} busy={exporting} onIncludeRelatedChange={setIncludeRelated} onCancel={() => setExportDialogOpen(false)} onConfirm={() => void exportIssuance()} />}
     {actionConfirm && <ConfirmDialog title={actionConfirm.action === 'approve' ? '确认通过申请？' : '确认已完成？'} description={actionConfirm.action === 'approve' ? '通过后申请会进入待完成队列。' : '确认后申请将标记为已完成。'} confirmLabel={actionConfirm.action === 'approve' ? '确认通过' : '确认完成'} busy={actionSaving} onCancel={() => setActionConfirm(null)} onConfirm={() => void confirmAction()} />}
   </section>;
-}
-
-function ServerFilters({ options, value, onChange, counts }: { options: AppOptions; value: string; onChange: (value: string) => void; counts?: Record<string, number> }) {
-  const allCount = counts ? Object.values(counts).reduce((sum, count) => sum + count, 0) : 0;
-  return <div className="filter-choice-group server-filter-group" role="group" aria-label="筛选服务器"><span className="filter-choice-label"><Filter size={14} />服务器</span><button type="button" className={!value ? 'filter-choice selected' : 'filter-choice'} onClick={() => onChange('')}>全部{allCount > 0 ? ` ${allCount}` : ''}</button>{options.servers.map((server) => <button type="button" className={value === server.id ? 'filter-choice selected' : 'filter-choice'} key={server.id} onClick={() => onChange(server.id)}>{server.displayName}{counts?.[server.id] ? ` ${counts[server.id]}` : ''}</button>)}</div>;
-}
-
-function StatusFilters({ value, onChange }: { value: FilterStatus[]; onChange: (value: FilterStatus[]) => void }) {
-  const toggle = (status: FilterStatus) => onChange(value.includes(status) ? value.filter((item) => item !== status) : [...value, status]);
-  return <div className="filter-choice-group status-filter-group" role="group" aria-label="筛选状态"><span className="filter-choice-label"><Layers3 size={14} />状态</span><button type="button" className={value.length === statusEntries.length ? 'filter-choice selected' : 'filter-choice'} onClick={() => onChange(statusEntries.map(([status]) => status))}>全部</button>{statusEntries.map(([status, label]) => <button type="button" className={`filter-choice status-filter-choice status-filter-${status} ${value.includes(status) ? 'selected' : ''}`} key={status} onClick={() => toggle(status)}>{label}</button>)}</div>;
 }
 
 function RequestList({ panel, groups, options, onAction, copiedCommands, onCommandCopied, onCopyNotice }: { panel: 'queue' | 'ready' | 'archive' | 'reissue'; groups: ManagerGroup[]; options: AppOptions; onAction: (action: 'approve' | 'reject' | 'issue' | 'complete' | 'remind', group: ManagerGroup) => void; copiedCommands: Set<string>; onCommandCopied: (groupId: string, command: GeneratedCommand) => void; onCopyNotice: () => void }) {

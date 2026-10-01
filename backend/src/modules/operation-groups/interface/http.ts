@@ -2,7 +2,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AuthError, AuthService, hasUploadAccess, hasWorkspaceAccess } from '../../auth/public/index.js';
 import { CatalogError, type ItemCatalog } from '../../item-catalog/public/index.js';
 import { GroupError, type OperationGroupsService } from '../public/index.js';
-import type { GroupStatus, Identity, Role, SubmitGroupInput } from '../../../shared/types.js';
+import type { GroupStatus, Identity, Role, SubmitGroupInput, ManagerGroupProjection } from '../../../shared/types.js';
+import { normalizeArchiveSearchField } from '../domain/archive-search.js';
 import { projectGroupChanges } from '../domain/changes.js';
 import type { OperationAutomationWorkflow } from '../application/automation-workflow.js';
 
@@ -10,6 +11,24 @@ type Query = Record<string, unknown>;
 export { AuthError };
 
 const MAX_CATALOG_CONTENT_CHARS = 2_000_000;
+
+function csvCell(value: unknown) {
+  const text = value === undefined || value === null ? '' : String(value);
+  return /[",\r\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
+}
+
+function issuanceCsv(groups: ManagerGroupProjection[]) {
+  const rows = [['记录 ID', '服务器', '游戏账号', '玩家 QQ', '角色 ID', '状态', '提交时间', '理由', '物品代码', '物品名称', '数量']];
+  for (const group of groups) {
+    const items = group.operations.filter((operation) => operation.type === 'item' || operation.type === 'cash');
+    for (const operation of items) rows.push([
+      group.id, group.server.displayName, group.account ?? '', group.playerQQ ?? '', group.characterId, group.status,
+      group.submittedAt, group.reason.text || group.reason.code,
+      operation.type === 'item' ? operation.itemCode : 'cash', operation.type === 'item' ? operation.itemName : '点券', operation.quantity
+    ].map(csvCell));
+  }
+  return `\uFEFF${rows.map((row) => row.join(',')).join('\r\n')}\r\n`;
+}
 
 function headerValue(request: FastifyRequest, name: string) {
   const value = request.headers[name];
@@ -219,7 +238,24 @@ export function registerOperationRoutes(app: FastifyInstance, service: Operation
       if (kind !== undefined && kind !== 'issuance' && kind !== 'regular') throw new GroupError('invalid-input', 'invalid kind');
       const normalizedStatus = status?.length ? (status.length === 1 ? status[0] : status) : undefined;
       if (query.q !== undefined && typeof query.q !== 'string') throw new GroupError('invalid-input', 'invalid search query');
-      return reply.send(service.listArchive(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, normalizedStatus, query.serverId ? String(query.serverId) : undefined, kind, query.q as string | undefined));
+      if (query.searchField !== undefined && typeof query.searchField !== 'string') throw new GroupError('invalid-input', 'invalid search field');
+      const searchField = query.searchField === undefined ? undefined : normalizeArchiveSearchField(query.searchField);
+      return reply.send(service.listArchive(identity(request), limitOf(query), query.cursor ? String(query.cursor) : undefined, normalizedStatus, query.serverId ? String(query.serverId) : undefined, kind, query.q as string | undefined, searchField));
+    } catch (error) { return sendError(reply, error); }
+  });
+  app.get('/api/v1/manager/operation-groups/issuance-export', async (request, reply) => {
+    try {
+      const query = request.query as Query;
+      const status = query.status === undefined ? undefined : (Array.isArray(query.status) ? query.status.map(String) : String(query.status).split(',')).filter(Boolean) as GroupStatus[];
+      const normalizedStatus = status?.length ? (status.length === 1 ? status[0] : status) : undefined;
+      if (query.q !== undefined && typeof query.q !== 'string') throw new GroupError('invalid-input', 'invalid search query');
+      if (query.searchField !== undefined && typeof query.searchField !== 'string') throw new GroupError('invalid-input', 'invalid search field');
+      const searchField = query.searchField === undefined ? undefined : normalizeArchiveSearchField(query.searchField);
+      const includeRelated = query.includeRelated === 'true';
+      const groups = service.listIssuanceExport(identity(request), normalizedStatus, query.serverId ? String(query.serverId) : undefined, query.q as string | undefined, searchField, includeRelated);
+      reply.header('content-type', 'text/csv; charset=utf-8');
+      reply.header('content-disposition', `attachment; filename="material-issuance-${new Date().toISOString().slice(0, 10)}.csv"`);
+      return reply.send(issuanceCsv(groups));
     } catch (error) { return sendError(reply, error); }
   });
 }
