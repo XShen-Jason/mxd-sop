@@ -96,6 +96,7 @@ async function runViewport(browser, width) {
           { id: 'mushroom', displayName: 'Mushroom Server' },
           { id: 'yeti', displayName: 'Yeti Server' },
           { id: 'piaopiao-pig', displayName: 'Piaopiao Pig' },
+          { id: 'zhu-zhu', displayName: 'Zhu Zhu' },
         ],
         reasons: [], operations: [], commandRuleVersion: 'browser-test',
       };
@@ -285,6 +286,8 @@ async function runViewport(browser, width) {
   await page.locator('.server-configure-button:not([disabled])').click();
   const setup = page.locator('.server-dialog');
   await setup.locator('select').selectOption('piaopiao-pig');
+  assert.equal(await setup.locator('input[placeholder="1.0.2"]').inputValue(), '1.0.3');
+  await setup.locator('select').selectOption('zhu-zhu');
   assert.equal(await setup.locator('input[placeholder="1.0.2"]').inputValue(), '1.0.3');
   await setup.locator('select').selectOption('mushroom');
   assert.equal(await setup.locator('input[placeholder="1.0.2"]').inputValue(), '1.0.2');

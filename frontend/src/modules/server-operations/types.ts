@@ -58,7 +58,7 @@ export interface ServerFormValue {
 export const DEFAULT_GAME_PROTOCOL_VERSION = '1.0.2';
 
 export function defaultGameProtocolVersion(serverId: string) {
-  return serverId === 'piaopiao-pig' || serverId === 'ppz' ? '1.0.3' : DEFAULT_GAME_PROTOCOL_VERSION;
+  return serverId === 'piaopiao-pig' || serverId === 'ppz' || serverId === 'zhu-zhu' ? '1.0.3' : DEFAULT_GAME_PROTOCOL_VERSION;
 }
 
 export interface AccountSetupValue {

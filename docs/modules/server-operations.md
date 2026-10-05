@@ -50,6 +50,12 @@ also retains the existing `mxd-player` connection tab.
 - Account setup selects either a raw password or an already-derived 16-character
   MD5 login value. The latter is forwarded unchanged and remains encrypted and
   write-only after persistence.
+- New-server forms prefill protocol version `1.0.3` for `piaopiao-pig` (`ppz`)
+  and `zhu-zhu`; other servers retain `1.0.2`. Saved versions remain explicit
+  per-server settings. The authorized local capture
+  `PCAPdroid_05_10月_17_35_49.pcap` confirms `zhu-zhu` uses TCP
+  `103.88.32.132:12660` and login version `1.0.3`. Existing records created with
+  another version require an explicit configuration update.
 - Adding an account is an interactive flow: the first step calls auto's
   session-login endpoint, the returned server role list is shown in the second
   step, and the selected role is sent to `select-and-enter`. Only after the
