@@ -39,6 +39,7 @@ Out of scope:
 | red-snail | 红蜗牛 |
 | uu | UU |
 | piaopiao-pig | 漂漂猪 |
+| zhu-zhu | 猪猪 |
 
 初始 operation type：
 

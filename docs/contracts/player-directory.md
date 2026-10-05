@@ -51,7 +51,7 @@ The caller must have both the `player-directory` workspace and the independent
 `forbidden` (403). The JSON body is
 `{ "serverId": "mushroom", "file": { "name": "mg-char-user-qq.csv", "content": "..." } }`.
 The file is no larger than 1,000,000 characters and the request is limited to
-2 MiB. Supported names are `mg`, `xr`, `hwn`, `uu`, and `ppz` followed by
+2 MiB. Supported names are `mg`, `xr`, `hwn`, `uu`, `ppz`, and `zz` followed by
 `-char-user-qq.csv`; the selected server must match the filename mapping. The
 CSV header must contain `char_id,user_id,username,bindQQ` (case-insensitive).
 

@@ -5,7 +5,7 @@ SQLite persistence boundary.
 
 Account data is imported only from `data/char-user-qq/*-char-user-qq.csv`.
 Each row has `char_id,user_id,username,bindQQ`; the filename prefix maps the
-server (`mg`, `xr`, `hwn`, `uu`, or `ppz`). Set `PLAYER_CHAR_DATA_DIR` to use a
+server (`mg`, `xr`, `hwn`, `uu`, `ppz`, or `zz`). Set `PLAYER_CHAR_DATA_DIR` to use a
 different export directory. Account verification matches the complete
 `(server, bindQQ, username)` tuple and keeps every character for that account.
 If no CSV is available, the service creates no demo accounts or teams.

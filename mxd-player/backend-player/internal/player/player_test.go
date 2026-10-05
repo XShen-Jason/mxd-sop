@@ -11,7 +11,7 @@ import (
 )
 
 func TestPublishedServerNames(t *testing.T) {
-	want := []string{"蘑菇", "雪人", "红蜗牛", "UU", "漂漂猪"}
+	want := []string{"蘑菇", "雪人", "红蜗牛", "UU", "漂漂猪", "猪猪"}
 	if len(servers) != len(want) {
 		t.Fatalf("server count = %d, want %d", len(servers), len(want))
 	}

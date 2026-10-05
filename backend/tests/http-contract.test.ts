@@ -30,6 +30,12 @@ describe('HTTP role projections', () => {
     expect(response.json().error.code).toBe('unauthorized');
   });
 
+  it('exposes the 猪猪 server in the shared options contract', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/v1/operation-groups/options', headers: customerHeaders });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().servers).toContainEqual({ id: 'zhu-zhu', displayName: '猪猪' });
+  });
+
   it('omits commands from customer responses and exposes them only to managers', async () => {
     const created = await app.inject({
       method: 'POST', url: '/api/v1/operation-groups', headers: { ...customerHeaders, 'idempotency-key': 'contract-1' },

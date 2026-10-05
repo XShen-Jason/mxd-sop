@@ -38,7 +38,7 @@ query parameter is the usage date in
 `YYYY-MM-DD` (Beijing calendar). When omitted, the current Beijing lock date
 is used.
 
-The response is bounded to the configured five servers and two boss types:
+The response is bounded to the configured six servers and two boss types:
 
 ```json
 {

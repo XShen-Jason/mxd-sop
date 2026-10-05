@@ -62,7 +62,7 @@ unauthorized（401）、forbidden（403）、options-unavailable（503）。
 
 ### Examples
 
-正常：返回 mushroom、yeti、red-snail、uu、piaopiao-pig 及四种 operation。失败：目录/配置不可用返回 options-unavailable，不返回半截列表。
+正常：返回 mushroom、yeti、red-snail、uu、piaopiao-pig、zhu-zhu 及四种 operation。失败：目录/配置不可用返回 options-unavailable，不返回半截列表。
 
 ## operation-groups.submit-group
 

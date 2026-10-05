@@ -35,7 +35,7 @@ describe('team-view workspace', () => {
     for (const [role, id] of [['customer', 'customer-a'], ['manager', 'manager-b'], ['super_admin', 'super-admin']] as const) {
       const response = await app.inject({ method: 'GET', url: `/api/v1/team-view?date=${date}`, headers: { 'x-user-role': role, 'x-user-id': id, 'x-display-name': role } });
       expect(response.statusCode).toBe(200);
-      expect(response.json().servers).toHaveLength(5);
+      expect(response.json().servers).toHaveLength(6);
       expect(response.json().servers.every((server: { types: unknown[] }) => server.types.length === 2)).toBe(true);
     }
   });

@@ -6,7 +6,8 @@ export const appOptions: AppOptions = {
     { id: 'yeti', displayName: '雪人' },
     { id: 'red-snail', displayName: '红蜗牛' },
     { id: 'uu', displayName: 'UU' },
-    { id: 'piaopiao-pig', displayName: '漂漂猪' }
+    { id: 'piaopiao-pig', displayName: '漂漂猪' },
+    { id: 'zhu-zhu', displayName: '猪猪' }
   ],
   reasons: [
     { code: 'bug-recovery', displayName: 'BUG补发' },

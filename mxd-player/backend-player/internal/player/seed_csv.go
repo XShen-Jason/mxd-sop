@@ -10,7 +10,7 @@ import (
 )
 
 var serverFiles = map[string]string{
-	"mg": "蘑菇", "xr": "雪人", "hwn": "红蜗牛", "uu": "UU", "ppz": "漂漂猪",
+	"mg": "蘑菇", "xr": "雪人", "hwn": "红蜗牛", "uu": "UU", "ppz": "漂漂猪", "zz": "猪猪",
 }
 
 // seedCSV imports the authoritative char-user-qq exports. A row is a

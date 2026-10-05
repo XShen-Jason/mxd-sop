@@ -2,7 +2,7 @@ package player
 
 import "database/sql"
 
-var servers = []string{"蘑菇", "雪人", "红蜗牛", "UU", "漂漂猪"}
+var servers = []string{"蘑菇", "雪人", "红蜗牛", "UU", "漂漂猪", "猪猪"}
 var codeChars = []byte("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
 
 type app struct {

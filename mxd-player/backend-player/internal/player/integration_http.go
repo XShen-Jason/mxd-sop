@@ -154,7 +154,7 @@ func canonicalServer(value string) (string, bool) {
 	if validServer(value) {
 		return value, true
 	}
-	ids := map[string]string{"mushroom": "蘑菇", "yeti": "雪人", "red-snail": "红蜗牛", "uu": "UU", "piaopiao-pig": "漂漂猪"}
+	ids := map[string]string{"mushroom": "蘑菇", "yeti": "雪人", "red-snail": "红蜗牛", "uu": "UU", "piaopiao-pig": "漂漂猪", "zhu-zhu": "猪猪"}
 	server, ok := ids[strings.ToLower(value)]
 	return server, ok
 }
@@ -239,6 +239,6 @@ func validDayKey(value string) bool {
 }
 
 func playerServerID(server string) string {
-	ids := map[string]string{"蘑菇": "mushroom", "雪人": "yeti", "红蜗牛": "red-snail", "UU": "uu", "漂漂猪": "piaopiao-pig"}
+	ids := map[string]string{"蘑菇": "mushroom", "雪人": "yeti", "红蜗牛": "red-snail", "UU": "uu", "漂漂猪": "piaopiao-pig", "猪猪": "zhu-zhu"}
 	return ids[server]
 }

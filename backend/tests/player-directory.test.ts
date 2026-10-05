@@ -41,13 +41,14 @@ describe('player account directory', () => {
       { name: 'xr-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n201,8,beta,87654321\n' },
       { name: 'hwn-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n301,9,gamma,11112222\n' },
       { name: 'uu-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n401,10,delta,22223333\n' },
-      { name: 'ppz-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n501,11,epsilon,33334444\n' }
+      { name: 'ppz-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n501,11,epsilon,33334444\n' },
+      { name: 'zz-char-user-qq.csv', content: 'char_id,user_id,username,bindQQ\n601,12,zeta,44445555\n' }
     ];
     const managerImport = await app.inject({ method: 'POST', url: '/api/v1/player-directory/import', headers: { authorization: `Bearer ${managerToken}` }, payload: { serverId: 'mushroom', file: files[0] } });
     expect(managerImport.statusCode).toBe(201);
     const customerImport = await app.inject({ method: 'POST', url: '/api/v1/player-directory/import', headers: { authorization: `Bearer ${customerToken}` }, payload: { serverId: 'yeti', file: files[1] } });
     expect(customerImport.statusCode).toBe(201);
-    for (const [serverId, index] of [['mushroom', 0], ['yeti', 1], ['red-snail', 2], ['uu', 3], ['piaopiao-pig', 4]] as const) {
+    for (const [serverId, index] of [['mushroom', 0], ['yeti', 1], ['red-snail', 2], ['uu', 3], ['piaopiao-pig', 4], ['zhu-zhu', 5]] as const) {
       const imported = await app.inject({ method: 'POST', url: '/api/v1/player-directory/import', headers: { authorization: `Bearer ${superToken}` }, payload: { serverId, file: files[index] } });
       expect(imported.statusCode).toBe(201);
       expect(imported.json()).toEqual(expect.objectContaining({ serverId, fileCount: 1 }));

@@ -72,7 +72,7 @@ contracts/player-directory.md.
 
 `team-view.read` (`GET /api/v1/team-view`) requires the `team-view` workspace
 and returns a bounded projection of the usage-date snapshot grouped by the
-five servers and the two boss types. The canonical definition lives in
+six servers and the two boss types. The canonical definition lives in
 `docs/contracts/team-view.md`.
 
 ## player-integration contracts

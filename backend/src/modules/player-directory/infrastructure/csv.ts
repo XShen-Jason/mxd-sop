@@ -6,7 +6,8 @@ const FILE_SERVERS: Record<string, string> = {
   'xr-char-user-qq.csv': 'yeti',
   'hwn-char-user-qq.csv': 'red-snail',
   'uu-char-user-qq.csv': 'uu',
-  'ppz-char-user-qq.csv': 'piaopiao-pig'
+  'ppz-char-user-qq.csv': 'piaopiao-pig',
+  'zz-char-user-qq.csv': 'zhu-zhu'
 };
 const MAX_FILE_CHARS = 1_000_000;
 const MAX_ROWS = 200_000;

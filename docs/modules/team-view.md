@@ -18,7 +18,7 @@ In scope:
 - Persisting one operations-desk snapshot per lock date, replaceable by a sync.
 - Reading a bounded projection and applying eligible rewards for every
   authenticated user with the `team-view` workspace.
-- Grouping the five configured servers, then `black-dragon` and `zakum`.
+- Grouping the six configured servers, then `black-dragon` and `zakum`.
 - Sorting teams within a type by member count descending, first join time
   ascending, and stable team ID; assigning the displayed sequence after that
   sort.
