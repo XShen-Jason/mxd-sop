@@ -62,4 +62,18 @@ describe('HTTP role projections', () => {
     expect(response.json().items.every((item: { itemClass?: string }) => item.itemClass === 'consume')).toBe(true);
     expect(response.json().items[0].image).toMatch(/^\/item-images\/.+\.png$/u);
   });
+
+  it.each([11, 100])('accepts equipment level %s through the submit and edit HTTP contracts', async (itemLevel) => {
+    const payload = { serverId: 'mushroom', account: 'acc', characterId: '321', playerQQ: '456', reason: { code: 'compensation' },
+      operations: [{ type: 'item', itemCode: '01012190', itemLevel, quantity: 1 }] };
+    const created = await app.inject({ method: 'POST', url: '/api/v1/operation-groups', headers: customerHeaders, payload });
+    expect(created.statusCode).toBe(201);
+    const id = created.json().id;
+    const updated = await app.inject({ method: 'PUT', url: `/api/v1/operation-groups/${id}`, headers: customerHeaders, payload });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().operations[0]).toMatchObject({ itemCode: `01012190_${itemLevel}`, itemLevel });
+    const queue = await app.inject({ method: 'GET', url: '/api/v1/manager/operation-groups/queue', headers: managerHeaders });
+    const group = queue.json().groups.find((group: { id: string }) => group.id === id);
+    expect(group.commands[0].text).toBe(`drop@321@01012190_${itemLevel}@1`);
+  });
 });

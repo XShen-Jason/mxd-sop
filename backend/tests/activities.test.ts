@@ -56,6 +56,25 @@ describe('shared activities', () => {
     expect(listed.json().activities[0].rewards[0].itemCode).toBe('02046830_1');
   });
 
+  it.each([11, 100, Number.MAX_SAFE_INTEGER])('persists equipment reward level %s for request quick fill', async (itemLevel) => {
+    const activity = { id: 'high-level', name: 'High level', rewards: [
+      { kind: 'item', quantity: 1, itemCode: '01012190', itemClass: 'equip', itemLevel },
+    ] };
+    const saved = await app.inject({ method: 'PUT', url: '/api/v1/activities', headers: manager, payload: { activities: [activity] } });
+    expect(saved.statusCode).toBe(200);
+    const listed = await app.inject({ method: 'GET', url: '/api/v1/activities', headers: customer });
+    expect(listed.json().activities[0].rewards[0]).toMatchObject({ itemCode: '01012190', itemLevel });
+  });
+
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '11'])('rejects invalid equipment reward level %s', async (itemLevel) => {
+    const activity = { id: 'invalid-level', name: 'Invalid level', rewards: [
+      { kind: 'item', quantity: 1, itemCode: '01012190', itemClass: 'equip', itemLevel },
+    ] };
+    const saved = await app.inject({ method: 'PUT', url: '/api/v1/activities', headers: manager, payload: { activities: [activity] } });
+    expect(saved.statusCode).toBe(400);
+    expect(saved.json().error.code).toBe('invalid-input');
+  });
+
   it('repairs binding suffixes stripped by older activity editors', async () => {
     const legacy = {
       id: 'legacy-bound-item', name: '旧绑定道具', description: '',

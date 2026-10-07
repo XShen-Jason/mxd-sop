@@ -4,8 +4,6 @@ import type { AppOptions, GroupReason, Operation, OperationType, SubmitGroupInpu
 import { GroupError } from './errors.js';
 import { quantity, safeText, strictText } from './helpers.js';
 
-export const MAX_EQUIPMENT_LEVEL = 10;
-
 function parseEquipmentSuffix(code: string) {
   const match = /^([^_]+)_([0-9]+)$/u.exec(code);
   if (!match) return undefined;
@@ -16,7 +14,7 @@ function parseEquipmentSuffix(code: string) {
 
 function normalizeEquipmentLevel(value: unknown) {
   if (value === undefined) return 1;
-  if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > MAX_EQUIPMENT_LEVEL) {
+  if (!Number.isSafeInteger(value) || (value as number) < 1) {
     throw new GroupError('invalid-input', 'invalid item level');
   }
   return value as number;

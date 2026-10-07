@@ -12,7 +12,7 @@ import './reminders.css';
 import type { AppOptions, CatalogItem, Group } from '../../types';
 import { activityRewardLabel, readActivities, writeActivities, type Activity } from '../activities/store';
 import { expandCompletedStatuses } from '../operation-groups/pagination';
-import { codeForLevel, isEquipment, MAX_EQUIPMENT_LEVEL, normalizeEquipmentLevel, splitEquipmentCode } from '../../shared/item-level';
+import { codeForLevel, isEquipment, normalizeEquipmentLevel, splitEquipmentCode } from '../../shared/item-level';
 import { useOperationGroupRefresh } from '../operation-groups/live-refresh';
 import { CursorPagination } from '../../components/CursorPagination';
 
@@ -195,7 +195,7 @@ export function CustomerView({ options, token, userId, section = 'operations', o
       if (hasBlankItem && !(items.length === 1 && items[0].state === 'empty' && cashQuantity.trim())) throw new Error('请为每一行选择具体物品');
       const operations: Array<Record<string, unknown>> = [];
       const finalCodes = new Set<string>();
-      for (const item of items) { if (!item.itemCode) continue; const quantity = Number(item.quantity); if (!Number.isSafeInteger(quantity) || quantity <= 0) throw new Error('物品数量必须是正整数'); if (isEquipment(item.itemClass) && item.itemLevel !== undefined && (!Number.isInteger(item.itemLevel) || item.itemLevel < 1 || item.itemLevel > MAX_EQUIPMENT_LEVEL)) throw new Error(`装备等级必须是 1-${MAX_EQUIPMENT_LEVEL} 的整数`); const itemLevel = isEquipment(item.itemClass) ? normalizeEquipmentLevel(item.itemLevel) : undefined; const finalCode = codeForLevel(item.itemCode, item.itemClass, itemLevel); if (finalCodes.has(finalCode)) throw new Error('同一物品和等级不能重复选择'); finalCodes.add(finalCode); operations.push({ type: 'item', itemCode: item.itemCode, ...(isEquipment(item.itemClass) ? { itemLevel } : {}), quantity }); }
+      for (const item of items) { if (!item.itemCode) continue; const quantity = Number(item.quantity); if (!Number.isSafeInteger(quantity) || quantity <= 0) throw new Error('物品数量必须是正整数'); if (isEquipment(item.itemClass) && item.itemLevel !== undefined && (!Number.isSafeInteger(item.itemLevel) || item.itemLevel < 1)) throw new Error('装备等级必须是正整数'); const itemLevel = isEquipment(item.itemClass) ? normalizeEquipmentLevel(item.itemLevel) : undefined; const finalCode = codeForLevel(item.itemCode, item.itemClass, itemLevel); if (finalCodes.has(finalCode)) throw new Error('同一物品和等级不能重复选择'); finalCodes.add(finalCode); operations.push({ type: 'item', itemCode: item.itemCode, ...(isEquipment(item.itemClass) ? { itemLevel } : {}), quantity }); }
       if (cashQuantity.trim()) { const quantity = Number(cashQuantity); if (!Number.isSafeInteger(quantity) || quantity <= 0) throw new Error('点券数量必须是正整数'); operations.push({ type: 'cash', quantity }); }
       if (!operations.length) throw new Error('至少添加一项发放内容');
       payload.account = form.account.trim(); payload.playerQQ = form.playerQQ.trim(); payload.operations = operations;

@@ -43,9 +43,34 @@ sudo chown -R mxd-sop:mxd-sop /opt/mxd-sop
 ```bash
 (
 set -eu
-sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm ci && npm test && npm run lint && npm run build && npm prune --omit=dev && npm audit --omit=dev --audit-level=high'
+sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm ci && npm test && npm run lint && npm run build && npm prune --omit=dev --package-lock=false && npm audit --omit=dev --audit-level=high'
 test -f /opt/mxd-sop/frontend/dist/index.html
 test -f /opt/mxd-sop/backend/dist/src/server.js
+status=$(sudo -u mxd-sop git -c core.fileMode=false -C /opt/mxd-sop status --porcelain --untracked-files=no)
+test -z "$status" || { printf '构建后工作区出现修改：\n%s\n' "$status" >&2; exit 1; }
+)
+```
+
+若曾运行旧版命令，拉取代码时报 `package-lock.json would be overwritten`，
+执行下面一段即可。它只在该文件是唯一的已跟踪修改且未暂存时自动备份并恢复；
+其他修改会保留并停止。完成后重新执行本节构建命令。
+
+```bash
+(
+set -eu
+repo=/opt/mxd-sop
+status=$(sudo -u mxd-sop git -c core.fileMode=false -C "$repo" status --porcelain --untracked-files=no)
+case "$status" in
+  '') ;;
+  ' M package-lock.json')
+    backup_dir=$(sudo mktemp -d /var/tmp/mxd-sop-lock.XXXXXX)
+    sudo cp -a "$repo/package-lock.json" "$backup_dir/package-lock.json"
+    sudo -u mxd-sop git -C "$repo" restore --source=HEAD --worktree -- package-lock.json
+    printf '旧锁文件已备份到 %s/package-lock.json\n' "$backup_dir"
+    ;;
+  *) printf '存在其他已跟踪修改，已停止：\n%s\n' "$status" >&2; exit 1 ;;
+esac
+sudo -u mxd-sop git -c core.fileMode=false -C "$repo" pull --ff-only origin main
 )
 ```
 
@@ -137,8 +162,26 @@ curl -fsS http://127.0.0.1:26902/health
 set -eu
 SOP_DOMAIN=$(sudo sed -n 's/^SOP_DOMAIN=//p' /etc/mxd-sop/mxd-sop.env)
 read -rp 'Let’s Encrypt 邮箱: ' ACME_EMAIL
+site=/etc/nginx/sites-available/mxd-sop.conf
+enabled=/etc/nginx/sites-enabled/mxd-sop.conf
+marker='# Managed by MXDCMD Ubuntu 24 SOP guide'
+printf '%s\n' "$SOP_DOMAIN" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,}$' || { echo 'SOP 域名格式无效' >&2; exit 1; }
+case "$SOP_DOMAIN" in *.example.com|example.com) echo '请填写真实域名' >&2; exit 1;; esac
+sudo nginx -t
+if sudo test -e "$site"; then
+  sudo grep -Fxq "$marker" "$site" && sudo grep -Fq "server_name $SOP_DOMAIN;" "$site" || { echo '已有同名 SOP 站点文件，已停止以免覆盖' >&2; exit 1; }
+fi
+if sudo test -e "$enabled" || sudo test -L "$enabled"; then
+  test "$(sudo readlink -f "$enabled")" = "$site" || { echo 'Nginx 同名启用文件已被其他站点使用' >&2; exit 1; }
+fi
+if sudo nginx -T 2>/dev/null | awk -v host="$SOP_DOMAIN" -v own="$enabled" '
+  /^# configuration file / { file=$4; sub(/:$/, "", file) }
+  file != own && $1 == "server_name" { for (i=2; i<=NF; i++) { name=$i; sub(/;$/, "", name); if (tolower(name) == tolower(host)) found=1 } }
+  END { exit !found }
+'; then echo '该域名已被另一个 Nginx 站点使用' >&2; exit 1; fi
 sudo install -d -o mxd-sop -g mxd-sop -m 755 /opt/mxd-sop/frontend/dist
 sudo tee /etc/nginx/sites-available/mxd-sop.conf >/dev/null <<NGINX
+# Managed by MXDCMD Ubuntu 24 SOP guide
 server {
     listen 80;
     listen [::]:80;
@@ -152,6 +195,7 @@ sudo ln -sfn /etc/nginx/sites-available/mxd-sop.conf /etc/nginx/sites-enabled/mx
 sudo nginx -t && sudo systemctl reload nginx
 sudo certbot certonly --webroot --non-interactive --agree-tos --email "$ACME_EMAIL" --keep-until-expiring -w /opt/mxd-sop/frontend/dist -d "$SOP_DOMAIN"
 sudo tee /etc/nginx/sites-available/mxd-sop.conf >/dev/null <<NGINX
+# Managed by MXDCMD Ubuntu 24 SOP guide
 server {
     listen 80;
     listen [::]:80;
@@ -224,14 +268,36 @@ sudo chmod 644 /etc/cron.d/mxd-sop-backup
 sudo /usr/local/sbin/mxd-sop-backup
 ```
 
-后续发布：
+后续发布。旧版部署命令可能只把 `package-lock.json` 改脏；下面的命令会先把
+该文件备份到 `/var/tmp`，恢复为当前 Git 提交，再拉取新版。若还有其他已跟踪
+文件被修改，命令会停止，不会覆盖它们。后续裁剪依赖时不再写回锁文件。
 
 ```bash
 (
 set -eu
+repo=/opt/mxd-sop
+status=$(sudo -u mxd-sop git -c core.fileMode=false -C "$repo" status --porcelain --untracked-files=no)
+case "$status" in
+  '') ;;
+  ' M package-lock.json')
+    backup_dir=$(sudo mktemp -d /var/tmp/mxd-sop-lock.XXXXXX)
+    sudo cp -a "$repo/package-lock.json" "$backup_dir/package-lock.json"
+    sudo -u mxd-sop git -C "$repo" restore --source=HEAD --worktree -- package-lock.json
+    printf '旧锁文件已备份到 %s/package-lock.json\n' "$backup_dir"
+    ;;
+  *)
+    printf '工作区有其他已跟踪文件修改，已停止：\n%s\n' "$status" >&2
+    exit 1
+    ;;
+esac
 sudo /usr/local/sbin/mxd-sop-backup
-sudo -u mxd-sop git -C /opt/mxd-sop pull --ff-only origin main
-sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm ci && npm test && npm run lint && npm run build && npm prune --omit=dev && npm audit --omit=dev --audit-level=high'
+sudo -u mxd-sop git -c core.fileMode=false -C "$repo" pull --ff-only origin main
+sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm ci && npm test && npm run lint && npm run build && npm prune --omit=dev --package-lock=false && npm audit --omit=dev --audit-level=high'
+status=$(sudo -u mxd-sop git -c core.fileMode=false -C "$repo" status --porcelain --untracked-files=no)
+if [ -n "$status" ]; then
+  printf '构建后出现工作区修改，未重启服务：\n%s\n' "$status" >&2
+  exit 1
+fi
 sudo systemctl restart mxd-sop
 curl -fsS http://127.0.0.1:26902/health
 )

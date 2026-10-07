@@ -138,9 +138,10 @@ done
 这段命令会拉取完整 MXDCMD 仓库，但只安装依赖、测试、构建并重启运营台。
 不会构建或重启 mxd-player、mxd-auto-process，也不会触碰它们的数据库。
 
-core.fileMode=false 只用于忽略服务器上备份脚本的执行权限差异；任何内容
-修改都会停止流程。--package-lock=false 防止服务器 npm 版本把生成的元数据
-写回 Git 工作区。
+core.fileMode=false 只用于忽略服务器上备份脚本的执行权限差异。旧命令若只把
+`package-lock.json` 改脏，本流程会先保存该文件再恢复 Git 版本；其他已跟踪
+文件的修改仍会停止流程。--package-lock=false 防止服务器 npm 版本把生成的
+元数据写回 Git 工作区。
 
 ~~~bash
 (
@@ -149,12 +150,21 @@ sudo -v
 
 cd /opt/mxd-sop
 
-status=$(sudo -u mxd-sop git -c core.fileMode=false status --porcelain)
-if [ -n "$status" ]; then
-  echo '服务器工作区有未提交的内容修改，已停止：' >&2
-  printf '%s\n' "$status" >&2
-  exit 1
-fi
+status=$(sudo -u mxd-sop git -c core.fileMode=false status --porcelain --untracked-files=no)
+case "$status" in
+  '') ;;
+  ' M package-lock.json')
+    backupDir=$(sudo mktemp -d /var/tmp/mxd-lock-backup.XXXXXX)
+    sudo cp -a package-lock.json "$backupDir/package-lock.json"
+    sudo -u mxd-sop git restore --source=HEAD --worktree -- package-lock.json
+    printf '旧锁文件已备份到 %s/package-lock.json\n' "$backupDir"
+    ;;
+  *)
+    echo '服务器工作区有其他已跟踪内容修改，已停止：' >&2
+    printf '%s\n' "$status" >&2
+    exit 1
+    ;;
+esac
 
 env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \
   sh /opt/mxd-sop/deploy/backup-sqlite.sh /var/backups/mxd-sop
@@ -322,6 +332,13 @@ sudo install -o mxd-auto -g mxd-auto -m 755 \
   /opt/mxd-auto-process/bin/mxd-auto-process.new
 sudo mv /opt/mxd-auto-process/bin/mxd-auto-process.new \
   /opt/mxd-auto-process/bin/mxd-auto-process
+
+# 旧部署可能留下由 root 创建的 SQLite/WAL/密钥文件；确保服务用户可写。
+sudo chown -R mxd-auto:mxd-auto /var/lib/mxd-auto-process
+sudo find /var/lib/mxd-auto-process -type d -exec chmod 700 {} +
+sudo find /var/lib/mxd-auto-process -type f -exec chmod u+rw,go-rwx {} +
+sudo -u mxd-auto test -w /var/lib/mxd-auto-process
+sudo -u mxd-auto test -w /var/lib/mxd-auto-process/datacj
 
 # 只比较令牌，不输出内容。
 sudo sh -c '

@@ -29,7 +29,7 @@ Response:
 Request body is `{ "activities": Activity[] }`. Each activity may set
 `visible` to control whether it appears in request quick fill. Each activity requires a stable
 `id`, a non-empty `name`, and at least one positive integer reward. Item rewards
-require `itemCode`; equipment levels, when present, are integers from 1 to 10.
+require `itemCode`; equipment levels, when present, are positive safe integers.
 The operation replaces the complete set atomically and requires the
 `activities` workspace.
 

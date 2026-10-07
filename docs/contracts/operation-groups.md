@@ -112,7 +112,9 @@ unauthorized（401）、forbidden（403）、invalid-input（400）、unknown-se
 
 ### Equipment level normalization
 
-Item operations may include `itemLevel` for equipment. The service defaults it to 1 and bounds it to 1-10. Level 1 keeps the base `itemCode`; higher levels use a `_N` suffix (for example `01012190_2`). The persisted operation and manager commands always use this final code. Duplicate checks use the final code, so different equipment levels may coexist. Legacy requests that already contain a suffixed equipment code remain readable.
+Item operations may include `itemLevel` for equipment. The service defaults it to 1 and accepts any positive safe integer. Level 1 keeps the base `itemCode`; higher levels use a `_N` suffix (for example `01012190_2`). The persisted operation and manager commands always use this final code. Duplicate checks use the final code, so different equipment levels may coexist. Legacy requests that already contain a suffixed equipment code remain readable.
+
+Equipment levels have no business upper limit of 10; numeric precision is bounded by JavaScript's safe integer range (up to 9007199254740991).
 
 ### Item image snapshots
 

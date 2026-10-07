@@ -56,6 +56,7 @@ Lint/format: `cd backend-auto-process; gofmt -w cmd internal; go vet ./...`
 Build: `cd backend-auto-process; go build ./...`
 Frontend build: `cd frontend-auto-process; npm run build`
 Frontend test/lint: `cd frontend-auto-process; npm test; npm run lint`
+Ubuntu 24 deployment: pull `origin/main` on the server and follow `../../docs/depoly/DEPLOY-AUTO-UBUNTU24.md`
 File-size/quality check: `Get-ChildItem -Recurse -File -Include *.go,*.ts,*.tsx | ForEach-Object { if ((Get-Content $_.FullName).Count -gt 300) { $_.FullName } }`
 ```
 

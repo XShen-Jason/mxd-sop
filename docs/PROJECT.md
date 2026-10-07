@@ -104,6 +104,7 @@ Start: `npm run dev` (or run backend, frontend, and auto separately)
 Test: `npm test`; `cd mxd-auto-process/backend-auto-process; go test ./...`
 Lint/format: `npm run lint`; `gofmt -w cmd internal`
 Build: `npm run build`; `cd mxd-auto-process/backend-auto-process; go build ./...`
+Auto Ubuntu 24 deployment: pull `origin/main` on the server and follow `docs/depoly/DEPLOY-AUTO-UBUNTU24.md`
 File-size/quality check: inspect `backend/src`, `frontend/src`, and `mxd-auto-process/backend-auto-process`/`frontend-auto-process` against AGENTS.md budgets
 ```
 

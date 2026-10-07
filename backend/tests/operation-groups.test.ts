@@ -87,7 +87,7 @@ describe('operation-groups lifecycle and projections', () => {
     const instance = service();
     const legacy = instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '126', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '01012190_2', quantity: 1 }] });
     expect(legacy.operations[0]).toMatchObject({ itemCode: '01012190_2', itemLevel: 2 });
-    for (const itemLevel of [0, 1.5, 11, '2']) {
+    for (const itemLevel of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, Infinity, NaN, '2']) {
       expect(() => instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '127', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '01012190', itemLevel, quantity: 1 }] })).toThrowError(expect.objectContaining({ code: 'invalid-input' }));
     }
     expect(() => instance.submit(customer, { serverId: 'mushroom', account: 'acc', characterId: '128', playerQQ: '456', reason: { code: 'compensation' }, operations: [{ type: 'item', itemCode: '00000001', itemLevel: 2, quantity: 1 }] })).toThrowError(expect.objectContaining({ code: 'invalid-input' }));
@@ -103,6 +103,21 @@ describe('operation-groups lifecycle and projections', () => {
       { type: 'item', itemCode: '01012190', itemLevel: 2, quantity: 1 },
       { type: 'item', itemCode: '01012190_2', quantity: 1 }
     ] })).toThrowError(expect.objectContaining({ code: 'invalid-input' }));
+  });
+
+  it.each([10, 11, 100, Number.MAX_SAFE_INTEGER])('preserves equipment level %s through submission, editing and commands', (itemLevel) => {
+    const instance = service();
+    const input = { serverId: 'mushroom', account: 'acc', characterId: '131', playerQQ: '456', reason: { code: 'compensation' },
+      operations: [{ type: 'item', itemCode: '01012190', itemLevel, quantity: 1 }] };
+    const group = instance.submit(customer, input);
+    const itemCode = `01012190_${itemLevel}`;
+    expect(group.operations[0]).toMatchObject({ itemCode, itemLevel });
+    expect(instance.update(customer, group.id, input).operations[0]).toMatchObject({ itemCode, itemLevel });
+    expect(instance.listQueue(manager).groups[0].commands[0].text).toBe(`drop@131@${itemCode}@1`);
+    const legacy = instance.submit(customer, { ...input, operations: [{ type: 'item', itemCode, quantity: 1 }] });
+    expect(legacy.operations[0]).toMatchObject({ itemCode, itemLevel });
+    expect(() => instance.submit(customer, { ...input, operations: [...input.operations, { type: 'item', itemCode, quantity: 1 }] }))
+      .toThrowError(expect.objectContaining({ code: 'invalid-input' }));
   });
 
   it('rejects duplicate item operations while allowing cash-only requests', () => {

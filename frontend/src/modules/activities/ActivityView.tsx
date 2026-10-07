@@ -8,7 +8,7 @@ import { ItemThumbnail } from '../../components/ItemThumbnail';
 import type { CatalogItem } from '../../types';
 import { CatalogPager } from './CatalogPager';
 import { activityRewardLabel, catalogToReward, readActivities, writeActivities, type Activity, type ActivityReward } from './store';
-import { codeForLevel, isEquipment, MAX_EQUIPMENT_LEVEL, normalizeEquipmentLevel } from '../../shared/item-level';
+import { codeForLevel, isEquipment, normalizeEquipmentLevel } from '../../shared/item-level';
 
 const RECENT_ITEMS_KEY = 'game-support-recent-items';
 const ACTIVITIES_MIGRATED_KEY = 'game-support-activities-migrated';
@@ -119,7 +119,7 @@ export function ActivityView({ userId, token, uploadEnabled = true }: { userId?:
     const rewards = draft.rewards.filter((reward) => reward.quantity > 0 && (reward.kind === 'cash' || reward.itemCode));
     if (!cleanName) { setNotice({ kind: 'error', text: '请输入活动名称' }); return; }
     if (!rewards.length) { setNotice({ kind: 'error', text: '至少添加一个有效奖励，数量需大于 0' }); return; }
-    if (rewards.some((reward) => reward.kind === 'item' && isEquipment(reward.itemClass) && reward.itemLevel !== undefined && (!Number.isInteger(reward.itemLevel) || reward.itemLevel < 1 || reward.itemLevel > MAX_EQUIPMENT_LEVEL))) { setNotice({ kind: 'error', text: `装备等级必须是 1-${MAX_EQUIPMENT_LEVEL} 的整数` }); return; }
+    if (rewards.some((reward) => reward.kind === 'item' && isEquipment(reward.itemClass) && reward.itemLevel !== undefined && (!Number.isSafeInteger(reward.itemLevel) || reward.itemLevel < 1))) { setNotice({ kind: 'error', text: '装备等级必须是正整数' }); return; }
     const normalizedRewards = rewards.map((reward) => reward.kind === 'item' ? {
       ...reward,
       // Only equipment uses the numeric suffix as an editable level. Other

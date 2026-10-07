@@ -57,7 +57,7 @@ sudo chown -R mxd-sop:mxd-sop /opt/mxd-sop
 sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm ci'
 sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm test'
 sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm run build'
-sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm prune --omit=dev'
+sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm prune --omit=dev --package-lock=false'
 ```
 
 ## 4. 创建生产环境变量
@@ -268,7 +268,7 @@ sudo -u mxd-sop bash -lc '
   npm test
   npm run lint
   npm run build
-  npm prune --omit=dev
+  npm prune --omit=dev --package-lock=false
 '
 
 # player 前端与 Go 后端：先构建临时二进制，成功后再原子替换。
@@ -485,7 +485,7 @@ sudo env DATABASE_PATH=/var/lib/mxd-sop/ops.sqlite \
 
 sudo systemctl stop mxd-sop
 sudo -u mxd-sop git -C /opt/mxd-sop pull --ff-only
-sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm ci && npm run test && npm run build && npm prune --omit=dev'
+sudo -u mxd-sop bash -lc 'cd /opt/mxd-sop && npm ci && npm run test && npm run build && npm prune --omit=dev --package-lock=false'
 sudo systemctl start mxd-sop
 
 curl -fsS http://127.0.0.1:26902/health

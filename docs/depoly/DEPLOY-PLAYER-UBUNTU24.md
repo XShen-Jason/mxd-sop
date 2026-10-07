@@ -118,7 +118,25 @@ curl -fsS http://127.0.0.1:26906/health
 set -eu
 PLAYER_DOMAIN=$(sudo sed -n 's/^PLAYER_DOMAIN=//p' /etc/mxd-player/mxd-player.env)
 read -rp 'Let’s Encrypt 邮箱: ' ACME_EMAIL
+site=/etc/nginx/sites-available/mxd-player.conf
+enabled=/etc/nginx/sites-enabled/mxd-player.conf
+marker='# Managed by MXDCMD Ubuntu 24 player guide'
+printf '%s\n' "$PLAYER_DOMAIN" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,}$' || { echo 'player 域名格式无效' >&2; exit 1; }
+case "$PLAYER_DOMAIN" in *.example.com|example.com) echo '请填写真实域名' >&2; exit 1;; esac
+sudo nginx -t
+if sudo test -e "$site"; then
+  sudo grep -Fxq "$marker" "$site" && sudo grep -Fq "server_name $PLAYER_DOMAIN;" "$site" || { echo '已有同名 player 站点文件，已停止以免覆盖' >&2; exit 1; }
+fi
+if sudo test -e "$enabled" || sudo test -L "$enabled"; then
+  test "$(sudo readlink -f "$enabled")" = "$site" || { echo 'Nginx 同名启用文件已被其他站点使用' >&2; exit 1; }
+fi
+if sudo nginx -T 2>/dev/null | awk -v host="$PLAYER_DOMAIN" -v own="$enabled" '
+  /^# configuration file / { file=$4; sub(/:$/, "", file) }
+  file != own && $1 == "server_name" { for (i=2; i<=NF; i++) { name=$i; sub(/;$/, "", name); if (tolower(name) == tolower(host)) found=1 } }
+  END { exit !found }
+'; then echo '该域名已被另一个 Nginx 站点使用' >&2; exit 1; fi
 sudo tee /etc/nginx/sites-available/mxd-player.conf >/dev/null <<NGINX
+# Managed by MXDCMD Ubuntu 24 player guide
 server {
     listen 80;
     listen [::]:80;
@@ -132,6 +150,7 @@ sudo ln -sfn /etc/nginx/sites-available/mxd-player.conf /etc/nginx/sites-enabled
 sudo nginx -t && sudo systemctl reload nginx
 sudo certbot certonly --webroot --non-interactive --agree-tos --email "$ACME_EMAIL" --keep-until-expiring -w /opt/mxd-sop/mxd-player/frontend-player/dist -d "$PLAYER_DOMAIN"
 sudo tee /etc/nginx/sites-available/mxd-player.conf >/dev/null <<NGINX
+# Managed by MXDCMD Ubuntu 24 player guide
 server {
     listen 80;
     listen [::]:80;

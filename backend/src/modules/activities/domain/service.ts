@@ -72,7 +72,7 @@ function normalizeReward(value: unknown): ActivityReward {
     if (value !== undefined) reward[key] = value;
   }
   if (input.itemLevel !== undefined) {
-    if (!Number.isInteger(input.itemLevel) || Number(input.itemLevel) < 1 || Number(input.itemLevel) > 10) throw new ActivityError('invalid-input', 'invalid item level');
+    if (!Number.isSafeInteger(input.itemLevel) || Number(input.itemLevel) < 1) throw new ActivityError('invalid-input', 'invalid item level');
     reward.itemLevel = Number(input.itemLevel);
   }
   return reward;

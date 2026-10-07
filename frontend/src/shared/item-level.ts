@@ -1,12 +1,10 @@
-export const MAX_EQUIPMENT_LEVEL = 10;
-
 export function isEquipment(itemClass?: string) {
   return itemClass === 'equip';
 }
 
 export function normalizeEquipmentLevel(value: unknown) {
   const level = typeof value === 'number' ? value : Number(value);
-  return Number.isInteger(level) && level >= 1 && level <= MAX_EQUIPMENT_LEVEL ? level : 1;
+  return Number.isSafeInteger(level) && level >= 1 ? level : 1;
 }
 
 export function splitEquipmentCode(code: string) {

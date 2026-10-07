@@ -41,6 +41,7 @@ data/player-fbhd
 data/char-user-qq/*.csv
 data/server_data_check
 data/research_data
+data/922-105
 **/datacj/
 *.pcap
 *.pcapng

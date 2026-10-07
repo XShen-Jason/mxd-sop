@@ -260,6 +260,21 @@ sudo chmod 750 /usr/local/sbin/mxd-auto-backup
 
 ## 6. 创建并启动 systemd 服务
 
+先把运行时数据目录交给 `mxd-auto`。如果数据库、WAL 文件或密钥曾由 root
+复制/创建，跳过这一步会导致服务日志出现 `attempt to write a readonly database`。
+这一步只修正属主和权限，不会删除或重建任何数据。
+
+~~~bash
+(
+set -eu
+sudo chown -R mxd-auto:mxd-auto /var/lib/mxd-auto-process
+sudo find /var/lib/mxd-auto-process -type d -exec chmod 700 {} +
+sudo find /var/lib/mxd-auto-process -type f -exec chmod u+rw,go-rwx {} +
+sudo -u mxd-auto test -w /var/lib/mxd-auto-process
+sudo -u mxd-auto test -w /var/lib/mxd-auto-process/datacj
+)
+~~~
+
 ~~~bash
 sudo tee /etc/systemd/system/mxd-auto-process.service >/dev/null <<'SERVICE'
 [Unit]
