@@ -1,5 +1,6 @@
 import { hasWorkspaceAccess } from '../../auth/public/index.js';
 import { AutoIntegrationError } from './errors.js';
+import type { ServerOptionsProjection } from './server-options.js';
 import type { AutoAccountInput, AutoEndpointConfig, AutoExecutionInput, AutoExecutionResult, AutoIntegrationActor, AutoIntegrationClient, AutoIntegrationRepository, AutoIntegrationState, AutoLoginInput, AutoMessageInput, AutoMessageResult, AutoServerInput, AutoServiceStatus, AutoSessionMessageResult } from './types.js';
 
 export const AUTO_CONNECTION_CONFIRMATION = 'CHANGE AUTO CONNECTION';
@@ -8,7 +9,7 @@ export class AutoIntegrationService {
   private readonly endpoint?: string;
   private readonly token: string;
 
-  constructor(config: AutoEndpointConfig, private readonly client: AutoIntegrationClient, private readonly repository: AutoIntegrationRepository) {
+  constructor(config: AutoEndpointConfig, private readonly client: AutoIntegrationClient, private readonly repository: AutoIntegrationRepository, private readonly serverOptions?: ServerOptionsProjection) {
     this.endpoint = normalizeEndpoint(config.localUrl ?? 'http://127.0.0.1:26909');
     this.token = config.serviceToken?.trim() ?? '';
   }
@@ -23,6 +24,11 @@ export class AutoIntegrationService {
 
   isEnabled() { return this.repository.get()?.enabled ?? true; }
 
+  async refreshServerOptions(actor: AutoIntegrationActor) {
+    if (!actor?.id || !this.isEnabled() || !this.endpoint || !this.token) return;
+    await this.serverOptions?.refresh(() => this.client.listServers(actor));
+  }
+
   async setConnection(actor: AutoIntegrationActor, enabled: unknown, confirmation: unknown) {
     this.requireActor(actor);
     if (typeof enabled !== 'boolean') throw new AutoIntegrationError('invalid-input', 'enabled must be a boolean');
@@ -36,14 +42,30 @@ export class AutoIntegrationService {
     return { enabled, endpoint: this.endpoint ?? null, updatedAt: state.updatedAt };
   }
 
-  async overview(actor: AutoIntegrationActor, signal?: AbortSignal) { this.requireAccess(actor); return this.client.overview(actor, signal); }
+  async overview(actor: AutoIntegrationActor, signal?: AbortSignal) {
+    this.requireAccess(actor);
+    const result = await this.client.overview(actor, signal);
+    // Overview is not used for the name projection: an older poll may finish after a rename.
+    return result;
+  }
   async startSession(actor: AutoIntegrationActor, serverId: string, input: AutoLoginInput) { this.requireAccess(actor); return this.client.startSession(actor, serverId, input); }
   async getSession(actor: AutoIntegrationActor, sessionId: string) { this.requireAccess(actor); if (!this.client.getSession) throw new AutoIntegrationError('auto-request-failed', 'session status is unavailable'); return this.client.getSession(actor, sessionId); }
   async selectAndEnterSession(actor: AutoIntegrationActor, sessionId: string, characterId: string) { this.requireAccess(actor); return this.client.selectAndEnterSession(actor, sessionId, characterId); }
   async stopSession(actor: AutoIntegrationActor, sessionId: string) { this.requireAccess(actor); return this.client.stopSession(actor, sessionId); }
   async sendSessionMessage(actor: AutoIntegrationActor, sessionId: string, input: AutoMessageInput): Promise<AutoSessionMessageResult> { this.requireAccess(actor); if (!this.client.sendSessionMessage) throw new AutoIntegrationError('auto-request-failed', 'session chat is unavailable'); return this.client.sendSessionMessage(actor, sessionId, input); }
-  async createServer(actor: AutoIntegrationActor, input: AutoServerInput) { this.requireAccess(actor); return this.client.createServer(actor, input); }
-  async updateServer(actor: AutoIntegrationActor, id: string, input: Partial<AutoServerInput>) { this.requireAccess(actor); return this.client.updateServer(actor, id, input); }
+  async createServer(actor: AutoIntegrationActor, input: AutoServerInput) {
+    this.requireAccess(actor);
+    const server = await this.client.createServer(actor, input);
+    this.serverOptions?.merge([server]);
+    return server;
+  }
+  async updateServer(actor: AutoIntegrationActor, id: string, input: Partial<AutoServerInput>) {
+    this.requireAccess(actor);
+    if (input.id !== undefined && input.id !== id) throw new AutoIntegrationError('invalid-input', 'server ID is immutable');
+    const server = await this.client.updateServer(actor, id, input);
+    this.serverOptions?.merge([server]);
+    return server;
+  }
   async deleteServer(actor: AutoIntegrationActor, id: string) { this.requireAccess(actor); return this.client.deleteServer(actor, id); }
   async createAccount(actor: AutoIntegrationActor, serverId: string, input: AutoAccountInput) { this.requireAccess(actor); return this.client.createAccount(actor, serverId, input); }
   async updateAccount(actor: AutoIntegrationActor, serverId: string, id: string, input: Partial<AutoAccountInput>) { this.requireAccess(actor); return this.client.updateAccount(actor, serverId, id, input); }

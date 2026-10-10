@@ -56,6 +56,13 @@ also retains the existing `mxd-player` connection tab.
   `PCAPdroid_05_10月_17_35_49.pcap` confirms `zhu-zhu` uses TCP
   `103.88.32.132:12660` and login version `1.0.3`. Existing records created with
   another version require an explicit configuration update.
+- Authorized operators can enter a new server ID, display name, address, and
+  protocol version in the game-server dialog. Successful create and rename
+  operations immediately update the shared SOP server-options projection;
+  background refresh reads auto at most once every 15 seconds and persists the
+  last known ID/name list for disconnected/manual workflows. Request forms,
+  directory filters, and team views consume this same projection. The separate
+  mxd-player application is outside this dynamic catalog.
 - Adding an account is an interactive flow: the first step calls auto's
   session-login endpoint, the returned server role list is shown in the second
   step, and the selected role is sent to `select-and-enter`. Only after the

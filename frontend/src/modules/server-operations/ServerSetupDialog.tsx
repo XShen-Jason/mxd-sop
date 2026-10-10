@@ -1,30 +1,9 @@
 import { Check, CircleCheck, Gamepad2, KeyRound, LoaderCircle, Pencil, UserRound, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import type { AppOptions, AutoCredentialType, AutoRole, AutoSession } from '../../types';
-import { defaultGameProtocolVersion, normalizeGameHost, normalizeGamePort, type AccountSetupValue, type ConfiguredServer, type ServerAccount, type ServerFormValue } from './types';
+import type { AutoCredentialType, AutoRole, AutoSession } from '../../types';
+import { type AccountSetupValue, type ConfiguredServer, type ServerAccount } from './types';
 
-export function ServerConfigDialog({ options, server, configuredIds, onCancel, onSave }: { options: AppOptions; server: ConfiguredServer | null; configuredIds: string[]; onCancel: () => void; onSave: (value: ServerFormValue) => void }) {
-  const availableServers = options.servers.filter((item) => item.id === server?.id || !configuredIds.includes(item.id));
-  const initial = server ? splitAddress(server.address) : { host: '127.0.0.1', port: '12660' };
-  const initialServerId = server?.id ?? availableServers[0]?.id ?? '';
-  const [form, setForm] = useState<ServerFormValue>({ catalogId: initialServerId, host: initial.host, port: initial.port, version: server?.version ?? defaultGameProtocolVersion(initialServerId) });
-  const [formError, setFormError] = useState('');
-  useDialogEscape(onCancel);
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const host = normalizeGameHost(form.host);
-    const port = normalizeGamePort(form.port);
-    if (!host) return setFormError('请输入有效的游戏服务器 IP 地址');
-    if (!port) return setFormError('请输入 1 到 65535 之间的端口');
-    if (!form.catalogId) return setFormError('请选择游戏服务器');
-    if (!form.version.trim()) return setFormError('请输入协议版本');
-    setFormError('');
-    onSave({ catalogId: form.catalogId, host, port: String(port), version: form.version.trim() });
-  };
-
-  return <div className="server-dialog-backdrop" role="presentation"><div className="server-dialog" role="dialog" aria-modal="true" aria-labelledby="server-dialog-title"><div className="server-dialog-header"><div><h2 id="server-dialog-title">{server ? '修改游戏服务器' : '添加游戏服务器'}</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={onCancel}><X size={18} /></button></div><form className="server-dialog-form" onSubmit={submit}><label><span>服务器标识</span><select required value={form.catalogId} onChange={(event) => setForm({ ...form, catalogId: event.target.value, version: defaultGameProtocolVersion(event.target.value) })} disabled={Boolean(server)}><option value="" disabled>选择服务器</option>{availableServers.map((item) => <option value={item.id} key={item.id}>{item.displayName}</option>)}{server && !availableServers.some((item) => item.id === server.id) && <option value={server.id}>{server.name}</option>}</select></label><div className="server-form-grid tcp-address-grid"><label className="server-endpoint-field"><span>游戏服务器 IP</span><input required type="text" inputMode="url" value={form.host} placeholder="127.0.0.1" onChange={(event) => { setForm({ ...form, host: event.target.value }); setFormError(''); }} /><small>auto 将通过 TCP 连接此地址</small></label><label className="server-endpoint-field"><span>端口</span><input required type="number" inputMode="numeric" min="1" max="65535" value={form.port} placeholder="12660" onChange={(event) => { setForm({ ...form, port: event.target.value }); setFormError(''); }} /><small>游戏服务端口</small></label></div><label><span>协议版本</span><input required value={form.version} placeholder="1.0.2" onChange={(event) => { setForm({ ...form, version: event.target.value }); setFormError(''); }} /><small>每台服务器单独保存；默认 1.0.2</small></label>{formError && <p className="setup-error" role="alert">{formError}</p>}<div className="server-dialog-actions"><button type="button" className="secondary-button" onClick={onCancel}>取消</button><button type="submit" className="primary-button"><Check size={16} />保存配置</button></div></form></div></div>;
-}
+export { ServerConfigDialog } from './ServerConfigDialog';
 
 export function AccountSetupDialog({ server, account, onCancel, onResetLogin, onLogin, onEnterGame, onComplete }: { server: ConfiguredServer; account?: ServerAccount | null; onCancel: (sessionId?: string) => void; onResetLogin: (sessionId: string) => Promise<void>; onLogin?: (username: string, password: string, credentialType: AutoCredentialType) => Promise<AutoSession>; onEnterGame?: (sessionId: string, characterId: string) => Promise<AutoSession>; onComplete: (value: AccountSetupValue) => Promise<boolean> | boolean }) {
   const editing = Boolean(account);
@@ -131,6 +110,5 @@ export function AccountSetupDialog({ server, account, onCancel, onResetLogin, on
 
 function StepMarker({ number, label, active, complete }: { number: string; label: string; active: boolean; complete: boolean }) { return <div className={`setup-step ${active ? 'active' : ''} ${complete ? 'complete' : ''}`}><span>{complete ? <Check size={13} /> : number}</span><small>{label}</small></div>; }
 function CredentialTypeField({ value, onChange }: { value: AutoCredentialType; onChange: (value: AutoCredentialType) => void }) { return <fieldset className="credential-type-field"><legend>密码类型</legend><div className="credential-type-options" role="radiogroup" aria-label="密码类型">{([{ id: 'password', label: '原始密码' }, { id: 'md5', label: 'MD5 登录值' }] as const).map((option) => <button type="button" key={option.id} className={`credential-type-option ${value === option.id ? 'selected' : ''}`} role="radio" aria-checked={value === option.id} onClick={() => onChange(option.id)}>{option.label}</button>)}</div></fieldset>; }
-function splitAddress(address: string) { const value = address.trim(); if (value.startsWith('[')) { const end = value.indexOf(']'); return end > 0 ? { host: value.slice(1, end), port: value.slice(end + 2) } : { host: value, port: '' }; } const separator = value.lastIndexOf(':'); return separator > 0 ? { host: value.slice(0, separator), port: value.slice(separator + 1) } : { host: value, port: '' }; }
 function setupError(reason: unknown, fallback: string) { return reason instanceof Error && reason.message ? reason.message : fallback; }
 function useDialogEscape(onCancel: () => void) { useEffect(() => { const handler = (event: KeyboardEvent) => { if (event.key === 'Escape') onCancel(); }; window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler); }, [onCancel]); }

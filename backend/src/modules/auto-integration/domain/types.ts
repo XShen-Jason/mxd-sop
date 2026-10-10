@@ -189,6 +189,7 @@ export interface AutoExecutionResult { execution_id: string; status: 'running' |
 export type AutoIntegrationActor = Pick<Identity, 'id' | 'role' | 'displayName' | 'workspacePermissions'>;
 
 export interface AutoIntegrationClient {
+  listServers(actor: AutoIntegrationActor): Promise<Pick<AutoServer, 'id' | 'name'>[]>;
   health(signal?: AbortSignal): Promise<boolean>;
   overview(actor: AutoIntegrationActor, signal?: AbortSignal): Promise<AutoOverview>;
   startSession(actor: AutoIntegrationActor, serverId: string, input: AutoLoginInput): Promise<AutoSession>;

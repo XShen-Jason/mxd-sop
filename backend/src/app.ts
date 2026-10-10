@@ -31,6 +31,7 @@ import { AutoIntegrationService, HttpAutoIntegrationClient, loadAutoEndpointConf
 import { registerAutoIntegrationRoutes } from './modules/auto-integration/interface/http.js';
 import { OperationAutomationWorkflow } from './modules/operation-groups/application/automation-workflow.js';
 import { registerPotentialRoutes, potentialPoolPath } from './modules/potential/index.js';
+import { ServerOptionsProjection, SqliteServerOptionsRepository } from './modules/auto-integration/public/index.js';
 
 loadEnvironment();
 
@@ -114,7 +115,9 @@ export async function createApp(config: AppConfig = {}) {
   const integration = new PlayerIntegrationService(integrationRepository, integrationConfig, config.playerIntegrationClient ?? new HttpPlayerIntegrationClient(integrationConfig.timeoutMs));
   const autoConfig = { ...loadAutoEndpointConfig(), ...config.autoIntegration };
   const autoIntegrationRepository = testPersistence ? new MemoryAutoIntegrationRepository() : new SqliteAutoIntegrationRepository(db!);
-  const autoIntegration = new AutoIntegrationService(autoConfig, config.autoIntegrationClient ?? new HttpAutoIntegrationClient(autoConfig), autoIntegrationRepository);
+  const serverOptions = new ServerOptionsProjection(appOptions.servers, db ? new SqliteServerOptionsRepository(db) : undefined);
+  const options = { ...structuredClone(appOptions), servers: serverOptions.servers };
+  const autoIntegration = new AutoIntegrationService(autoConfig, config.autoIntegrationClient ?? new HttpAutoIntegrationClient(autoConfig), autoIntegrationRepository, serverOptions);
   const sourceUrl = process.env.MXD_PLAYER_TEAM_SNAPSHOT_URL;
   const teamSource = config.teamSource ?? (sourceUrl ? new HttpLockedTeamSource(sourceUrl, process.env.MXD_PLAYER_TEAM_SNAPSHOT_TOKEN) : new HttpLockedTeamSource(() => integration.teamSnapshotEndpoint(), () => integration.serviceToken()));
   const sourceConfigured = Boolean(config.teamSource || sourceUrl || integration.hasConfiguredEndpoint());
@@ -133,13 +136,22 @@ export async function createApp(config: AppConfig = {}) {
     }
     throw error;
   }
-  const service = new OperationGroupsService({ repository, catalog, options: appOptions, resolveDisplayName: (id) => auth.resolveDisplayName(id) });
+  // Refresh the shared projection before consumers validate server IDs; failed reads
+  // retain the durable catalog and never block manual workflows on auto health.
+  app.addHook('preHandler', async (request) => {
+    if (process.env.NODE_ENV === 'test' && !config.autoIntegrationClient) return;
+    if (!/^\/api\/v1\/(operation-groups|player-directory|team-view)(\/|\?|$)/u.test(request.url)
+      || request.url.includes('/events') || request.url.includes('/workspace-counts')) return;
+    try { await autoIntegration.refreshServerOptions(auth.requestIdentity(request.headers as Record<string, unknown>)); }
+    catch { /* Route handlers own authentication errors. */ }
+  });
+  const service = new OperationGroupsService({ repository, catalog, options, resolveDisplayName: (id) => auth.resolveDisplayName(id) });
   const automation = (process.env.NODE_ENV !== 'test' || config.autoIntegrationClient) ? new OperationAutomationWorkflow(service, autoIntegration) : undefined;
   registerAuthRoutes(app, auth);
   registerOperationRoutes(app, service, catalog, auth, automation, replaceUploadedCatalog);
   registerActivityRoutes(app, new ActivitiesService(activitiesRepository, catalog), auth);
   const playerSync = config.playerIntegrationClient || process.env.NODE_ENV !== 'test' ? integration : undefined;
-  const playerDirectory = new PlayerDirectoryService(directoryRepository, appOptions.servers, playerSync);
+  const playerDirectory = new PlayerDirectoryService(directoryRepository, options.servers, playerSync);
   registerPlayerDirectoryRoutes(app, playerDirectory, auth);
   registerPlayerIntegrationRoutes(app, integration, auth);
   registerAutoIntegrationRoutes(app, autoIntegration, auth);
@@ -147,7 +159,7 @@ export async function createApp(config: AppConfig = {}) {
   const teamClears = testPersistence
     ? new JsonTeamClearRepository(`${config.teamViewPath ?? config.dataPath ?? projectPath('data/generated/operation-groups.json')}.clears.json`)
     : new SqliteTeamClearRepository(db!);
-  const teamViewService = new TeamViewService(teamRepository, teamSource, appOptions.servers, teamClears);
+  const teamViewService = new TeamViewService(teamRepository, teamSource, options.servers, teamClears);
   registerTeamViewRoutes(app, teamViewService, auth, service, playerDirectory);
   const scheduler = new TeamViewScheduler(teamViewService, undefined, () => integration.isEnabled());
   integration.onConnectionChange((enabled) => scheduler.connectionChanged(enabled));

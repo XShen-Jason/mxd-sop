@@ -9,9 +9,11 @@ import { PlayerDirectoryView } from './modules/player-directory/PlayerDirectoryV
 import { TeamView } from './modules/team-view/TeamView';
 import { ServerOperationsView } from './modules/server-operations/ServerOperationsView';
 import { PotentialEditorView } from './modules/potential/PotentialEditorView';
-import type { AppOptions, Session, User, WorkspaceId } from './types';
+import type { Session, User, WorkspaceId } from './types';
 import { isUploadEnabled, isWorkspaceEnabled } from './permissions';
 import { GROUPS_CHANGED_EVENT, parseGroupChange } from './modules/operation-groups/live-refresh';
+
+import { useAppOptions } from './modules/server-operations/useAppOptions';
 
 type Workspace = WorkspaceId;
 type WorkspaceCounts = Partial<Record<Workspace, number>> & { reminderIssuance?: number; reminderRegular?: number; ownIssuance?: number; ownRegular?: number };
@@ -41,7 +43,6 @@ function workspaceFromPath(user: User): Workspace | null { const path = window.l
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
-  const [options, setOptions] = useState<AppOptions | null>(null);
   const [error, setError] = useState('');
   const [workspace, setWorkspace] = useState<Workspace | null>('request');
   const [workspaceCounts, setWorkspaceCounts] = useState<WorkspaceCounts>({});
@@ -52,17 +53,17 @@ export default function App() {
   useEffect(() => { if (!session) return; const next = workspaceFromPath(session.user); setWorkspace(next); const nextPath = next ? workspacePaths[next] : '/'; if (window.location.pathname !== nextPath) window.history.replaceState({}, '', nextPath); }, [session?.user.id, session?.user.role, session?.user.workspacePermissions]);
   useEffect(() => { const onPopState = () => { if (session) { invalidateApiCache(); setWorkspace(workspaceFromPath(session.user)); } }; window.addEventListener('popstate', onPopState); return () => window.removeEventListener('popstate', onPopState); }, [session]);
   useEffect(() => { const bootstrap = async () => { try { const user = await new ApiClient().me(); setSession({ user, expiresAt: '' }); } catch (reason) { if (reason instanceof ApiError && reason.code !== 'unauthorized') setError(reason.message); } finally { setChecking(false); } }; void bootstrap(); }, []);
-  useEffect(() => { if (!session) { setOptions(null); return; } setError(''); client.options().then(setOptions).catch((reason) => { setSession(null); setOptions(null); setError(reason instanceof ApiError ? reason.message : '会话已失效，请重新登录'); }); }, [session?.user.id, client]);
+  const { options, error: optionsError, retry: retryOptions } = useAppOptions(client, session?.user.id, workspace);
   useWorkspaceCounts(session, client, setWorkspaceCounts);
 
-  const login = async (username: string, password: string) => { const result = await new ApiClient().login(username, password); resetApiClientState(); setSession({ user: result.user, expiresAt: result.expiresAt }); setOptions(null); };
-  const logout = async () => { try { await client.logout(); } catch { /* local session still clears */ } resetApiClientState(); setSession(null); setOptions(null); window.history.pushState({}, '', '/'); };
+  const login = async (username: string, password: string) => { const result = await new ApiClient().login(username, password); resetApiClientState(); setSession({ user: result.user, expiresAt: result.expiresAt }); };
+  const logout = async () => { try { await client.logout(); } catch { /* local session still clears */ } resetApiClientState(); setSession(null); window.history.pushState({}, '', '/'); };
   const relogin = () => { void logout(); setError('密码已修改，请使用新密码重新登录'); };
   const selectWorkspace = (next: Workspace) => { if (!session || !isWorkspaceEnabled(session.user, next)) return; if (next !== workspace) invalidateApiCache(); setWorkspace(next); setMobileNavOpen(false); if (window.location.pathname !== workspacePaths[next]) window.history.pushState({}, '', workspacePaths[next]); };
 
   if (checking) return <div className="app-loading"><div className="loading-mark"><LoaderCircle className="spin" size={24} /></div><p>正在验证会话</p></div>;
   if (!session) return <LoginView onLogin={login} initialError={error} />;
-  if (!options) return <div className="app-loading"><div className="loading-mark"><LoaderCircle className="spin" size={24} /></div><p>正在加载工作台</p></div>;
+  if (!options) return <div className="app-loading">{optionsError ? <><p role="alert">{optionsError}</p><button type="button" className="primary-button" onClick={retryOptions}>重试</button></> : <><div className="loading-mark"><LoaderCircle className="spin" size={24} /></div><p>正在加载工作台</p></>}</div>;
   if (!workspace) return <NoWorkspaceView onLogout={() => void logout()} />;
   const items = workspaceItems(session.user);
   const managerPanel = workspace === 'ready' || workspace === 'archive' || workspace === 'reissue' ? workspace : workspace === 'accounts' ? 'users' : 'queue';
@@ -70,7 +71,7 @@ export default function App() {
   const content = workspace === 'server-operations' ? <ServerOperationsView options={options} userId={session.user.id} token={session.token} />
     : workspace === 'potential-editor' ? <PotentialEditorView options={options} userId={session.user.id} token={session.token} />
     : workspace === 'player-directory' ? <PlayerDirectoryView options={options} userId={session.user.id} token={session.token} uploadEnabled={isUploadEnabled(session.user, 'player-directory')} />
-    : workspace === 'team-view' ? <TeamView userId={session.user.id} token={session.token} uploadEnabled={isUploadEnabled(session.user, 'team-view')} />
+    : workspace === 'team-view' ? <TeamView options={options} userId={session.user.id} token={session.token} uploadEnabled={isUploadEnabled(session.user, 'team-view')} />
     : workspace === 'activities' ? <ActivityView userId={session.user.id} token={session.token} uploadEnabled={isUploadEnabled(session.user, 'item-catalog')} />
     : workspace === 'reminders' ? <CustomerView options={options} userId={session.user.id} token={session.token} section="reminders" reminderCounts={{ issuance: workspaceCounts.reminderIssuance, regular: workspaceCounts.reminderRegular }} />
     : workspace === 'archive' || workspace === 'reissue' ? <ManagerView options={options} userId={session.user.id} token={session.token} panel={managerPanel} actorId={session.user.id} onRequireRelogin={relogin} />

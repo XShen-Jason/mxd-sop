@@ -28,6 +28,21 @@ the connection does not dispatch previously approved work automatically.
 
 ## Forwarded operations (v1)
 
+Server creation supports arbitrary unique IDs (1–64 lowercase letters, digits,
+or hyphens, starting with a letter/digit) and names (1–80 characters). IDs are
+immutable on update. Successful create/update immediately publishes the name
+to SOP options. Auto remains the configuration authority; SOP stores only a
+derived ID/name projection in SQLite for disconnected/manual operation.
+
+The backend reads auto's authenticated `GET /api/v1/servers` catalog at most
+once per 15 seconds, coalescing concurrent reads. Successful catalog reads and
+overview responses merge names into the projection; failures preserve the last
+known values and the next attempt waits 15 seconds. Disabled connections never
+read auto. Previously known IDs (including the six legacy IDs) are retained for
+history and manual work after deletion/disable; deleting an auto server removes
+its connection/accounts, not historical SOP identities. Ordinary authenticated
+users receive only `{id, displayName}` through the existing options route.
+
 Overview, setup sessions, server/account CRUD, account lifecycle, messaging,
 and execution routes retain the mappings registered in `docs/CONTRACTS.md`.
 The adapter sends the configured service token and authenticated actor headers;

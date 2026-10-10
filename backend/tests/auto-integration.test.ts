@@ -24,6 +24,7 @@ describe('auto integration boundary', () => {
   const session: AutoSession = { id: 'session-1', server_id: server.id, state: 'logged_in', roles: [{ id: '265', name: 'Galaxy', opaque_available: true }], sent_messages: 0, chat_success_count: 0, chat_failure_count: 0, chat_unknown_count: 0, created_at: '2026-09-15T00:00:00Z', updated_at: '2026-09-15T00:00:00Z' };
   const record = (name: string, actor: { id: string }, input?: unknown) => calls.push({ name, actor: actor.id, input });
   const client: AutoIntegrationClient = {
+    listServers: async () => [{ id: server.id, name: server.name }],
     health: async () => { healthCalls += 1; return true; },
     overview: async (actor) => { record('overview', actor); return overview(); },
     startSession: async (actor, serverId, input) => { record('startSession', actor, { serverId, input }); return { ...session, server_id: serverId }; },

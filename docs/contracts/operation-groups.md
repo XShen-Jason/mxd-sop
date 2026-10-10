@@ -38,6 +38,14 @@ Consumers: 已认证客服、管理前端
 
 GET /api/v1/operation-groups/options
 
+`servers` includes runtime-configured auto servers through the ID/name-only
+projection described in `auto-integration.md`. The same projection validates
+submissions, directory filters/imports, and team views. Configured names override
+legacy labels for new operations; existing group snapshots remain unchanged.
+Authenticated visible browsers refresh options every 15 seconds and on focus,
+navigation, or a successful local server mutation. No auto workspace permission
+is needed to read these safe options; server writes still require it.
+
 无业务请求体；认证上下文决定可见范围。
 
 ### Response/handling

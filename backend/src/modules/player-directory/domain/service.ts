@@ -6,10 +6,10 @@ import type { DirectoryPage, DirectoryRepository, DirectorySearchInput, PlayerAc
 import { importCsvFile, type UploadFile } from '../infrastructure/csv.js';
 
 export class PlayerDirectoryService {
-  private readonly servers: ReadonlyMap<string, ServerOption>;
+  constructor(private readonly repository: DirectoryRepository, private readonly serverOptions: ServerOption[], private readonly playerSync?: PlayerAccountSync) {}
 
-  constructor(private readonly repository: DirectoryRepository, servers: ServerOption[], private readonly playerSync?: PlayerAccountSync) {
-    this.servers = new Map(servers.map((server) => [server.id, server]));
+  private get servers(): ReadonlyMap<string, ServerOption> {
+    return new Map(this.serverOptions.map((server) => [server.id, server]));
   }
 
   search(actor: Identity, input: DirectorySearchInput = {}): DirectoryPage {

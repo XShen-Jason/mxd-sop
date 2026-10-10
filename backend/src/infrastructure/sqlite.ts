@@ -12,6 +12,10 @@ export function openDatabase(filePath: string) {
   db.pragma('temp_store = MEMORY');
   db.pragma('cache_size = -64000');
   db.exec(`
+    CREATE TABLE IF NOT EXISTS auto_server_options (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      payload_json TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL COLLATE NOCASE UNIQUE,

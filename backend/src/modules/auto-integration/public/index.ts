@@ -4,3 +4,5 @@ export type { AutoAccount, AutoAccountInput, AutoAccountStatus, AutoAuditEntry, 
 export { HttpAutoIntegrationClient } from '../infrastructure/http-client.js';
 export { MemoryAutoIntegrationRepository } from '../infrastructure/memory-store.js';
 export { SqliteAutoIntegrationRepository } from '../infrastructure/sqlite-store.js';
+export { ServerOptionsProjection } from '../domain/server-options.js';
+export { SqliteServerOptionsRepository } from '../infrastructure/server-options-store.js';

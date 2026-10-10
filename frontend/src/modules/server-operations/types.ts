@@ -50,6 +50,7 @@ export function accountCharacterLabel(account: Pick<AutoAccount, 'character_id' 
 
 export interface ServerFormValue {
   catalogId: string;
+  name: string;
   host: string;
   port: string;
   version: string;

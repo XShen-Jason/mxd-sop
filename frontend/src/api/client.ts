@@ -35,6 +35,7 @@ const errorMessages: Record<string, string> = {
   'account_exists': '该服务器已存在同名账号',
   'account_not_found': '账号不存在',
   'server_not_found': '服务器不存在',
+  server_exists: '服务器标识已存在，请换一个标识',
   server_disabled: '服务器已停用',
   capacity_full: '自动处理服务会话已达到上限',
   invalid_state: '当前登录流程状态无效，请重新开始',
@@ -61,6 +62,7 @@ const responseCache = new Map<string, { expiresAt: number; value: unknown }>();
 const inFlightRequests = new Map<string, Promise<unknown>>();
 const eventConnections = new Map<string, { source: EventSource; users: number; closeTimer?: number }>();
 export const OPERATION_GROUPS_LOCAL_CHANGE_EVENT = 'operation-groups-local-change';
+export const SERVER_OPTIONS_CHANGED_EVENT = 'server-options-changed';
 let cacheEpoch = 0;
 
 /** Drop cached reads after a mutation or an SSE change notification. */
@@ -115,6 +117,9 @@ export class ApiClient {
       if (path.includes('/operation-groups') && typeof window !== 'undefined') {
         window.dispatchEvent(new Event(OPERATION_GROUPS_LOCAL_CHANGE_EVENT));
       }
+      if (/^\/api\/v1\/auto\/servers(?:\/[^/]+)?$/u.test(path) && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(SERVER_OPTIONS_CHANGED_EVENT));
+      }
     }
     return value;
   }
@@ -131,7 +136,7 @@ export class ApiClient {
   updateUser(id: string, input: Partial<{ password: string; displayName: string; role: Role; active: boolean; workspacePermissions: Partial<WorkspacePermissions>; uploadPermissions: Partial<UploadPermissions> }>) { return this.request<User>(`/api/v1/auth/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }); }
   deleteUser(id: string) { return this.request<User>(`/api/v1/auth/users/${encodeURIComponent(id)}/delete`, { method: 'POST' }); }
 
-  options() { return this.request<AppOptions>('/api/v1/operation-groups/options'); }
+  options(signal?: AbortSignal) { return this.request<AppOptions>('/api/v1/operation-groups/options', { signal }); }
   activities() { return this.request<{ activities: Activity[] }>('/api/v1/activities'); }
   saveActivities(activities: Activity[]) { return this.request<{ activities: Activity[] }>('/api/v1/activities', { method: 'PUT', body: JSON.stringify({ activities }) }); }
   searchPlayerDirectory(query = '', serverId?: string, signal?: AbortSignal, cursor?: string, limit = 20) {

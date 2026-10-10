@@ -39,6 +39,8 @@ function serverInput(value: Body, partial: boolean): AutoServerInput | Partial<A
   if (value.version !== undefined) result.version = text(value.version, 'version')!;
   if (!partial || value.map_id !== undefined) result.map_id = text(value.map_id, 'map_id')!;
   if (value.id !== undefined) result.id = text(value.id, 'id');
+  if (result.id !== undefined && !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(result.id)) throw new AutoIntegrationError('invalid-input', '服务器标识请使用 1–64 位小写字母、数字或短横线');
+  if (result.name !== undefined && (result.name.length > 80 || /[\u0000-\u001f\u007f]/u.test(result.name))) throw new AutoIntegrationError('invalid-input', '服务器名称请使用 1–80 个字符');
   if (value.enabled !== undefined) result.enabled = bool(value.enabled, 'enabled');
   return result as AutoServerInput;
 }

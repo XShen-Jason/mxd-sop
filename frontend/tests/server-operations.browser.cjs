@@ -97,11 +97,14 @@ async function runViewport(browser, width) {
           { id: 'yeti', displayName: 'Yeti Server' },
           { id: 'piaopiao-pig', displayName: 'Piaopiao Pig' },
           { id: 'zhu-zhu', displayName: 'Zhu Zhu' },
+          ...(server?.id === 'new-world' ? [{ id: 'new-world', displayName: server.name }] : []),
         ],
         reasons: [], operations: [], commandRuleVersion: 'browser-test',
       };
     } else if (pathname.endsWith('/workspace-counts')) {
       body = {};
+    } else if (pathname.includes('/operation-groups/mine')) {
+      body = { items: [], nextCursor: null };
     } else if (pathname.endsWith('/events')) {
       await route.fulfill({ contentType: 'text/event-stream', body: ': ready\n\n' });
       return;
@@ -150,11 +153,15 @@ async function runViewport(browser, width) {
       return;
     } else if (pathname === '/api/v1/auto/servers' && request.method() === 'POST') {
       const payload = request.postDataJSON();
-      assert.deepEqual(payload, {
+      if (payload.id === 'mushroom') assert.deepEqual(payload, {
         id: 'mushroom', name: 'Mushroom Server', address: '45.117.11.230:12660',
         version: '1.0.2', map_id: '211000000', enabled: true,
       });
-      server = makeServer(payload.address);
+      else assert.deepEqual(payload, {
+        id: 'new-world', name: '新区', address: '127.0.0.1:12660',
+        version: '1.0.2', map_id: '211000000', enabled: true,
+      });
+      server = { ...makeServer(payload.address), ...payload, accounts: [] };
       body = server;
     } else if (pathname === '/api/v1/auto/servers/mushroom' && request.method() === 'PATCH') {
       const payload = request.postDataJSON();
@@ -432,6 +439,16 @@ async function runViewport(browser, width) {
   await page.locator('.server-detail-empty').waitFor();
   assert.equal(serverDeleteRequests, 1);
   assert.equal(await page.locator('.server-list-item').count(), 0);
+
+  await page.locator('.server-configure-button:not([disabled])').click();
+  const custom = page.locator('.server-dialog');
+  await custom.locator('input[placeholder="例如：新区"]').fill('新区');
+  await custom.locator('input[placeholder="例如：new-world"]').fill('new-world');
+  await custom.locator('form .primary-button').click();
+  await page.locator('.server-list-copy strong').getByText('新区', { exact: true }).waitFor();
+  if (width < 700) await page.locator('.mobile-nav-toggle').click();
+  await page.locator('.side-link').getByText('申请操作', { exact: true }).click();
+  await page.locator('.server-picker .server-choice').getByText('新区', { exact: true }).waitFor();
 
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
   assert.deepEqual(errors, []);

@@ -74,6 +74,12 @@ internals or database structures.
 
 ## Game-server integration boundary
 
+The auto-integration module also owns a persisted, read-only server-option
+projection for SOP consumers (`operation-groups.list-options`). Runtime auto
+catalog changes update the projection without deployment; legacy server IDs
+remain compatible with manual workflows and historical records. The projection
+contains only IDs and display names, never endpoints or account data.
+
 The `server-operations` game-server surface is backed entirely by
 `mxd-auto-process`. Auto owns its SQLite server catalog, encrypted account
 credentials, sessions, runtime state, and audit log. This project only forwards

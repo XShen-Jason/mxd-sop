@@ -18,6 +18,7 @@ export class HttpAutoIntegrationClient implements AutoIntegrationClient {
   }
 
   overview(actor: AutoIntegrationActor, signal?: AbortSignal) { return this.request<AutoOverview>('/api/v1/overview?include_logs=false', { method: 'GET', signal, actor }); }
+  async listServers(actor: AutoIntegrationActor) { return (await this.request<{ servers: Pick<AutoServer, 'id' | 'name'>[] }>('/api/v1/servers', { method: 'GET', actor })).servers; }
   startSession(actor: AutoIntegrationActor, serverId: string, input: AutoLoginInput) { return this.request<AutoSession>(`/api/v1/servers/${encodeURIComponent(serverId)}/sessions`, { method: 'POST', body: JSON.stringify(input), actor }); }
   getSession(actor: AutoIntegrationActor, sessionId: string) { return this.request<AutoSession>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, { method: 'GET', actor }); }
   selectAndEnterSession(actor: AutoIntegrationActor, sessionId: string, characterId: string) { return this.request<AutoSession>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/select-and-enter`, { method: 'POST', body: JSON.stringify({ character_id: characterId }), actor }); }

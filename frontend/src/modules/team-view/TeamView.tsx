@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { ApiClient, ApiError } from '../../api/client';
 import { FloatingNotice } from '../../components/FloatingNotice';
 import { TeamClearUpload } from './TeamClearUpload';
-import type { TeamViewResult, TeamViewServer, TeamViewType } from '../../types';
+import type { AppOptions, TeamViewResult, TeamViewServer, TeamViewType } from '../../types';
 
-export function TeamView({ userId, token, uploadEnabled = true }: { userId?: string; token?: string; uploadEnabled?: boolean }) {
+export function TeamView({ options, userId, token, uploadEnabled = true }: { options: AppOptions; userId?: string; token?: string; uploadEnabled?: boolean }) {
   const client = useMemo(() => new ApiClient(userId ?? 'anonymous', token), [userId, token]);
   const [date, setDate] = useState(defaultTeamDate);
   const [serverId, setServerId] = useState('');
@@ -41,7 +41,7 @@ export function TeamView({ userId, token, uploadEnabled = true }: { userId?: str
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [client, date, refreshKey]);
+  }, [client, date, refreshKey, options.servers]);
 
   return <section className="workspace team-view-workspace">
     <div className="page-heading team-view-heading"><div><p className="eyebrow">客服工作台</p><h1>{formatTeamDate(date)}组队名单</h1><p className="heading-copy">名单日期为锁定日：{formatTeamDate(previousTeamDate(date))} 全天开放组队，{formatTeamDate(date)} 00:00 锁定。成员仅显示角色 ID。</p></div><div className="heading-stat"><span>队伍总数</span><strong>{result ? totalTeams(result, serverId) : '—'}</strong></div></div>
