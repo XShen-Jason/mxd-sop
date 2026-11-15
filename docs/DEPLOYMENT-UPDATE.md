@@ -135,6 +135,10 @@ done
 
 ## 2. 只更新 SOP 项目
 
+若服务器仍在 `476b904` 且保留此前直接部署的安全源码，先使用
+[SOP 安全发布与旧源码对齐](deployment/SOP-SECURITY-RELEASE.md) 的受控流程。
+该流程会校验并保留已知旧修改；不要直接清空工作区来绕过下面的检查。
+
 本次若包含按 IP 登录保护且域名使用 Cloudflare 橙云，完成本节更新后还要按
 [Cloudflare 橙云与登录限流](deployment/cloudflare-login-ip.md) 安装真实 IP 配置并重载 Nginx。
 下方后端构建/重启不会改写 `/etc/nginx`；未配置时会把 Cloudflare 节点当作访客计数。

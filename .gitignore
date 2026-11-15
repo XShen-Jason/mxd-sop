@@ -4,6 +4,7 @@ node_modules/
 dist/
 build/
 coverage/
+__pycache__/
 *.exe
 *.test
 *.out
