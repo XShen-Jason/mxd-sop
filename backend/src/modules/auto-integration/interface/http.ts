@@ -80,6 +80,8 @@ function messageInput(value: Body): AutoMessageInput {
 
 function sendError(reply: FastifyReply, error: unknown) {
   if (error instanceof AutoIntegrationError) {
+    // A non-zero game response is a downstream rejection, not malformed SOP input.
+    if (error.code === 'remote_error') return reply.code(502).send({ error: { code: error.code, message: error.message } });
     const status = error.code === 'forbidden' ? 403 : error.code === 'connection-disabled' || error.code === 'endpoint-not-configured' || error.code === 'endpoint-unavailable' ? 503 : error.code === 'overview_unavailable' || error.code === 'auto-request-failed' ? 502 : error.code === 'not_found' || error.code === 'server_not_found' || error.code === 'account_not_found' || error.code === 'session_not_found' ? 404 : error.code === 'account_exists' || error.code === 'server_exists' || error.code === 'invalid_state' || error.code === 'session_server_mismatch' ? 409 : error.code === 'timeout' || error.code === 'map_initialization_timeout' ? 504 : 400;
     return reply.code(status).send({ error: { code: error.code, message: error.message } });
   }

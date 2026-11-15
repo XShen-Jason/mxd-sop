@@ -1,5 +1,6 @@
 import { hasWorkspaceAccess } from '../../auth/public/index.js';
 import { AutoIntegrationError } from './errors.js';
+import { configuredServiceToken } from './service-token.js';
 import type { ServerOptionsProjection } from './server-options.js';
 import type { AutoAccountInput, AutoEndpointConfig, AutoExecutionInput, AutoExecutionResult, AutoIntegrationActor, AutoIntegrationClient, AutoIntegrationRepository, AutoIntegrationState, AutoLoginInput, AutoMessageInput, AutoMessageResult, AutoServerInput, AutoServiceStatus, AutoSessionMessageResult } from './types.js';
 
@@ -11,7 +12,7 @@ export class AutoIntegrationService {
 
   constructor(config: AutoEndpointConfig, private readonly client: AutoIntegrationClient, private readonly repository: AutoIntegrationRepository, private readonly serverOptions?: ServerOptionsProjection) {
     this.endpoint = normalizeEndpoint(config.localUrl ?? 'http://127.0.0.1:26909');
-    this.token = config.serviceToken?.trim() ?? '';
+    this.token = configuredServiceToken(config.serviceToken) ?? '';
   }
 
   async status(actor: AutoIntegrationActor, signal?: AbortSignal): Promise<AutoServiceStatus> {
@@ -109,7 +110,7 @@ export class AutoIntegrationService {
 }
 
 export function loadAutoEndpointConfig(env: NodeJS.ProcessEnv = process.env): AutoEndpointConfig {
-  return { localUrl: env.MXD_AUTO_LOCAL_URL?.trim() || 'http://127.0.0.1:26909', serviceToken: env.MXD_AUTO_SERVICE_TOKEN?.trim() || 'local-auto-service-token', timeoutMs: Number(env.MXD_AUTO_TIMEOUT_MS) || 10_000 };
+  return { localUrl: env.MXD_AUTO_LOCAL_URL?.trim() || 'http://127.0.0.1:26909', serviceToken: configuredServiceToken(env.MXD_AUTO_SERVICE_TOKEN), timeoutMs: Number(env.MXD_AUTO_TIMEOUT_MS) || 10_000 };
 }
 
 function normalizeEndpoint(value: string | undefined) {

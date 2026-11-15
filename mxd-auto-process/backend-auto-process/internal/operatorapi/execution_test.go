@@ -36,7 +36,7 @@ func TestExecutionWithoutOnlineAccountIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer accounts.Close()
-	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: "service-token"})
+	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: testServiceToken})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestExecutionSwitchesAccountsAfterPlayerNamePermissionFailure(t *testing.T)
 		t.Fatal(err)
 	}
 	defer accounts.Close()
-	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: "service-token"})
+	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: testServiceToken})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestExecutionSendsEachCommandAsAnIndependentPrivateChat(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer accounts.Close()
-	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: "service-token"})
+	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: testServiceToken})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -41,7 +41,7 @@ func TestAccountLoginAndAutomationAreIndependent(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer accounts.Close()
-	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: "service-token"})
+	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: testServiceToken})
 	if err != nil {
 		t.Fatal(err)
 	}

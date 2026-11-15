@@ -41,7 +41,7 @@ func TestAccountCreateAdoptsInteractiveSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer accounts.Close()
-	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: "service-token"})
+	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: testServiceToken})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestAccountCreateAdoptsInteractiveSession(t *testing.T) {
 func serviceRequest(t *testing.T, handler http.Handler, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
-	request.Header.Set("Authorization", "Bearer service-token")
+	request.Header.Set("Authorization", "Bearer "+testServiceToken)
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	return recorder

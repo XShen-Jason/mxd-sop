@@ -16,6 +16,14 @@ direct operator clients and use the same authentication boundary.
 
 ## Authentication and deployment
 
+Service tokens are explicitly provisioned random values, 32–512 non-space ASCII
+characters. A blank token disables service authentication while retaining operator
+cookie login; an unsafe nonempty token rejects handler startup without exposing
+the value. There is no unauthenticated legacy handler mode. `X-Ops-Actor-ID` is
+audit metadata only and cannot authorize a request. A new operator database
+requires `AUTO_INITIAL_PASSWORD`; existing databases never reset their password
+from bootstrap settings, and the former published default is rejected on creation.
+
 - `GET /` serves the separated Vite/React application shell. The browser shows
   only the operator login screen until the HttpOnly session cookie is valid.
   `GET /api/v1/overview`, `/logs`, `/events`, and `/servers` require that
@@ -128,6 +136,13 @@ Go tests cover route authorization, default pages, full session compatibility,
 interactive role selection and account-session binding, operator
 initialization/password change, login throttling, SQLite persistence, audit
 redaction, account lifecycle, and reconnect behavior.
+
+`remote_error_test.go` reproduces a rejected login through the HTTP handler
+and checks wrapped errors for role selection, map entry and initialization.
+The error preserves `remote_error` and adds a safe message containing stage,
+operation and numeric return code. Raw server error text is never exposed,
+since it can echo credentials. No server-specific return-code meaning is
+assumed. See the `RemoteGameError` response in operator-api.v1.
 
 Server records in the operator overview and server create/update responses include the persisted quick command settings (`spawn_rate`, `exp_rate`, `exp_max`, `drop_rate`, `meso_rate`, `domain_times`). The management UI sends the corresponding `spawnrate@`, `exp@`, `droprate@`, `mesorate@`, and `domaintimes@` strings through the existing private chat message route.
 

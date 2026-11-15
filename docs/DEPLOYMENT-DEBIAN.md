@@ -29,6 +29,8 @@ sudo chmod 600 /etc/ops-desk/ops-desk.env
    both services.
 
 ```bash
+sudo install -d -m 755 /etc/nginx/snippets
+sudo install -m 644 /opt/ops-desk/deploy/security/mxd-cloudflare-realip.conf /etc/nginx/snippets/mxd-cloudflare-realip.conf
 sudo systemctl daemon-reload
 sudo systemctl enable --now ops-desk
 sudo nginx -t && sudo systemctl reload nginx
@@ -37,6 +39,11 @@ sudo nginx -t && sudo systemctl reload nginx
 On the first successful start, the application creates exactly one
 `super_admin` from `INITIAL_ADMIN_*`. Remove `INITIAL_ADMIN_PASSWORD` from the
 environment file after that first start; the account remains in SQLite.
+
+The Nginx template includes trusted Cloudflare visitor-IP restoration. For an
+existing orange-cloud deployment, follow [the incremental IP configuration guide](deployment/cloudflare-login-ip.md)
+using `/opt/ops-desk` as the repository path. Updating the backend alone does not
+update Nginx's installed site configuration.
 
 ## Backups and upgrades
 

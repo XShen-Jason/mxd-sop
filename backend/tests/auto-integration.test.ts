@@ -50,7 +50,7 @@ describe('auto integration boundary', () => {
   };
 
   beforeAll(async () => {
-    app = await createApp({ catalogPath, dataPath, usersPath, autoIntegration: { localUrl: 'http://auto.internal:26909', serviceToken: 'integration-token' }, autoIntegrationClient: client, initialAdmin: { username: 'integration-admin', displayName: 'Integration Admin', password: 'Admin12345!' } });
+    app = await createApp({ catalogPath, dataPath, usersPath, autoIntegration: { localUrl: 'http://auto.internal:26909', serviceToken: 'fixture-integration-token-at-least-32-bytes' }, autoIntegrationClient: client, initialAdmin: { username: 'integration-admin', displayName: 'Integration Admin', password: 'Admin12345!' } });
   });
 
   afterAll(async () => {
@@ -389,9 +389,9 @@ describe('auto HTTP client deployment boundary', () => {
     await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve));
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('test server did not expose a port');
-    const client = new HttpAutoIntegrationClient({ localUrl: `http://127.0.0.1:${address.port}`, serviceToken: 'separate-deployment-token' });
+    const client = new HttpAutoIntegrationClient({ localUrl: `http://127.0.0.1:${address.port}`, serviceToken: 'fixture-separate-deployment-token-at-least-32-bytes' });
     await client.overview({ id: 'operator-1', role: 'super_admin', displayName: '中文客服' });
-    expect(requests).toEqual([{ path: '/api/v1/overview?include_logs=false', authorization: 'Bearer separate-deployment-token', actor: 'operator-1', actorName: 'base64url:5Lit5paH5a6i5pyN' }]);
+    expect(requests).toEqual([{ path: '/api/v1/overview?include_logs=false', authorization: 'Bearer fixture-separate-deployment-token-at-least-32-bytes', actor: 'operator-1', actorName: 'base64url:5Lit5paH5a6i5pyN' }]);
   });
 });
 

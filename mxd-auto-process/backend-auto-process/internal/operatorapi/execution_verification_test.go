@@ -147,7 +147,7 @@ func offlineVerificationFixture(t *testing.T, withAccount bool) (http.Handler, *
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { accounts.Close() })
-	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: "service-token"})
+	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: testServiceToken})
 	if err != nil {
 		t.Fatal(err)
 	}

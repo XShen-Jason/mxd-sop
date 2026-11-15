@@ -1,4 +1,5 @@
 import { AutoIntegrationError } from '../domain/errors.js';
+import { configuredServiceToken } from '../domain/service-token.js';
 import type { AutoAccount, AutoAccountInput, AutoEndpointConfig, AutoExecutionInput, AutoExecutionResult, AutoIntegrationActor, AutoIntegrationClient, AutoLoginInput, AutoMessageInput, AutoMessageResult, AutoOverview, AutoServer, AutoServerInput, AutoSession, AutoSessionMessageResult } from '../domain/types.js';
 
 export class HttpAutoIntegrationClient implements AutoIntegrationClient {
@@ -8,7 +9,7 @@ export class HttpAutoIntegrationClient implements AutoIntegrationClient {
 
   constructor(config: AutoEndpointConfig) {
     this.endpoint = normalizeEndpoint(config.localUrl ?? 'http://127.0.0.1:26909');
-    this.token = config.serviceToken?.trim() ?? '';
+    this.token = configuredServiceToken(config.serviceToken) ?? '';
     this.timeoutMs = config.timeoutMs ?? 10_000;
   }
 
@@ -66,10 +67,14 @@ export class HttpAutoIntegrationClient implements AutoIntegrationClient {
   }
 
   private async error(response: Response) {
-    const payload = await response.json().catch(() => ({})) as { error?: { code?: string; message?: string } | string };
+    const payload = await response.json().catch(() => ({})) as { error?: { code?: string; message?: string } | string; message?: string };
     const value = payload.error;
     const code = typeof value === 'string' ? value : value?.code ?? 'auto-request-failed';
-    const message = typeof value === 'string' ? value : value?.message ?? code;
+    // Auto keeps its legacy string error code and adds a safe sibling message.
+    // Preserve the diagnostic through SOP; older auto builds need a useful fallback.
+    const detail = typeof value === 'string' ? payload.message : value?.message;
+    const message = typeof detail === 'string' && detail.trim() && detail !== code ? detail
+      : code === 'remote_error' ? '游戏服务器拒绝了操作。当前 auto 服务未返回具体步骤和错误码，请查看 auto 游戏通信日志中的 op、rc，并核对游戏服务端日志。' : code;
     return new AutoIntegrationError(code, message);
   }
 }

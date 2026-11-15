@@ -51,7 +51,7 @@ func TestServerLogsContainRedactedHTTPAndGameExchanges(t *testing.T) {
 		t.Fatalf("game login failed: %d %s", login.Code, login.Body.String())
 	}
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/logs?server_id=local&limit=20", nil)
-	request.Header.Set("Authorization", "Bearer service-token")
+	request.Header.Set("Authorization", "Bearer "+testServiceToken)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	body := response.Body.String()
@@ -88,7 +88,7 @@ func monitoringHandler(t *testing.T, client *apiClient) (http.Handler, func()) {
 		store.Close()
 		t.Fatal(err)
 	}
-	handler, err := NewHandler(manager, catalog, Options{Store: store, ServiceToken: "service-token"})
+	handler, err := NewHandler(manager, catalog, Options{Store: store, ServiceToken: testServiceToken})
 	if err != nil {
 		manager.Close()
 		store.Close()

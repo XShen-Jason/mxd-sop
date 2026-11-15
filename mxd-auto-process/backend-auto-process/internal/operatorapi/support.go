@@ -3,6 +3,7 @@ package operatorapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -51,7 +52,8 @@ type chatResponse struct {
 }
 
 type apiError struct {
-	Error string `json:"error"`
+	Error   string `json:"error"`
+	Message string `json:"message,omitempty"`
 }
 
 func decodeJSON(writer http.ResponseWriter, request *http.Request, target any) error {
@@ -93,7 +95,38 @@ func writeDomainError(writer http.ResponseWriter, err error) {
 	case errors.Is(err, gamesession.ErrTimeout), errors.Is(err, gamesession.ErrMapInitializationTimeout):
 		status = http.StatusGatewayTimeout
 	}
-	writeJSON(writer, status, apiError{Error: code})
+	body := apiError{Error: code}
+	var remote *gamesession.RemoteError
+	if errors.As(err, &remote) {
+		body.Message = remoteErrorMessage(remote)
+	}
+	writeJSON(writer, status, body)
+}
+
+// remoteErrorMessage exposes only the failed operation and numeric return code.
+// Remote text can echo credentials or keys, so it must not enter the HTTP error.
+// Return-code meanings vary by game server; do not infer a password/version error.
+func remoteErrorMessage(remote *gamesession.RemoteError) string {
+	stage := "游戏操作"
+	switch remote.Operation {
+	case 0:
+		stage = "账号登录"
+	case 6:
+		stage = "角色选择"
+	case 7:
+		stage = "进入地图"
+	case 8:
+		stage = "地图初始化"
+	case 10:
+		stage = "发送消息"
+	}
+	message := fmt.Sprintf("游戏服务器拒绝了%s（op=%d，rc=%d）。", stage, remote.Operation, remote.Code)
+	if remote.Operation == 0 {
+		message += "请核对所选服务器、账号、密码或 MD5 凭据类型及客户端版本；具体原因以游戏服务端日志为准。"
+	} else {
+		message += "请结合 auto 游戏通信日志和游戏服务端日志检查具体原因。"
+	}
+	return message
 }
 
 func methodNotAllowed(writer http.ResponseWriter, methods ...string) {

@@ -85,7 +85,7 @@ func (h *Handler) requireOperator(writer http.ResponseWriter, request *http.Requ
 	if _, ok := h.authorized(request, false); ok {
 		return true
 	}
-	if session, ok := h.operatorIdentity(request); ok && session.MustChange && !h.legacyUnauthenticated {
+	if session, ok := h.operatorIdentity(request); ok && session.MustChange {
 		writeJSON(writer, http.StatusForbidden, apiError{Error: "password_change_required"})
 		return false
 	}

@@ -22,6 +22,7 @@ describe('workspace permissions', () => {
   let managerToken = '';
   let customerToken = '';
   let customerId = '';
+  const clientIps = new Map<string, string>();
 
   beforeAll(async () => {
     app = await createApp({
@@ -240,7 +241,10 @@ describe('workspace permissions', () => {
   }
 
   async function login(username: string, password: string) {
-    const response = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username, password } });
+    // These independent permission actors represent separate clients; shared-IP
+    // login limits are exercised in login-protection.test.ts.
+    if (!clientIps.has(username)) clientIps.set(username, `192.0.2.${clientIps.size + 1}`);
+    const response = await app.inject({ method: 'POST', url: '/api/v1/auth/login', remoteAddress: clientIps.get(username), payload: { username, password } });
     expect(response.statusCode, response.body).toBe(200);
     return response.json().token as string;
   }

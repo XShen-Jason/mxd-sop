@@ -38,7 +38,7 @@ func TestHTTPApiExposesTheOrderedControlFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer manager.Close()
-	handler, err := NewHandler(manager, catalog, Options{LegacyUnauthenticated: true})
+	handler, err := NewHandler(manager, catalog, Options{ServiceToken: testServiceToken})
 	if err != nil {
 		t.Fatal(err)
 	}

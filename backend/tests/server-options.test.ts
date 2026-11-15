@@ -28,7 +28,7 @@ describe('SOP server options', () => {
         return server;
       },
     } as unknown as AutoIntegrationClient;
-    const config = { databasePath, catalogPath, autoIntegration: { localUrl: 'http://auto.internal:26909', serviceToken: 'integration-token' }, autoIntegrationClient: client };
+    const config = { databasePath, catalogPath, autoIntegration: { localUrl: 'http://auto.internal:26909', serviceToken: 'fixture-integration-token-at-least-32-bytes' }, autoIntegrationClient: client };
     try {
       app = await createApp({ ...config, initialAdmin: { username: 'server-admin', displayName: 'Server Admin', password: 'Admin12345!' } });
       const login = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'server-admin', password: 'Admin12345!' } });

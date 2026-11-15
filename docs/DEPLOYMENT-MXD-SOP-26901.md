@@ -330,7 +330,12 @@ sudo certbot certonly --webroot \
 
 ## 8. 配置 Nginx 监听 443
 
+橙云必须恢复真实访客 IP，才能按用户出口 IP 限制登录。已有站点的增量操作见
+[Cloudflare 橙云与登录限流](deployment/cloudflare-login-ip.md)。
+
 ```bash
+sudo install -d -m 755 /etc/nginx/snippets
+sudo install -m 644 /opt/mxd-sop/deploy/security/mxd-cloudflare-realip.conf /etc/nginx/snippets/mxd-cloudflare-realip.conf
 sudo tee /etc/nginx/sites-available/mxd-sop.conf >/dev/null <<'NGINX'
 server {
     listen 80;
@@ -351,6 +356,7 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     server_name mxd-sop.5202345.xyz;
+    include /etc/nginx/snippets/mxd-cloudflare-realip.conf;
 
     ssl_certificate /etc/letsencrypt/live/mxd-sop.5202345.xyz/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/mxd-sop.5202345.xyz/privkey.pem;
@@ -368,7 +374,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Connection "";
         proxy_buffering off;
@@ -382,7 +388,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 30s;
     }

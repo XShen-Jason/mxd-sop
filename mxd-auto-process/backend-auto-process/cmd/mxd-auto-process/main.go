@@ -27,8 +27,8 @@ func main() {
 	roleOpaquePCAPPath := flag.String("role-opaque-pcap-path", "", "PCAP file or directory used to resolve role selection values (defaults to ../datacj beside the config directory)")
 	databasePath := flag.String("database", envOrDefault("AUTO_DATABASE_PATH", "data/auto.sqlite"), "auto SQLite database path")
 	keyPath := flag.String("credential-key", envOrDefault("AUTO_CREDENTIAL_KEY_PATH", "data/auto-credentials.key"), "account credential encryption key path")
-	initialPassword := flag.String("initial-password", envOrDefault("AUTO_INITIAL_PASSWORD", "ChangeMe-26909!"), "initial operator password; it must be changed after first login")
-	serviceToken := flag.String("service-token", envOrDefault("AUTO_SERVICE_TOKEN", "local-auto-service-token"), "service token for the operations desk")
+	initialPassword := flag.String("initial-password", os.Getenv("AUTO_INITIAL_PASSWORD"), "required for a new database; must be changed after first login")
+	serviceToken := flag.String("service-token", os.Getenv("AUTO_SERVICE_TOKEN"), "random service token for the operations desk; empty disables service authentication")
 	flag.Parse()
 	roleOpaquePath := *roleOpaquePCAPPath
 	if roleOpaquePath == "" {

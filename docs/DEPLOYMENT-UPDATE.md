@@ -135,6 +135,10 @@ done
 
 ## 2. 只更新 SOP 项目
 
+本次若包含按 IP 登录保护且域名使用 Cloudflare 橙云，完成本节更新后还要按
+[Cloudflare 橙云与登录限流](deployment/cloudflare-login-ip.md) 安装真实 IP 配置并重载 Nginx。
+下方后端构建/重启不会改写 `/etc/nginx`；未配置时会把 Cloudflare 节点当作访客计数。
+
 这段命令会拉取完整 MXDCMD 仓库，但只安装依赖、测试、构建并重启运营台。
 不会构建或重启 mxd-player、mxd-auto-process，也不会触碰它们的数据库。
 

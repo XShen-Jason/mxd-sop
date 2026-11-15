@@ -42,6 +42,37 @@
 
 请求体：`{ "username": "...", "password": "..." }`。账号必须由管理员预先创建；不存在注册接口。生产环境成功返回 `{ expiresAt, user }` 并设置同源 HttpOnly、SameSite=Strict cookie；仅测试环境保留 `token` 字段。失败返回 `unauthorized`（401），不区分用户名不存在或密码错误。
 
+### 按 IP 的登录保护
+
+- `/api/v1/auth/login` 与兼容地址 `/api/v1/login` 共用同一 IP 计数，不按账号分开。
+- 任意滚动 5 分钟（300 秒）最多放行 10 次请求，第 11 次返回 `login-rate-limited`（429）。
+  成功、密码错误和格式错误的请求均占额度；被限流/暂停拒绝的请求不追加额度，也不延长等待时间。
+- 同一 IP 累计认证失败达到 5 次，第 5 次立即返回 `login-blocked`（429），
+  暂停 20 分钟（1200 秒）。即使请求额度尚有剩余也锁定；错误跨请求窗口累计，
+  期间正确密码也不能登录，换账号不能绕过。
+  为避免暴露账号存在性，用户名不存在、停用账号和不合法凭据同样计入；
+  JSON/请求结构错误与服务器内部错误不计认证失败次数。
+- 成功登录清零该 IP 的认证失败次数，但不清除 5 分钟请求额度。暂停到期清零失败次数，
+  重新允许登录。暂停期间的请求不刷新暂停截止时间。已有登录会话不受影响。
+- 429 返回 `{ error: { code, message, retryAfterSeconds } }`，`message` 为可展示的中文提示；
+  `Retry-After` 响应头与 `retryAfterSeconds` 均为向上取整的剩余秒数。
+
+IP 来自 Fastify 的可信客户端地址，仅信任直接相连的本机代理
+（`127.0.0.1`、`::1` 或 IPv4 映射回环地址），只取该代理提供的最后一个
+`X-Forwarded-For` 地址。直接外部连接的转发头不受信任。本项目单机部署的 Nginx 使用
+`proxy_set_header X-Forwarded-For $remote_addr`，覆盖客户端传入的转发链。Cloudflare 橙云部署需在 Nginx
+加载 `deploy/security/mxd-cloudflare-realip.conf`，只对官方网段来源的请求使用
+`CF-Connecting-IP` 恢复 `$remote_addr`，然后只转发已验证的访客地址。
+后端不直接信任客户端传入的 `CF-Connecting-IP`。安装和验证见
+`docs/deployment/cloudflare-login-ip.md`；其他多层/异机代理需先调整明确的信任边界。
+IPv6 等价写法、IPv4 及其 IPv6 映射形式归一后共用计数；共享出口 IP 的用户共用额度。
+
+当前单后端进程把计数保存在内存，进程重启清零，不写入业务数据库。最多跟踪 10,000 个 IP，
+每个 IP 最多保留 10 个请求时间；每分钟按需清理无错误的过期窗口及已到期暂停。
+未触发暂停的错误累计保留到成功登录或进程结束。容量满时，新 IP 返回 `login-capacity`（503）
+及 `Retry-After: 60`，不会淘汰已有失败计数或暂停记录；已跟踪 IP 仍按各自状态处理。
+扩展为多进程部署前必须将状态替换为共享且原子更新的存储。
+
 ## auth.logout
 
 `POST /api/v1/auth/logout`。使当前令牌失效，成功返回 204。重复调用幂等。
@@ -78,6 +109,12 @@ In production, login sets an HttpOnly, SameSite=Strict cookie and returns only
 the legacy token response is retained only for contract tests.
 
 ## Workspace permissions
+
+Production and ordinary development never accept demo identity headers, including
+when JSON persistence is explicitly selected. Legacy demo identities exist only
+when `NODE_ENV=test`; a production route without an auth adapter rejects the
+request. Internal `auto-process` audit identities do not create password-login
+users or browser sessions.
 
 `UserSummary` and `auth.me` include a complete `workspacePermissions` object. Its
 keys are the stable workspace IDs:

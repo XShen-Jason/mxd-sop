@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AuthError, type AuthService } from '../public/index.js';
 import type { CreateUserInput, UpdateUserInput } from '../public/index.js';
+import { LoginLimiter, LoginLimitError } from '../domain/login-limiter.js';
+import { loginIp } from './client-ip.js';
 
 function objectBody(request: FastifyRequest) {
   const body = request.body ?? {};
@@ -23,6 +25,11 @@ function tokenFromRequest(request: FastifyRequest) {
 }
 
 function sendAuthError(reply: FastifyReply, error: unknown) {
+  if (error instanceof LoginLimitError) {
+    return reply.code(error.code === 'login-capacity' ? 503 : 429)
+      .header('retry-after', error.retryAfterSeconds)
+      .send({ error: { code: error.code, message: error.message, retryAfterSeconds: error.retryAfterSeconds } });
+  }
   if (!(error instanceof AuthError)) return reply.code(500).send({ error: { code: 'internal-error', message: 'internal error' } });
   const authError = error;
   const status = authError.code === 'unauthorized' || authError.code === 'invalid-credentials' ? 401 : authError.code === 'forbidden' ? 403 : authError.code === 'user-not-found' ? 404 : authError.code === 'username-taken' || authError.code === 'last-super-admin' || authError.code === 'conflict' ? 409 : 400;
@@ -31,6 +38,7 @@ function sendAuthError(reply: FastifyReply, error: unknown) {
 }
 
 export function registerAuthRoutes(app: FastifyInstance, auth: AuthService) {
+  const loginLimiter = new LoginLimiter();
   const identity = (request: FastifyRequest) => auth.requestIdentity(request.headers as Record<string, unknown>);
   const limit = (request: FastifyRequest) => {
     const value = (request.query as Record<string, unknown> | undefined)?.limit;
@@ -43,7 +51,7 @@ export function registerAuthRoutes(app: FastifyInstance, auth: AuthService) {
     try {
       const body = objectBody(request);
       if (Object.keys(body).some((key) => !['username', 'password'].includes(key))) throw new AuthError('invalid-input');
-      const result = auth.login(body.username, body.password);
+      const result = loginLimiter.authenticate(loginIp(request.ip), () => auth.login(body.username, body.password));
       reply.header('x-session-expires', result.expiresAt);
       const secure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production' ? '; Secure' : '';
       reply.header('set-cookie', `session=${result.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${secure}`);
@@ -52,8 +60,15 @@ export function registerAuthRoutes(app: FastifyInstance, auth: AuthService) {
       return reply.send({ expiresAt: result.expiresAt, user: result.user });
     } catch (error) { return sendAuthError(reply, error); }
   };
-  app.post('/api/v1/auth/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, login);
-  app.post('/api/v1/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, login);
+  // One auth-owned limiter covers aliases and runs before parsing/hashing. The
+  // global plugin is disabled only here so it cannot mask our stable 429 errors.
+  const admitLogin = async (request: FastifyRequest, reply: FastifyReply) => {
+    try { loginLimiter.admit(loginIp(request.ip)); }
+    catch (error) { return sendAuthError(reply, error); }
+  };
+  for (const url of ['/api/v1/auth/login', '/api/v1/login']) {
+    app.post(url, { config: { rateLimit: false }, onRequest: admitLogin }, login);
+  }
 
   app.post('/api/v1/auth/logout', async (request, reply) => {
     auth.logout(tokenFromRequest(request));

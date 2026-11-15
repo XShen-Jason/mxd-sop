@@ -37,13 +37,13 @@ func TestServerCreateIsNotShadowedByReadOnlyCatalogRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer accounts.Close()
-	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: "service-token"})
+	handler, err := NewHandler(manager, catalog, Options{Store: store, Accounts: accounts, ServiceToken: testServiceToken})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(`{"id":"new-server","name":"New server","address":"127.0.0.1:12661","map_id":"211000000"}`))
-	request.Header.Set("Authorization", "Bearer service-token")
+	request.Header.Set("Authorization", "Bearer "+testServiceToken)
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusCreated {
@@ -57,7 +57,7 @@ func TestServerCreateIsNotShadowedByReadOnlyCatalogRoute(t *testing.T) {
 		t.Fatalf("created server did not use the default version: %q", created.Version)
 	}
 	duplicate := httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(`{"id":"new-server","name":"New server","address":"127.0.0.1:12661","version":"1.0.2","map_id":"211000000"}`))
-	duplicate.Header.Set("Authorization", "Bearer service-token")
+	duplicate.Header.Set("Authorization", "Bearer "+testServiceToken)
 	duplicateRecorder := httptest.NewRecorder()
 	handler.ServeHTTP(duplicateRecorder, duplicate)
 	if duplicateRecorder.Code != http.StatusConflict {

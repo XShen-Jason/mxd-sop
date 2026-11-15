@@ -60,12 +60,6 @@ type Store struct {
 }
 
 func Open(path, keyPath, initialPassword string) (*Store, error) {
-	if strings.TrimSpace(initialPassword) == "" {
-		initialPassword = "ChangeMe-26909!"
-	}
-	if len(initialPassword) < minOperatorPasswordSize {
-		return nil, ErrInvalidPassword
-	}
 	key, err := loadKey(keyPath)
 	if err != nil {
 		return nil, err
@@ -163,6 +157,11 @@ CREATE TABLE IF NOT EXISTS automation_round_robin (
 	}
 	if count > 0 {
 		return nil
+	}
+	// Bootstrap only an empty operator table. Reopening an existing deployment
+	// never resets its credential or requires retaining the initial password.
+	if strings.TrimSpace(initialPassword) == "" || len(initialPassword) < minOperatorPasswordSize || len(initialPassword) > 512 || initialPassword == "ChangeMe-26909!" {
+		return fmt.Errorf("AUTO_INITIAL_PASSWORD is required for a new database and must not use the former default: %w", ErrInvalidPassword)
 	}
 	hash, err := hashPassword(initialPassword)
 	if err != nil {

@@ -48,6 +48,20 @@ and execution routes retain the mappings registered in `docs/CONTRACTS.md`.
 The adapter sends the configured service token and authenticated actor headers;
 credentials remain write-only.
 
+Service authentication requires an explicitly configured random token of 32–512
+non-space ASCII characters. Missing or invalid `MXD_AUTO_SERVICE_TOKEN` leaves
+the adapter unconfigured and prevents outbound calls; there is no shared default.
+`auto-process` is an internal audit actor, not a login credential. Requests still
+require a real SOP session and the owning workspace permission before automation.
+
+Game-session rejections preserve `error.code: remote_error` and return HTTP 502
+(previously mapped to 400). `error.message` forwards auto's safe diagnostic,
+including the failed stage and numeric `op`/`rc`. The adapter accepts both the
+legacy auto `{error: string, message?: string}` and nested error envelopes.
+An older auto without a message receives a Chinese fallback directing the
+operator to game communication logs; no return code or cause is invented.
+Login, role selection and map entry are not automatically retried.
+
 Execution retries accept the additive `offline_verification_id` field defined
 by operator-api.v1. Operation-groups supplies this only after a ready-workspace
 operator has explicitly verified offline non-delivery. It uses the original

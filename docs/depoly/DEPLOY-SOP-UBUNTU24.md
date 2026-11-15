@@ -157,6 +157,10 @@ curl -fsS http://127.0.0.1:26902/health
 先确认 `SOP_DOMAIN` 的 DNS 已生效，然后执行。命令会自动申请证书；邮箱用于
 证书到期提醒。
 
+下面会安装 Cloudflare 真实 IP 配置，适用于橙云及直接访问。已有站点只补此项时，
+按 [Cloudflare 橙云与登录限流](../deployment/cloudflare-login-ip.md) 操作；仅更新后端
+不会自动更新服务器上的 Nginx 配置。
+
 ```bash
 (
 set -eu
@@ -180,6 +184,8 @@ if sudo nginx -T 2>/dev/null | awk -v host="$SOP_DOMAIN" -v own="$enabled" '
   END { exit !found }
 '; then echo '该域名已被另一个 Nginx 站点使用' >&2; exit 1; fi
 sudo install -d -o mxd-sop -g mxd-sop -m 755 /opt/mxd-sop/frontend/dist
+sudo install -d -m 755 /etc/nginx/snippets
+sudo install -m 644 /opt/mxd-sop/deploy/security/mxd-cloudflare-realip.conf /etc/nginx/snippets/mxd-cloudflare-realip.conf
 sudo tee /etc/nginx/sites-available/mxd-sop.conf >/dev/null <<NGINX
 # Managed by MXDCMD Ubuntu 24 SOP guide
 server {
@@ -207,6 +213,7 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     server_name $SOP_DOMAIN;
+    include /etc/nginx/snippets/mxd-cloudflare-realip.conf;
     ssl_certificate /etc/letsencrypt/live/$SOP_DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$SOP_DOMAIN/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -218,7 +225,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For \$remote_addr;
         proxy_set_header Connection "";
         proxy_buffering off;
         proxy_read_timeout 1h;
@@ -228,7 +235,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For \$remote_addr;
         proxy_read_timeout 60s;
     }
     location = /health { proxy_pass http://127.0.0.1:26902; }

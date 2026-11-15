@@ -96,6 +96,11 @@ no execution request, retry traffic, or failure-reminder write. Re-enabling does
 not scan or dispatch the existing manual backlog.
 ## Current deployment baseline
 
+登录保护由 auth 模块维护单进程有界内存状态，在解析请求体/校验密码之前拒绝超限请求，
+没有数据库写入、外部调用或前端轮询。请求窗口最多存储 10 个时间戳/IP，
+清理扫描最多 10,000 个 IP 且每分钟最多触发一次。达到容量上限拒绝新 IP，
+不驱逐有效限制；具体阈值、重试与重启语义见 `contracts/auth.md`。
+
 For up to 10 internal users, SQLite in WAL mode with `synchronous=NORMAL`,
 memory temporary storage, and a bounded page cache is the selected persistence
 adapter. It provides transactional writes and indexed status/submitter queries

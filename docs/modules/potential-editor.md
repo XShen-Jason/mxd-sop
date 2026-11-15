@@ -23,6 +23,10 @@ Browser tests use Playwright with installed Chrome, a frontend dev server and
 mocked API calls; no real game account is used.
 Auto heartbeat_idle_test.go reproduces a blocking idle monitor preventing
 heartbeat writes, then verifies successful heartbeat delivery and explicit close.
+`auto-login-errors.test.ts` verifies the real HTTP adapter and SOP login/entry
+routes preserve remote rejection diagnostics, handle older auto responses and
+send each login/entry request only once. The existing UI displays the Chinese
+diagnostic message; no polling or game-login behavior changes are needed.
 
 ## Session lifetime
 Auto owns runtime credentials, the fixed 10-second op=19 heartbeat and reconnect.

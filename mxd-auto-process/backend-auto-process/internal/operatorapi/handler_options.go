@@ -19,11 +19,10 @@ const (
 )
 
 type Options struct {
-	Store                 *autostore.Store
-	Accounts              *sessioncontrol.AccountManager
-	ServiceToken          string
-	SecureCookie          bool
-	LegacyUnauthenticated bool
+	Store        *autostore.Store
+	Accounts     *sessioncontrol.AccountManager
+	ServiceToken string
+	SecureCookie bool
 }
 
 type operatorSession struct {
@@ -43,7 +42,6 @@ func (h *Handler) configure(options Options) {
 	h.accounts = options.Accounts
 	h.serviceToken = options.ServiceToken
 	h.secureCookie = options.SecureCookie
-	h.legacyUnauthenticated = options.LegacyUnauthenticated
 	h.operatorSessions = make(map[string]operatorSession)
 	h.loginFailures = make(map[string]loginFailure)
 }
@@ -76,9 +74,6 @@ func (h *Handler) operatorIdentity(request *http.Request) (operatorSession, bool
 }
 
 func (h *Handler) authorized(request *http.Request, allowPasswordChange bool) (operatorSession, bool) {
-	if h.legacyUnauthenticated {
-		return operatorSession{}, true
-	}
 	if h.isServiceRequest(request) {
 		return operatorSession{Username: "service"}, true
 	}

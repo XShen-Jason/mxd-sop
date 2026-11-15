@@ -137,7 +137,9 @@ export class AuthService {
     this.now = options.now ?? (() => new Date());
     this.idFactory = options.idFactory ?? randomUUID;
     this.sessionTtlMs = options.sessionTtlMs ?? 8 * 60 * 60 * 1000;
-    this.allowLegacyHeaders = options.allowLegacyHeaders ?? process.env.NODE_ENV === 'test';
+    // JSON persistence is not evidence of a test deployment. Demo identities
+    // require the test runtime even when a caller explicitly enables the option.
+    this.allowLegacyHeaders = process.env.NODE_ENV === 'test' && (options.allowLegacyHeaders ?? true);
     this.sessions = options.sessions ?? new MemorySessionRepository();
     this.ensureInitialAdmin(options.initialAdmin);
   }
@@ -171,7 +173,7 @@ export class AuthService {
     const token = this.extractToken(headers);
     const authenticated = this.identityFromToken(token);
     if (authenticated) return authenticated;
-    // Kept for the repository's local contract tests and an explicit demo mode.
+    // Test-only identities cannot authenticate in normal development/production.
     const roleHeader = this.header(headers, 'x-user-role');
     const idHeader = this.header(headers, 'x-user-id');
     if (this.allowLegacyHeaders && roleHeader && idHeader && this.isLegacyDemo(idHeader, roleHeader)) {

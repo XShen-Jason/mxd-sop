@@ -30,7 +30,7 @@ func TestOperatorLoginIsRateLimitedAfterRepeatedFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer manager.Close()
-	handler, err := NewHandler(manager, catalog, Options{Store: store, ServiceToken: "service-token"})
+	handler, err := NewHandler(manager, catalog, Options{Store: store, ServiceToken: testServiceToken})
 	if err != nil {
 		t.Fatal(err)
 	}

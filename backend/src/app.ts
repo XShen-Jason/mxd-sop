@@ -58,7 +58,10 @@ export interface AppConfig {
 const MAX_JSON_BODY_BYTES = 2 * 1024 * 1024;
 
 export async function createApp(config: AppConfig = {}) {
-  const app = Fastify({ logger: false, bodyLimit: MAX_JSON_BODY_BYTES, trustProxy: true });
+  // Deployment uses a same-host Nginx proxy. Trust only its immediate loopback
+  // hop, never client-supplied addresses earlier in X-Forwarded-For.
+  const app = Fastify({ logger: false, bodyLimit: MAX_JSON_BODY_BYTES,
+    trustProxy: (address, hop) => hop === 0 && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address) });
   const allowedOrigin = process.env.CORS_ORIGIN;
   await app.register(cors, allowedOrigin ? { origin: allowedOrigin, credentials: true } : { origin: false });
   await app.register(helmet, { contentSecurityPolicy: false });

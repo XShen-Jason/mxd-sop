@@ -36,9 +36,10 @@ function headerValue(request: FastifyRequest, name: string) {
   return Array.isArray(value) ? String(value[0] ?? '') : typeof value === 'string' ? value : '';
 }
 
-/** Identity is resolved from the auth adapter; headers are only a local demo fallback. */
+/** Production identity always requires auth; bare headers exist only in tests. */
 export function identityFromRequest(request: FastifyRequest, auth?: AuthService): Identity {
   if (auth) return auth.requestIdentity(request.headers as Record<string, unknown>);
+  if (process.env.NODE_ENV !== 'test') throw new AuthError('unauthorized');
   const roleValue = headerValue(request, 'x-user-role');
   const userId = headerValue(request, 'x-user-id');
   if (!roleValue || !userId || !userId.trim() || userId.length > 128 || /[\s\u0000-\u001f\u007f]/u.test(userId) || !['customer', 'manager', 'super_admin'].includes(roleValue)) throw new AuthError('unauthorized');

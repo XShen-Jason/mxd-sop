@@ -19,23 +19,27 @@ import (
 var assetFS embed.FS
 
 type Handler struct {
-	manager               *sessioncontrol.Manager
-	catalog               *servercatalog.Catalog
-	assets                http.Handler
-	store                 *autostore.Store
-	accounts              *sessioncontrol.AccountManager
-	serviceToken          string
-	secureCookie          bool
-	legacyUnauthenticated bool
-	operatorMu            sync.Mutex
-	operatorSessions      map[string]operatorSession
-	loginFailures         map[string]loginFailure
-	executionMu           sync.Mutex
+	manager          *sessioncontrol.Manager
+	catalog          *servercatalog.Catalog
+	assets           http.Handler
+	store            *autostore.Store
+	accounts         *sessioncontrol.AccountManager
+	serviceToken     string
+	secureCookie     bool
+	operatorMu       sync.Mutex
+	operatorSessions map[string]operatorSession
+	loginFailures    map[string]loginFailure
+	executionMu      sync.Mutex
 }
 
 func NewHandler(manager *sessioncontrol.Manager, catalog *servercatalog.Catalog, options ...Options) (http.Handler, error) {
 	if manager == nil || catalog == nil {
 		return nil, errors.New("manager and catalog are required")
+	}
+	if len(options) > 0 {
+		if err := validateServiceToken(options[0].ServiceToken); err != nil {
+			return nil, err
+		}
 	}
 	assets, err := fsHandler()
 	if err != nil {

@@ -35,7 +35,7 @@ directory and expose only the secured reverse-proxy route; do not publish 6909.
 The browser initially shows only the operator
 login form; server names, accounts, and logs are fetched only after login. The
 initial operator is `admin` and the initial password is `AUTO_INITIAL_PASSWORD`
-(default for a new local database: `ChangeMe-26909!`); the first login must
+(required for a new database; there is no default password); the first login must
 replace it. New administrator passwords must be at least 6 characters.
 `/operator` is a compatibility alias for the same application.
 
