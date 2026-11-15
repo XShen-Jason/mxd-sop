@@ -1,10 +1,13 @@
 """Regression checks for safe reconciliation and release rollback, without services."""
 from pathlib import Path
+from io import BytesIO
+from email.message import Message
 import subprocess
 import sys
 import tarfile
 import tempfile
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -79,6 +82,62 @@ class SourceReconciliationTest(unittest.TestCase):
 
 
 class ReleaseVerificationTest(unittest.TestCase):
+    def response(self, status, body, content_type="application/json"):
+        headers = Message()
+        headers["Content-Type"] = content_type
+        headers["Server"] = "cloudflare"
+        headers["CF-Ray"] = "test-ray"
+        return urllib.error.HTTPError("https://example.invalid/health", status, "fixture", headers, BytesIO(body))
+
+    def test_html_error_reports_http_metadata_without_leaking_the_body(self):
+        response = self.response(403, b"<html>private challenge body</html>", "text/html")
+        response.headers["CF-Mitigated"] = "challenge"
+        with patch.object(updater.urllib.request, "urlopen", side_effect=response):
+            with self.assertRaisesRegex(ValueError, '"status": 403') as caught:
+                updater.request("https://example.invalid/health")
+        self.assertIn('"cf_mitigated": "challenge"', str(caught.exception))
+        self.assertIn('"content_type": "text/html"', str(caught.exception))
+        self.assertNotIn("private challenge body", str(caught.exception))
+
+    def test_empty_or_non_object_success_is_not_a_healthy_json_response(self):
+        for body in (b"", b"[]", b"null"):
+            with self.subTest(body=body):
+                with patch.object(updater.urllib.request, "urlopen", return_value=self.response(200, body)):
+                    with self.assertRaisesRegex(ValueError, '"status": 200'):
+                        updater.request("https://example.invalid/health")
+
+    def test_json_http_errors_keep_the_login_contract(self):
+        response = self.response(429, b'{"error":{"code":"login-blocked","retryAfterSeconds":1200}}')
+        with patch.object(updater.urllib.request, "urlopen", side_effect=response):
+            status, body = updater.request("https://example.invalid/login")
+        self.assertEqual(status, 429)
+        self.assertEqual(body["error"]["retryAfterSeconds"], 1200)
+
+    def test_public_health_only_never_runs_deployment(self):
+        with patch.object(updater, "deploy") as deploy, patch.object(updater, "check_public_health") as check:
+            updater.main(["--check-public-health"])
+        check.assert_called_once_with()
+        deploy.assert_not_called()
+
+    def test_public_health_uses_project_identity_and_accepts_healthy_json(self):
+        response = self.response(200, b'{"status":"ok","catalogItems":5932}')
+        with patch.object(updater.urllib.request, "urlopen", return_value=response) as get:
+            with patch("builtins.print") as output:
+                updater.check_public_health()
+        request = get.call_args.args[0]
+        self.assertEqual(request.get_header("User-agent"), "mxd-sop-release-check/1.0")
+        self.assertEqual(request.get_header("Accept"), "application/json")
+        output.assert_called_once_with("PUBLIC_HEALTH_OK; HTTP 200; status=ok", flush=True)
+
+    def test_public_health_rejects_non_200_unhealthy_and_network_failures(self):
+        for result in ((503, {"status": "ok"}), (200, {"status": "error"})):
+            with patch.object(updater, "request", return_value=result):
+                with self.assertRaises(updater.PublicHealthError):
+                    updater.check_public_health()
+        with patch.object(updater, "request", side_effect=urllib.error.URLError("unavailable")):
+            with self.assertRaisesRegex(updater.PublicHealthError, "unavailable"):
+                updater.check_public_health()
+
     def test_live_checks_reject_old_thresholds_and_accept_current_contract(self):
         rates = [(400, {})] * 10 + [(429, {"error": {"code": "login-rate-limited", "retryAfterSeconds": 300}})]
         locks = [(401, {})] * 4 + [(429, {"error": {"code": "login-blocked", "retryAfterSeconds": 1200}})]

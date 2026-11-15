@@ -1,6 +1,6 @@
 # SOP 安全规则发布与旧源码对齐
 
-适用于 HK-MXD 的 `/opt/mxd-sop`：服务器仍在 `476b904`，且曾直接部署过安全补丁。
+用于 HK-MXD 的 `/opt/mxd-sop`，最初处理 `476b904` 加直接部署安全补丁的工作区。
 用户确认保留现有 SSH 防护，不调整 SSH、Fail2ban、防火墙、Docker 或 Tailscale。
 本次只切换 SOP 后端和前端构建产物，并更新三个已有 Nginx 安全片段；auto/player
 源码随仓库同步，但其二进制和进程不会更新，不把 Git 同步称为它们运行版本已经升级。
@@ -26,6 +26,21 @@
 
 登录探测使用保留测试 IP 和随机不存在的账号，不接触真实用户密码/会话，不发送游戏指令。
 成功行是 `SOP_DEPLOYMENT_OK`。健康和登录验证不代表完整游戏流程已测试。
+
+若已输出 `deployed.json` 对应的提交/配置摘要和 `LOGIN_LIMIT_OK`，仅在最后公网检查失败，
+则 SOP 和 Nginx 已更新且未回滚。`4dc8aa4` 的旧脚本遇到非 JSON 响应会报
+`JSONDecodeError`；这不能判断具体 HTTP 状态，也不能据此认定 Cloudflare 拦截或服务宕机。
+本次本地复核发现：普通 curl 和项目探测标识返回 200 JSON；同一 curl 使用
+`Python-urllib/3.13` 标识时返回 403。具体边缘规则尚未从管理端确认。
+新脚本使用明确的 `User-Agent: mxd-sop-release-check/1.0` 和 `Accept: application/json`，
+并报告 HTTP 状态、Content-Type、Server、CF-Ray 和 CF-Mitigated，不输出响应正文。
+公网检查失败仍返回非零退出码，不把失败当作成功；不重跑整个发布即可独立检查：
+
+```bash
+python3 deploy/update-sop-security.py --check-public-health
+```
+
+该模式只发送一次公网 GET，不需要 root，不修改 Git、数据、配置或进程。
 
 若脚本因内容差异停止，保留输出中指出的文件并核对，不强制清空工作区。若在构建后失败，
 Git 可能已前进而运行产物已恢复旧版；此时以备份和错误为准，不能宣称版本一致。

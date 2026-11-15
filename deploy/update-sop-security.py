@@ -122,7 +122,16 @@ def build_release(release, changes, backup):
 
 
 def request(url, body=None, probe_ip=None):
-    headers = {"Content-Type": "application/json"} if body is not None else {}
+    """Return HTTP status and a JSON object, retaining metadata on invalid bodies.
+
+    HTTP errors may carry valid login errors. A proxy/challenge response may be
+    HTML or empty; never treat that as health success or print its response body.
+    """
+    # Identify this probe explicitly: the public edge returned 403 for the
+    # generic Python-urllib agent during release verification.
+    headers = {"Accept": "application/json", "User-Agent": "mxd-sop-release-check/1.0"}
+    if body is not None:
+        headers["Content-Type"] = "application/json"
     if probe_ip:
         headers["X-Forwarded-For"] = probe_ip
     req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None, headers=headers)
@@ -131,7 +140,31 @@ def request(url, body=None, probe_ip=None):
     except urllib.error.HTTPError as error:
         response = error
     with response:
-        return response.status, json.load(response)
+        metadata = {"status": response.status, "content_type": response.headers.get("Content-Type"),
+                    "server": response.headers.get("Server"), "cf_ray": response.headers.get("CF-Ray"),
+                    "cf_mitigated": response.headers.get("CF-Mitigated")}
+        try:
+            payload = json.load(response)
+        except ValueError:
+            raise ValueError("Expected JSON object; HTTP metadata=" + json.dumps(metadata)) from None
+        if not isinstance(payload, dict):
+            raise ValueError("Expected JSON object; HTTP metadata=" + json.dumps(metadata))
+        return response.status, payload
+
+
+class PublicHealthError(RuntimeError):
+    """Public verification failed; it does not imply rollback of a local release."""
+
+
+def check_public_health():
+    """Read-only public check, usable separately without Git, root or restarts."""
+    try:
+        status, health = request("https://mxd-sop.5202345.xyz/health")
+    except (OSError, ValueError) as error:
+        raise PublicHealthError(f"PUBLIC_HEALTH_CHECK_FAILED; {error}") from None
+    if status != 200 or health.get("status") != "ok":
+        raise PublicHealthError(f"PUBLIC_HEALTH_CHECK_FAILED; HTTP {status}; expected status=ok")
+    print("PUBLIC_HEALTH_OK; HTTP 200; status=ok", flush=True)
 
 
 def wait_for_health():
@@ -225,13 +258,29 @@ def deploy(release):
                 "unchanged_pids": preserved, "ssh": "unchanged", "scope": "SOP and Nginx; auto/player binaries unchanged"}
     (backup / "deployed.json").write_text(json.dumps(evidence, indent=2) + "\n")
     print(json.dumps(evidence, indent=2), flush=True)
-    status, health = request("https://mxd-sop.5202345.xyz/health")
-    if status != 200 or health.get("status") != "ok":
-        raise RuntimeError("Local deployment is healthy, but public health still needs investigation")
+    # Public verification is outside rollback: local health, login probes and
+    # deployed.json already confirm the release. Recheck without redeploying.
+    print("SOP_DEPLOYED_LOCAL_OK; public check follows; failure will not roll back; "
+          "recheck with --check-public-health", flush=True)
+    check_public_health()
     print("SOP_DEPLOYMENT_OK; public health OK; SSH/auto/player untouched", flush=True)
 
 
-if __name__ == "__main__":
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("commit", help="Full commit SHA already fetched as origin/main")
-    deploy(parser.parse_args().commit)
+    parser.add_argument("commit", nargs="?", help="Full commit SHA already fetched as origin/main")
+    parser.add_argument("--check-public-health", action="store_true", help="Only check public health; no deployment")
+    args = parser.parse_args(argv)
+    if bool(args.commit) == args.check_public_health:
+        parser.error("Provide a commit OR --check-public-health")
+    try:
+        if args.check_public_health:
+            check_public_health()
+        else:
+            deploy(args.commit)
+    except PublicHealthError as error:
+        parser.exit(2, str(error) + "\n")
+
+
+if __name__ == "__main__":
+    main()
