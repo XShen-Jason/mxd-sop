@@ -31,19 +31,14 @@ type operatorSession struct {
 	MustChange bool
 }
 
-type loginFailure struct {
-	windowStarted time.Time
-	count         int
-	blockedUntil  time.Time
-}
-
 func (h *Handler) configure(options Options) {
 	h.store = options.Store
 	h.accounts = options.Accounts
 	h.serviceToken = options.ServiceToken
 	h.secureCookie = options.SecureCookie
 	h.operatorSessions = make(map[string]operatorSession)
-	h.loginFailures = make(map[string]loginFailure)
+	h.loginFailures = make(map[string]*loginFailure)
+	h.loginNow = time.Now
 }
 
 func (h *Handler) isServiceRequest(request *http.Request) bool {

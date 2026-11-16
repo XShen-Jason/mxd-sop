@@ -8,6 +8,18 @@ desk independent from auto's Go packages and database.
 
 ## Scope
 
+Operator login uses a rolling per-IPv4 quota and temporary lockout plus durable
+failure totals in the auto-owned `operator_ip_failures` table. IPv6 is rejected.
+The complete threshold/error contract is in `operator-api.v1`; SOP counters are
+independent. Every new HTTP request rechecks the indexed ban table. No failure
+is inferred from rejected/malformed requests or historical logs. Existing SSE
+streams and game transports are not retroactively terminated by an HTTP ban.
+Login reservations precede audit/body reads; verification is serialized under
+`loginMu`, then acquires store/session locks. No path reverses that lock order.
+Memory is capped at 10000 entries; durable counts at 100000 addresses and 21 per
+address. Explicit operator unban deletes only that service's cumulative row;
+temporary lockouts may still need to expire. Tests are in `ip_access_test.go`.
+
 The API owns health and authenticated monitoring projections, operator authentication,
 server/account CRUD, interactive login sessions with role selection and map
 entry, complete account lifecycle controls, chat delivery, SSE snapshots, and

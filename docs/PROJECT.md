@@ -33,7 +33,7 @@ internals or database structures.
 | Module ID | Capability | Implementation location(s) | Owner application(s) | Public contracts | Dependencies |
 | --- | --- | --- | --- | --- | --- |
 | player-registration | Player verification, character selection, locked teams, and invite joining | `mxd-player/backend-player`; `mxd-player/frontend-player` | player backend + player frontend | `player.verify`, `player.me`, `player.teams`, `player.teams.join` | player SQLite adapter |
-| auth | Login sessions, three roles, account directory, and workspace permissions | `backend/src/modules/auth`; `frontend/src/App.tsx` | backend + frontend | `auth.*` | user/session persistence adapter |
+| auth | Login sessions, IPv4 access and durable IP bans, account directory, and workspace permissions | `backend/src/modules/auth`; `frontend/src/App.tsx` | backend + frontend | `auth.*` | user/session/IP-failure persistence adapters |
 | operation-groups | Request submission, approval, issue, completion, reminders, archive, and live counts | `backend/src/modules/operation-groups`; `frontend/src/modules/operation-groups`, `customer`, `manager` | backend + frontend | `operation-groups.*` | item-catalog, auth, persistence adapter |
 | item-catalog | Catalog import, code/name mapping, fuzzy search, class search, and image mapping | `backend/src/modules/item-catalog`; `data/item-catalog/source` | backend + frontend consumer | `item-catalog.*` | CSV/JSON import adapters |
 | activities | Shared activity/reward configuration and request shortcuts | `backend/src/modules/activities`; `frontend/src/modules/activities` | backend + frontend | `activities.*` | SQLite/JSON activity adapter, item-catalog |

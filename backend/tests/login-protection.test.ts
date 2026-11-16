@@ -142,7 +142,6 @@ describe('login protection HTTP contract', () => {
 
   it.each([
     ['192.0.2.10', '::ffff:192.0.2.10', '::ffff:c000:20a'],
-    ['2001:db8::1', '2001:0DB8:0:0:0:0:0:0001', '2001:db8:0::1'],
   ])('normalizes equivalent IP spellings for %s', async (...addresses) => {
     for (let i = 0; i < 11; i++) {
       expect((await login(payload.password, addresses[i % addresses.length])).statusCode).toBe(i < 10 ? 200 : 429);

@@ -3,3 +3,5 @@ export type { AuthErrorCode, CreateUserInput, UpdateUserInput } from '../domain/
 export { defaultUploadPermissions, defaultWorkspacePermissions, hasUploadAccess, hasWorkspaceAccess, UPLOAD_PERMISSIONS, WORKSPACES } from '../domain/permissions.js';
 export { JsonUserRepository } from '../infrastructure/json-users.js';
 export type { StoredUser, UserRepository } from '../infrastructure/json-users.js';
+export { IpAccessPolicy } from '../domain/ip-access.js';
+export { MemoryIpFailureStore, SqliteIpFailureStore } from '../infrastructure/ip-failures.js';

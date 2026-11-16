@@ -3,6 +3,7 @@ import { AuthError, type AuthService } from '../public/index.js';
 import type { CreateUserInput, UpdateUserInput } from '../public/index.js';
 import { LoginLimiter, LoginLimitError } from '../domain/login-limiter.js';
 import { loginIp } from './client-ip.js';
+import { IpAccessError, type IpAccessPolicy } from '../domain/ip-access.js';
 
 function objectBody(request: FastifyRequest) {
   const body = request.body ?? {};
@@ -25,6 +26,7 @@ function tokenFromRequest(request: FastifyRequest) {
 }
 
 function sendAuthError(reply: FastifyReply, error: unknown) {
+  if (error instanceof IpAccessError) return reply.code(error.status).send({ error: { code: error.code, message: error.message } });
   if (error instanceof LoginLimitError) {
     return reply.code(error.code === 'login-capacity' ? 503 : 429)
       .header('retry-after', error.retryAfterSeconds)
@@ -37,8 +39,14 @@ function sendAuthError(reply: FastifyReply, error: unknown) {
   return reply.code(status).send({ error: { code, message: authError.message } });
 }
 
-export function registerAuthRoutes(app: FastifyInstance, auth: AuthService) {
-  const loginLimiter = new LoginLimiter();
+export function registerAuthRoutes(app: FastifyInstance, auth: AuthService, access: IpAccessPolicy) {
+  const loginLimiter = new LoginLimiter(access);
+  // Root hook covers every new backend request, including existing cookies.
+  // The already trusted request.ip is the only source of client identity.
+  app.addHook('onRequest', async (request, reply) => {
+    try { access.assertAllowed(request.ip); }
+    catch (error) { return sendAuthError(reply, error); }
+  });
   const identity = (request: FastifyRequest) => auth.requestIdentity(request.headers as Record<string, unknown>);
   const limit = (request: FastifyRequest) => {
     const value = (request.query as Record<string, unknown> | undefined)?.limit;

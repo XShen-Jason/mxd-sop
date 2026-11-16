@@ -1,8 +1,8 @@
 import type { AccountSnapshot, AuditEntry, AutoMessageResult, AutoSession, CredentialType, OperatorSession, Overview, ServerRecord } from './types';
 
 export class ApiError extends Error {
-  constructor(public readonly status: number, public readonly code: string) {
-    super(code);
+  constructor(public readonly status: number, public readonly code: string, message = code) {
+    super(message);
   }
 }
 
@@ -12,8 +12,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body) headers.set('content-type', 'application/json');
   const response = await fetch(path, { ...init, headers, credentials: 'same-origin' });
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({})) as { error?: string };
-    throw new ApiError(response.status, payload.error ?? 'request_failed');
+    const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
+    throw new ApiError(response.status, payload.error ?? 'request_failed', payload.message);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;

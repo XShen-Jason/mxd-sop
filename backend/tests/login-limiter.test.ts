@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthError } from '../src/modules/auth/public/index.js';
+import { AuthError, IpAccessPolicy, MemoryIpFailureStore } from '../src/modules/auth/public/index.js';
 import { LoginLimiter } from '../src/modules/auth/domain/login-limiter.js';
 
 describe('auth IP login protection', () => {
@@ -14,7 +14,7 @@ describe('auth IP login protection', () => {
 
   beforeEach(() => {
     now = 1_000_000;
-    limiter = new LoginLimiter(() => now);
+    limiter = new LoginLimiter(new IpAccessPolicy(new MemoryIpFailureStore()), () => now);
   });
 
   it('uses a sliding five-minute window and does not extend it on rejection', () => {
@@ -81,24 +81,24 @@ describe('auth IP login protection', () => {
 
   it('bounds memory without evicting failures, and reclaims completed windows', () => {
     for (let i = 0; i < 10_000; i++) {
-      const address = `client-${i}`;
+      const address = `10.0.${Math.floor(i / 256)}.${i % 256}`;
       limiter.admit(address);
       expect(() => limiter.authenticate(address, invalid)).toThrow(AuthError);
     }
     now += 300_000;
-    expect(() => limiter.admit('new-client')).toThrow(expect.objectContaining({ code: 'login-capacity' }));
+    expect(() => limiter.admit('192.0.2.2')).toThrow(expect.objectContaining({ code: 'login-capacity' }));
     // Existing clients can still recover; the next cleanup frees their window.
-    limiter.admit('client-0');
-    limiter.authenticate('client-0', () => 'session');
+    limiter.admit('10.0.0.0');
+    limiter.authenticate('10.0.0.0', () => 'session');
     now += 300_000;
-    expect(() => limiter.admit('new-client')).not.toThrow();
+    expect(() => limiter.admit('192.0.2.2')).not.toThrow();
   });
 
   it('reclaims expired bans while retaining unexpired bans', () => {
     for (let i = 0; i < 4; i++) expect(attempt).toThrow(AuthError);
     expect(attempt).toThrow(expect.objectContaining({ code: 'login-blocked' }));
     now += 60_000;
-    limiter.admit('another-ip');
+    limiter.admit('192.0.2.2');
     expect(attempt).toThrow(expect.objectContaining({ code: 'login-blocked', retryAfterSeconds: 1140 }));
     now += 1_140_000;
     expect(attempt).toThrow(expect.objectContaining({ code: 'invalid-credentials' }));

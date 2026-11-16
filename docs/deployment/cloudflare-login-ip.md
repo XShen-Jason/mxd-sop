@@ -1,6 +1,6 @@
-# Cloudflare 橙云与 SOP 登录限流
+# Cloudflare 橙云与 SOP / auto 登录保护
 
-适用链路：访客 → Cloudflare 橙云 → 本机 Nginx → `127.0.0.1:26902` 的 SOP 后端。
+适用链路：访客 → Cloudflare 橙云 → 本机 Nginx → SOP `127.0.0.1:26902` 或 auto `127.0.0.1:26909`。
 后端只信任直接相连的本机代理，不自动跳过任意数量的代理。
 
 未配置真实 IP 时，Nginx 向 `X-Forwarded-For` 末尾追加 Cloudflare 节点地址，
@@ -61,9 +61,9 @@ python3 deploy/tests/cloudflare-realip.test.py
 
 默认调用 PATH 中的 `nginx`，也可设置 `NGINX_BINARY` 为待测二进制绝对路径。
 测试仅在临时配置中用 `127.0.0.2` 模拟 Cloudflare 来源，验证两名访客分离、
-不可信连接伪造头被忽略、IPv6 及缺失/非法头回退；生产片段不会加入回环信任。
+不可信连接伪造头被忽略、IPv6 拒绝及缺失/非法头回退；生产片段不会加入回环信任。
 同一测试还加载仓库的前置限流片段，验证 SOP 两个登录地址共用 10 次突发额度，
-auto 原有突发额度不变，普通 API 不占登录额度。
+auto 独立使用同样的 10 次突发额度，普通 API 不占登录额度。
 
 上线后用两个不同公网出口验证：A 在 5 分钟内发起第 11 次登录被拒绝时，B 仍可登录；
 请求额度测试应使用正确凭据，避免提前触发密码错误锁定。另行验证第 5 次密码错误
@@ -74,7 +74,7 @@ auto 原有突发额度不变，普通 API 不占登录额度。
 
 SOP 的两个登录地址在 Nginx 共用独立的 `mxd_sop_login_ip` 桶，持续速率 `2r/m`、
 `burst=9` 允许瞬间到达的 10 次请求。后端执行严格滚动窗口和认证失败锁定，
-Nginx 漏桶不能替代后端规则。auto 仍使用原先独立的 `5r/m`、`burst=5`；
+Nginx 漏桶不能替代后端规则。auto 使用独立的 `2r/m`、`burst=9`；
 两个站点各自的总量保护仍为 `2r/s`、`burst=10`。
 
 已有 `mxd-login-guard.conf` / `mxd-login-server.conf` 保护的服务器需同时更新这两个
@@ -83,3 +83,15 @@ Nginx 漏桶不能替代后端规则。auto 仍使用原先独立的 `5r/m`、`b
 
 HK-MXD 的入口限流、身份头清理和部署记录见
 [2026-11-15 安全加固记录](HK-MXD-SECURITY-20261115.md)。
+
+## 拒绝 IPv6 访客
+
+两个 HTTPS server 的共享片段按恢复后的 `$remote_addr` 拒绝 IPv6，覆盖页面、静态资源
+及 API。IPv4 访客不会因为 Cloudflare 到源站使用 IPv6 而被误封。保留 CF 的 IPv6 信任网段，
+不在系统层禁用 IPv6，不调整 SSH、Tailscale、Docker 或 player。
+若 Pseudo IPv4 使用 Overwrite Headers，CF 会另保留 `CF-Connecting-IPv6`；片段对该头含
+IPv6 的请求也直接拒绝，避免伪 IPv4 绕过。该头只用于增加拒绝，永远不赋予信任或选择计数身份；
+直连客户端伪造它只能让自己的请求被拒绝。行为依据
+[Cloudflare Pseudo IPv4](https://developers.cloudflare.com/network/pseudo-ipv4/)。
+后端再次按可信地址拒绝 IPv6；永久累计封禁由各服务自己的持久存储执行。
+联合更新及精确范围见 [登录 IP 防护发布](LOGIN-IP-PROTECTION.md)。

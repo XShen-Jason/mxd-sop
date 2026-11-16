@@ -9,7 +9,7 @@
 In scope:
 
 - 用户名/密码登录、退出和当前身份查询。
-- 按 IP 的登录请求限流和认证失败暂停，规则与恢复语义见 `docs/contracts/auth.md`。
+- 按 IPv4 的登录请求限流、认证失败暂停及持久永久封禁，拒绝 IPv6；规则与恢复语义见 `docs/contracts/auth.md`。
 - `customer`（普通客服）、`manager`（管理）、`super_admin`（超级管理）三层角色。
 - `accounts` 工作区持有者可创建、编辑、停用、启用和删除三类账号，并分别调整其工作区权限和上传权限。
 - 启用/停用账号、编辑时修改密码和最小一名超级管理约束。
@@ -54,6 +54,7 @@ Out of scope:
 认证测试覆盖登录、禁止注册、工作区默认值与覆盖、账号管理工作区、停用账号和最后超级管理保护；跨模块测试覆盖会话身份驱动的工单授权。
 
 `backend/tests/login-limiter.test.ts` 验证滚动窗口、失败阈值、暂停恢复及内存上限；
+`backend/tests/ip-access.test.ts` 验证持久累计、第 21 次永久封禁、并发、重启、人工解封与 IPv6 拒绝；
 `backend/tests/login-protection.test.ts` 验证两个登录地址共用额度、HTTP 错误、并发请求、
 可信代理 IP 和伪造转发头，使用模拟时间覆盖边界而无需实际等待。
 `deploy/tests/cloudflare-realip.test.py` 在隔离的真实 Nginx 中验证橙云访客 IP 恢复，

@@ -25,7 +25,7 @@ Applications: backend, separated Vite operator frontend
 | `game-session` | Framed TCP login, character selection, map entry, heartbeat, reconnect transport, and classified chat delivery | `backend-auto-process/internal/gameprotocol`, `backend-auto-process/internal/gamesession` | backend | `game-session.*` | Go net, configured server, optional PCAP source |
 | `server-catalog` | Validated multi-server definitions, default runtime settings, and persisted catalog | `backend-auto-process/internal/servercatalog` | backend | `server-catalog.*` | JSON bootstrap file, SQLite persistence |
 | `session-control` | Concurrent sessions, account lifecycle, automatic re-login, manual reconnect, limits, and bounded probes | `backend-auto-process/internal/sessioncontrol` | backend | `session-control.*` | game-session, server-catalog, auto store |
-| `auto-store` | SQLite schema, AES-GCM account credential storage, operator password, and bounded audit log | `backend-auto-process/internal/autostore` | backend | `auto-store.*` | SQLite, local key file |
+| `auto-store` | SQLite schema, encrypted credentials, operator password/IP-failure counters, and bounded audit log | `backend-auto-process/internal/autostore` | backend | `auto-store.*` | SQLite, local key file |
 | `operator-api` | Versioned HTTP boundary, authenticated overview/events/logs, service-token access, operator password login, and control UI | `backend-auto-process/internal/operatorapi` | backend, operator-frontend | `operator-api.v1` | session-control, auto-store |
 
 ## Contract registry

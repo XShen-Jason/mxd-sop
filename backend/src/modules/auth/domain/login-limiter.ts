@@ -1,4 +1,5 @@
 import { AuthError } from './service.js';
+import type { IpAccessPolicy } from './ip-access.js';
 
 const WINDOW_MS = 5 * 60_000;
 const MAX_REQUESTS = 10;
@@ -25,16 +26,18 @@ export class LoginLimitError extends Error {
  * Auth-owned, single-process IP protection. Both HTTP login aliases share one
  * instance. Times are milliseconds; failures survive five-minute window rollover,
  * and reset only on successful authentication or expiry of the twenty-minute ban.
- * No credentials are retained. Restarting the process clears this transient state.
+ * No credentials are retained. Restart clears only this temporary state; the
+ * separate cumulative failure store and permanent bans survive restarts.
  */
 export class LoginLimiter {
   private readonly attempts = new Map<string, Attempts>();
   private nextCleanupAt = 0;
 
-  constructor(private readonly now: () => number = Date.now) {}
+  constructor(private readonly access: IpAccessPolicy, private readonly now: () => number = Date.now) {}
 
   /** Reserve one request before body parsing, including malformed login requests. */
   admit(ip: string) {
+    ip = this.access.assertAllowed(ip);
     const now = this.now();
     const state = this.state(ip, now);
     this.checkBlock(state, now);
@@ -53,6 +56,7 @@ export class LoginLimiter {
    * failures; validation/storage errors do not. Never pass an async callback.
    */
   authenticate<T>(ip: string, verify: () => T): T {
+    ip = this.access.assertAllowed(ip);
     const now = this.now();
     const state = this.state(ip, now);
     this.checkBlock(state, now);
@@ -60,6 +64,9 @@ export class LoginLimiter {
     try { result = verify(); }
     catch (error) {
       if (error instanceof AuthError && error.code === 'invalid-credentials') {
+        // Commit the lifetime failure before reporting the temporary lock.
+        // On failure 21 the permanent error takes precedence over all timers.
+        this.access.recordFailure(ip);
         state.failures += 1;
         // Lock on the fifth failure itself, even with request quota remaining.
         if (state.failures >= MAX_FAILURES) {

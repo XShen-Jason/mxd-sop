@@ -85,6 +85,10 @@ func (s *Store) initialize(initialPassword string) error {
 	const schema = `
 PRAGMA journal_mode = WAL;
 PRAGMA busy_timeout = 5000;
+CREATE TABLE IF NOT EXISTS operator_ip_failures (
+  ip TEXT PRIMARY KEY,
+  failures INTEGER NOT NULL CHECK (failures > 0)
+);
 CREATE TABLE IF NOT EXISTS operator (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   username TEXT NOT NULL,

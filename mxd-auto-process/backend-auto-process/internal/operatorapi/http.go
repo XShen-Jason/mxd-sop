@@ -28,7 +28,10 @@ type Handler struct {
 	secureCookie     bool
 	operatorMu       sync.Mutex
 	operatorSessions map[string]operatorSession
-	loginFailures    map[string]loginFailure
+	loginMu          sync.Mutex
+	loginFailures    map[string]*loginFailure
+	loginNow         func() time.Time
+	loginCleanupAt   time.Time
 	executionMu      sync.Mutex
 }
 
@@ -58,6 +61,16 @@ func NewHandler(manager *sessioncontrol.Manager, catalog *servercatalog.Catalog,
 }
 
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// Deny before audit/body handling; rejected IPv6/permanent bans do no work.
+	if !h.accessAllowed(writer, request) {
+		return
+	}
+	if request.Method == http.MethodPost && request.URL.Path == "/api/v1/operator/login" {
+		ip, _ := clientIP(request)
+		if !h.reserveLogin(writer, ip.String()) {
+			return
+		}
+	}
 	if h.store != nil && shouldAudit(request.URL.Path) {
 		request = requestWithAuditBody(request)
 		wrapped := &auditResponseWriter{ResponseWriter: writer, status: http.StatusOK}

@@ -5,7 +5,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { appOptions } from './config/options.js';
-import { AuthService } from './modules/auth/public/index.js';
+import { AuthService, IpAccessPolicy, MemoryIpFailureStore, SqliteIpFailureStore } from './modules/auth/public/index.js';
 import { JsonUserRepository } from './modules/auth/public/index.js';
 import { SqliteUserRepository } from './modules/auth/infrastructure/sqlite-users.js';
 import { SqliteSessionRepository } from './modules/auth/infrastructure/sqlite-sessions.js';
@@ -150,7 +150,7 @@ export async function createApp(config: AppConfig = {}) {
   });
   const service = new OperationGroupsService({ repository, catalog, options, resolveDisplayName: (id) => auth.resolveDisplayName(id) });
   const automation = (process.env.NODE_ENV !== 'test' || config.autoIntegrationClient) ? new OperationAutomationWorkflow(service, autoIntegration) : undefined;
-  registerAuthRoutes(app, auth);
+  registerAuthRoutes(app, auth, new IpAccessPolicy(db ? new SqliteIpFailureStore(db) : new MemoryIpFailureStore()));
   registerOperationRoutes(app, service, catalog, auth, automation, replaceUploadedCatalog);
   registerActivityRoutes(app, new ActivitiesService(activitiesRepository, catalog), auth);
   const playerSync = config.playerIntegrationClient || process.env.NODE_ENV !== 'test' ? integration : undefined;

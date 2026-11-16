@@ -34,11 +34,15 @@ func TestOperatorLoginIsRateLimitedAfterRepeatedFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for attempt := 0; attempt < maxLoginFailures; attempt++ {
+	for attempt := 0; attempt < maxLoginFailures-1; attempt++ {
 		response := performOperatorLogin(t, handler, `{"username":"admin","password":"wrong-password"}`)
 		if response.Code != http.StatusUnauthorized {
 			t.Fatalf("attempt %d: got %d, want unauthorized", attempt+1, response.Code)
 		}
+	}
+	locked := performOperatorLogin(t, handler, `{"username":"admin","password":"wrong-password"}`)
+	if locked.Code != http.StatusTooManyRequests || locked.Header().Get("Retry-After") != "1200" {
+		t.Fatalf("fifth failure must immediately lock: %d %s", locked.Code, locked.Body.String())
 	}
 	response := performOperatorLogin(t, handler, `{"username":"admin","password":"InitialAutoPass!"}`)
 	if response.Code != http.StatusTooManyRequests || response.Header().Get("Retry-After") == "" {

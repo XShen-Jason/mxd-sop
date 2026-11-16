@@ -12,6 +12,10 @@ export function openDatabase(filePath: string) {
   db.pragma('temp_store = MEMORY');
   db.pragma('cache_size = -64000');
   db.exec(`
+    CREATE TABLE IF NOT EXISTS auth_ip_failures (
+      ip TEXT PRIMARY KEY,
+      failures INTEGER NOT NULL CHECK (failures > 0)
+    );
     CREATE TABLE IF NOT EXISTS auto_server_options (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       payload_json TEXT NOT NULL

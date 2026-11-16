@@ -1,5 +1,8 @@
 # SOP 安全规则发布与旧源码对齐
 
+本页记录此前仅更新 SOP 的流程。新增 auto 永久封禁/IPv6 拒绝的联合发布改用
+[登录 IP 防护发布](LOGIN-IP-PROTECTION.md)，该流程会重启 auto。
+
 用于 HK-MXD 的 `/opt/mxd-sop`，最初处理 `476b904` 加直接部署安全补丁的工作区。
 用户确认保留现有 SSH 防护，不调整 SSH、Fail2ban、防火墙、Docker 或 Tailscale。
 本次只切换 SOP 后端和前端构建产物，并更新三个已有 Nginx 安全片段；auto/player

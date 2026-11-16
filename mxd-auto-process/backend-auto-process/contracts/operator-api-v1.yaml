@@ -5,7 +5,10 @@ info:
   description: >-
     The v1 boundary for mxd-auto-process. Monitoring projections and control
     routes require the operator session cookie or the configured service token;
-    only health and operator login are public.
+    only health and operator login are public. All new HTTP requests reject IPv6
+    visitors and permanently banned IPv4 addresses, including existing sessions
+    and service tokens. Only an immediate loopback proxy can provide the final
+    X-Forwarded-For client address; mapped IPv4 is normalized to IPv4.
 security:
   - operatorCookie: []
   - serviceToken: []
@@ -69,6 +72,16 @@ paths:
   /api/v1/operator/login:
     post:
       operationId: operatorLogin
+      description: >-
+        Per real IPv4, admit at most 10 requests per rolling 300 seconds, including
+        successes and malformed bodies. Failure 5 immediately locks login for
+        1200 seconds. Success or lock expiry clears only the temporary streak.
+        Independent SQLite cumulative failures survive success, expiry and
+        restart; failure 21 permanently bans the IP with no Retry-After.
+        Denied and malformed requests do not add credential failures. Counts
+        are independent of SOP and begin when this version is installed.
+        At most 10000 transient entries and 100000 durable records are retained;
+        storage exhaustion or errors fail closed without evicting bans.
       security: []
       requestBody:
         required: true
@@ -82,7 +95,9 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/OperatorSession'}
         '401': {description: Invalid credentials}
-        '429': {description: Login throttled}
+        '403': {description: 'ipv6_disabled or ip_permanently_banned; no Retry-After'}
+        '429': {description: 'operator_login_rate_limited or operator_login_blocked; Retry-After header and retryAfterSeconds body in seconds'}
+        '503': {description: 'operator_login_capacity or operator_auth_unavailable'}
   /api/v1/operator/me:
     get:
       operationId: operatorMe

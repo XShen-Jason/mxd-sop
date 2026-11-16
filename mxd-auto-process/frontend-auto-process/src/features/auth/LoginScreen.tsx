@@ -44,6 +44,8 @@ export function LoginScreen({ onLogin }: { onLogin: (session: OperatorSession) =
 }
 
 function loginError(error: unknown) {
+  // Protection messages come from the auth owner, including its current limits.
+  if (error instanceof ApiError && ['ip_permanently_banned', 'ipv6_disabled', 'operator_login_blocked', 'operator_login_rate_limited'].includes(error.code)) return error.message;
   if (error instanceof ApiError && error.status === 429) return '尝试次数过多，请稍后再试。';
   if (error instanceof ApiError && error.status === 401) return '账号或密码不正确。';
   return '暂时无法连接自动化服务。';
