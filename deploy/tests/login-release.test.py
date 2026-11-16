@@ -79,7 +79,7 @@ class LoginReleaseTest(unittest.TestCase):
             def git(*args):
                 return b"current" if args[0] == "show" else b""
             with patch.object(joint.sop, "preflight", return_value=[]), patch.object(joint.sop, "git", side_effect=git), \
-                 patch.object(joint, "preflight_auto", return_value="auto.example.com"), patch.object(joint.sop, "CONFIGS", {"guard.conf": config}), \
+                 patch.object(joint, "preflight_auto", return_value=("auto.example.com", Path("/configured/go"))), patch.object(joint.sop, "CONFIGS", {"guard.conf": config}), \
                  patch.object(joint.sop, "service_value", return_value="42"), patch.object(joint.sop, "make_backup", return_value=root), \
                  patch.object(joint, "backup_auto"), patch.object(joint.sop, "build_release", side_effect=RuntimeError("build failed")), \
                  patch.object(joint.sop, "restore_built_assets") as restore, patch.object(joint, "install_binary") as install, \
@@ -104,7 +104,7 @@ class LoginReleaseTest(unittest.TestCase):
             def git(*args):
                 return b"current" if args[0] == "show" else release.encode() if args[0] == "rev-parse" else b""
             with patch.object(joint.sop, "preflight", return_value=[]), patch.object(joint.sop, "git", side_effect=git), \
-                 patch.object(joint, "preflight_auto", return_value="auto.example.com"), patch.object(joint.sop, "CONFIGS", {"guard.conf": config}), \
+                 patch.object(joint, "preflight_auto", return_value=("auto.example.com", Path("/configured/go"))), patch.object(joint.sop, "CONFIGS", {"guard.conf": config}), \
                  patch.object(joint.sop, "service_value", return_value="42"), patch.object(joint.sop, "make_backup", return_value=backup), \
                  patch.object(joint, "backup_auto"), patch.object(joint.sop, "build_release"), patch.object(joint, "build_auto", return_value=artifact), \
                  patch.object(joint.sop, "restore_built_assets") as restore, patch.object(joint, "install_binary") as install, \

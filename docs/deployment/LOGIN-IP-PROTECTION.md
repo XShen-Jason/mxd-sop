@@ -24,6 +24,19 @@
 它要求已有 HK-MXD 安装及干净 main 工作区，核对现有 Nginx 片段与旧提交一致后才继续。
 不自动 stash，也不强制 reset；未知修改或部署路径差异会在切换前停止。
 
+当前 Debian 部署以 [同机更新手册](../DEPLOYMENT-UPDATE.md) 第 4 节为准：
+Go 从 `/opt/mxd-auto-process/toolchain.env` 的 `GO_BIN` 读取，不要求固定安装路径。
+脚本只解析一个字面量绝对路径，不执行该配置中的 shell 内容；以 `mxd-sop` 检查可执行性
+及目标提交 `go.mod` 所需版本，再把同一个编译器传给构建。仅当该配置文件不存在时，
+兼容另一份 Ubuntu 手册使用的 `/opt/mxd-auto-process/toolchain/bin/go`。
+配置存在但无效时停止，不换用其他工具链，也不自动下载或改写系统 Go。
+Debian 初次部署的 env 不含 `AUTO_DOMAIN`，公网检查默认使用手册中的
+`mxd-auto-process.5202345.xyz`；已有显式 `AUTO_DOMAIN` 时仍使用它。
+
+Auto 从目标提交导出到 `/var/tmp/mxd-auto-security-*` 后，依次构建前端和 Go；
+嵌入资源、依赖和 Go 缓存都留在该临时目录，不向服务器仓库回写构建资产。
+`GOTOOLCHAIN=local` 保证检测和构建使用同一编译器，不隐式下载其他版本。
+
 脚本在 `/var/backups/mxd-sop/security-release-*` 保存 SOP 源码版本、构建产物、数据库快照、
 Nginx 片段以及 auto 的旧二进制、数据库快照、配置和密钥。目录 root 专有，证据不进入业务表。
 前端依赖、SOP 测试/类型检查/构建、auto 前端测试/构建、Go 测试/vet/构建和隔离 Nginx

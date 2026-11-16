@@ -96,7 +96,7 @@ def probe_service(service):
 def deploy(release):
     if sop.preflight(release) or sop.git("status", "--porcelain").strip():
         raise RuntimeError("Joint release requires a clean worktree; no automatic stash")
-    auto_domain = preflight_auto(sop)
+    auto_domain, go_binary = preflight_auto(sop, release)
     sop.run("curl", "--version", capture=True)
     # Do not overwrite operator customizations in installed snippets.
     for name, destination in sop.CONFIGS.items():
@@ -108,7 +108,7 @@ def deploy(release):
     switched = config_changed = False
     try:
         sop.build_release(release, [], backup)
-        artifact = build_auto(sop)
+        artifact = build_auto(sop, go_binary, release)
         expected_auto_hash = hashlib.sha256(artifact.read_bytes()).hexdigest()
         if sop.git("status", "--porcelain").strip() or sop.git("rev-parse", "HEAD").decode().strip() != release:
             raise RuntimeError("Source changed while building; nothing switched")

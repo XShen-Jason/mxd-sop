@@ -37,6 +37,11 @@
 第 2 节仍是本项目 SOP 的标准更新方式，并会在启动时执行兼容的 SQLite schema
 补充；它不会替代 player 或 auto 的独立构建和重启。
 
+若一次发布同时包含 SOP/auto 的永久 IP 封禁、IPv6 禁止及 Nginx 防护片段，使用
+[登录 IP 防护联合更新](deployment/LOGIN-IP-PROTECTION.md)，以便一起备份、切换和核验。
+该脚本遵循本文第 4 节的 `toolchain.env`/`GO_BIN` 及临时源码构建约定，仅更新 SOP、
+auto 和对应 Nginx 配置，保留 player 和 SSH；SOP 登录账号日志也随本次后端构建上线。
+
 ## 本地 SSH 连接
 
 只在本机新开的 PowerShell 窗口执行。输入 IP 后，OpenSSH 会在隐藏的密码提示
