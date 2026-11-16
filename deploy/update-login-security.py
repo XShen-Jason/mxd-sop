@@ -142,7 +142,9 @@ def probe_service(service):
 
 
 def deploy(release, resume_backup=None):
-    if sop.preflight(release) or sop.git("status", "--porcelain").strip():
+    # Preflight checks every tracked/untracked entry. Its sole runtime-token
+    # exception becomes ignored only after the target .gitignore is installed.
+    if sop.preflight(release):
         raise RuntimeError("Joint release requires a clean worktree; no automatic stash")
     auto_domain, go_binary = preflight_auto(sop, release)
     sop.run("curl", "--version", capture=True)

@@ -24,6 +24,12 @@
 它要求已有 HK-MXD 安装及干净 main 工作区，核对现有 Nginx 片段与旧提交一致后才继续。
 不自动 stash，也不强制 reset；未知修改或部署路径差异会在切换前停止。
 
+若旧测试留下未跟踪的 `.local/share/vitest/.vitest-secret-token`，新版预检只兼容
+这个确切普通文件：目标提交必须有精确忽略规则且没有跟踪该 token。文件保留原位，
+不读取/打印/上传内容，不 stash 或删除；快进后由新 `.gitignore` 接管。其他 `.local/`
+文件、符号链接、已暂存或已跟踪修改仍会停止。后续 auto 的 npm 命令设置
+`XDG_DATA_HOME=<临时构建目录>/user-data`，Vitest token 不再落入服务器仓库。
+
 当前 Debian 部署以 [同机更新手册](../DEPLOYMENT-UPDATE.md) 第 4 节为准：
 Go 从 `/opt/mxd-auto-process/toolchain.env` 的 `GO_BIN` 读取，不要求固定安装路径。
 脚本只解析一个字面量绝对路径，不执行该配置中的 shell 内容；以 `mxd-sop` 检查可执行性

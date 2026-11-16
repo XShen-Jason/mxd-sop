@@ -104,7 +104,8 @@ def make_backup(changes, release):
 
 def build_release(release, changes, backup):
     if changes:
-        git("stash", "push", "--include-untracked", "--message", f"HK-MXD pre-release {release[:12]}")
+        # Stash only the verified source paths, never the retained runtime token.
+        git("stash", "push", "--include-untracked", "--message", f"HK-MXD pre-release {release[:12]}", "--", *changes)
         (backup / "stash-id").write_bytes(git("rev-parse", "refs/stash"))
     git("merge", "--ff-only", release)
     if git("rev-parse", "HEAD").decode().strip() != release:

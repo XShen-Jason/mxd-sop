@@ -18,6 +18,9 @@ desktop.ini
 
 # Local configuration and persistence. The examples are the only env files
 # intended for source control; real values stay on the developer/server host.
+# Vitest uses this path when the Debian build user's home is the repository.
+# Keep the token private without hiding unrelated files under .local/.
+/.local/share/vitest/.vitest-secret-token
 .env
 .env.*
 !.env.example

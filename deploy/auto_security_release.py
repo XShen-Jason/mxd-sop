@@ -97,9 +97,12 @@ def build_auto(sop, go_binary, release):
     sop.run("git", "-c", "core.fileMode=false", "archive", "--format=tar", "--output", str(archive), release, "mxd-auto-process", user=True)
     sop.run("tar", "-xf", str(archive), "-C", str(stage), user=True)
     frontend = str(stage / AUTO_FRONTEND)
-    sop.run("npm", "--prefix", frontend, "ci", "--include=dev", "--ignore-scripts=false", "--package-lock=false", user=True)
+    # Vitest 5 persists an API token under XDG_DATA_HOME on Linux. Keep it in
+    # this private build stage even when the service user's home is the Git repo.
+    npm = ["env", f"XDG_DATA_HOME={stage / 'user-data'}", "npm", "--prefix", frontend]
+    sop.run(*npm, "ci", "--include=dev", "--ignore-scripts=false", "--package-lock=false", user=True)
     for command in ("test", "lint", "build"):
-        sop.run("npm", "--prefix", frontend, "run", command, user=True)
+        sop.run(*npm, "run", command, user=True)
     go = ["env", "GOTOOLCHAIN=local", f"GOCACHE={stage / 'cache'}", f"GOPATH={stage / 'go'}", "CGO_ENABLED=0",
           str(go_binary), "-C", str(stage / AUTO_SOURCE)]
     for command in ("test", "vet"):

@@ -35,6 +35,7 @@ class SourceReconciliationTest(unittest.TestCase):
         self.base = self.git("rev-parse", "HEAD").decode().strip()
         self.write(self.existing, "published\n")
         self.write(self.added, "new file\n")
+        self.write(".gitignore", "/.local/share/vitest/.vitest-secret-token\n")
         self.git("add", ".")
         self.git("commit", "-m", "release")
         self.release = self.git("rev-parse", "HEAD").decode().strip()
@@ -79,6 +80,77 @@ class SourceReconciliationTest(unittest.TestCase):
 
     def test_clean_worktree_needs_no_stash(self):
         self.assertEqual(verify_local_changes(self.repo, self.release, self.git), [])
+
+    def test_existing_vitest_token_survives_preflight_and_fast_forward_without_being_read(self):
+        token = ".local/share/vitest/.vitest-secret-token"
+        self.write(token, "fixture-token-not-production\n")
+        with patch.object(Path, "read_bytes", side_effect=AssertionError("Do not read runtime token content")):
+            self.assertEqual(verify_local_changes(self.repo, self.release, self.git), [])
+        self.git("merge", "--ff-only", self.release)
+        self.assertEqual((self.repo / token).read_text(), "fixture-token-not-production\n")
+        self.assertEqual(self.git("status", "--porcelain"), b"")
+        self.assertEqual(self.git("ls-files", "--", token), b"")
+
+    def test_vitest_exception_does_not_allow_neighbors_or_staged_tokens(self):
+        token = ".local/share/vitest/.vitest-secret-token"
+        note = ".local/share/vitest/operator-notes.txt"
+        self.write(token, "fixture-token-not-production\n")
+        self.write(note, "keep operator notes\n")
+        with self.assertRaisesRegex(RuntimeError, "Unknown local change"):
+            verify_local_changes(self.repo, self.release, self.git)
+        self.assertEqual((self.repo / note).read_text(), "keep operator notes\n")
+        (self.repo / note).unlink()
+        self.git("add", token)
+        with self.assertRaisesRegex(RuntimeError, "Unknown local change"):
+            verify_local_changes(self.repo, self.release, self.git)
+
+    def test_runtime_token_requires_the_exact_ignore_rule_in_the_target_release(self):
+        self.write(".gitignore", "/.local/\n")
+        self.git("add", ".gitignore")
+        self.git("commit", "-m", "overbroad exclusion is not an authorized token rule")
+        target = self.git("rev-parse", "HEAD").decode().strip()
+        self.git("switch", "--detach", self.base)
+        self.write(".local/share/vitest/.vitest-secret-token", "fixture-token\n")
+        with self.assertRaisesRegex(RuntimeError, "ignore rule"):
+            verify_local_changes(self.repo, target, self.git)
+
+    def test_runtime_token_symlink_is_rejected_without_reading_its_target(self):
+        token = self.repo / ".local/share/vitest/.vitest-secret-token"
+        target = self.repo / ".git/fixture-private-token"
+        target.write_text("fixture-only\n")
+        token.parent.mkdir(parents=True)
+        try:
+            token.symlink_to(target)
+        except OSError:
+            self.skipTest("symlink creation unavailable")
+        with patch.object(Path, "read_bytes", side_effect=AssertionError("Do not read link target")):
+            with self.assertRaisesRegex(RuntimeError, "regular local Vitest token"):
+                verify_local_changes(self.repo, self.release, self.git)
+
+    def test_runtime_token_is_rejected_if_target_release_would_track_it(self):
+        token = ".local/share/vitest/.vitest-secret-token"
+        self.git("switch", "--detach", self.release)
+        self.write(token, "synthetic-published-token\n")
+        self.git("add", "-f", token)
+        self.git("commit", "-m", "invalid fixture release with tracked token")
+        target = self.git("rev-parse", "HEAD").decode().strip()
+        self.git("switch", "--detach", self.base)
+        self.write(token, "synthetic-private-token\n")
+        with self.assertRaisesRegex(RuntimeError, "no tracked token"):
+            verify_local_changes(self.repo, target, self.git)
+
+    def test_legacy_source_stash_does_not_capture_the_untracked_runtime_token(self):
+        token = ".local/share/vitest/.vitest-secret-token"
+        self.write(token, "synthetic-private-token\n")
+        self.write(self.existing, "published\n")
+        self.write(self.added, "new file\n")
+        changes = verify_local_changes(self.repo, self.release, self.git)
+        backup = self.repo / ".git/test-release-backup"
+        backup.mkdir()
+        with patch.object(updater, "git", side_effect=self.git), patch.object(updater, "run"):
+            updater.build_release(self.release, changes, backup)
+        self.assertTrue((self.repo / token).is_file())
+        self.assertNotIn(token.encode(), self.git("ls-tree", "-r", "--name-only", "stash@{0}^3"))
 
 
 class ReleaseVerificationTest(unittest.TestCase):

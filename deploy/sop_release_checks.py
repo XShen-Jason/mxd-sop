@@ -21,6 +21,7 @@ RECONCILABLE_FILES = {
 # change. The source was the prior 60-second/5-request, 11-failure/10-minute version.
 # This is deployment provenance, not a second owner of authentication rules.
 LEGACY_LIMITER_SHA256 = "c8f4d8afc4709a1a316e494a14273cdaad0194521daeed77f876c01104d3bf30"
+VITEST_TOKEN_PATH = ".local/share/vitest/.vitest-secret-token"
 
 
 def normalized(content: bytes) -> bytes:
@@ -32,12 +33,22 @@ def verify_local_changes(repo: Path, release: str, git) -> list[str]:
 
     ``git`` executes read-only Git arguments and returns bytes. It runs as the
     repository owner in production and against an isolated repository in tests.
-    This function never modifies files, the index, branches or the stash.
+    This function never modifies files, the index, branches or the stash. The
+    one known untracked Vitest token may predate the target's exact ignore rule;
+    retain it without reading its contents until that rule arrives by fast-forward.
     """
     records = git("status", "--porcelain=v1", "-z", "--untracked-files=all").split(b"\0")
     changes = []
     for record in filter(None, records):
         status, name = record[:2].decode(), record[3:].decode("utf-8")
+        if status == "??" and name == VITEST_TOKEN_PATH:
+            token = repo / name
+            if not token.is_file() or token.is_symlink() or token.resolve() != token:
+                raise RuntimeError("Expected a regular local Vitest token; preserved without modification")
+            rules = git("show", f"{release}:.gitignore").decode().splitlines()
+            if f"/{name}" not in rules or git("ls-tree", "--name-only", release, "--", name).strip():
+                raise RuntimeError("Target must have the exact Vitest token ignore rule and no tracked token")
+            continue
         if status not in (" M", "??") or name not in RECONCILABLE_FILES:
             raise RuntimeError(f"Unknown local change; preserved without modification: {status} {name}")
         file = repo / name

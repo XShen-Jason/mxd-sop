@@ -108,8 +108,9 @@ class AutoEnvironmentTest(unittest.TestCase):
         calls = [call.args for call in self.sop.run.call_args_list]
         self.assertIn(("git", "-c", "core.fileMode=false", "archive", "--format=tar", "--output",
                        str(stage / "source.tar"), self.release, "mxd-auto-process"), calls)
-        npm_calls = [call for call in calls if call[0] == "npm"]
-        self.assertEqual([call[2] for call in npm_calls], [str(stage / auto.AUTO_FRONTEND)] * 4)
+        npm_calls = [call for call in calls if "npm" in call]
+        self.assertEqual([call[call.index("--prefix") + 1] for call in npm_calls], [str(stage / auto.AUTO_FRONTEND)] * 4)
+        self.assertTrue(all(call[:2] == ("env", f"XDG_DATA_HOME={stage / 'user-data'}") for call in npm_calls))
         go_calls = [call for call in calls if str(self.go) in call]
         self.assertEqual(len(go_calls), 3)
         for call in go_calls:
@@ -142,8 +143,8 @@ class RealGoArtifactTest(unittest.TestCase):
             release = git("rev-parse", "HEAD").decode().strip()
             compiler = Path(shutil.which("go")).resolve()
             def run(*args, **kwargs):
-                if args[0] in ("chown", "npm"):
-                    return  # No service users or frontend dependencies in this tiny Go fixture.
+                if args[0] == "chown":
+                    return  # No service users in this tiny Go fixture.
                 command, environment = list(args), os.environ.copy()
                 if command[0] == "env":
                     command.pop(0)
@@ -152,6 +153,8 @@ class RealGoArtifactTest(unittest.TestCase):
                         environment[key] = value
                     if "build" in command:
                         environment.update(GOOS="linux", GOARCH="amd64")
+                if command[0] == "npm":
+                    return  # No frontend dependencies in this Go fixture.
                 subprocess.run(command, cwd=repository, env=environment, check=True,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             sop = Mock(REPO=repository, run=run)
