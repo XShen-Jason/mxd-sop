@@ -82,6 +82,31 @@ class ResumeConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "exact regular"):
             joint.verify_installed_configs(self.root)
 
+    def test_missing_backup_can_use_explicit_matching_ancestor_without_mutation(self):
+        # An operator may have removed the previous backup after Git advanced.
+        # A pinned historical config is evidence only; do not invent a backup.
+        self.assertEqual(joint.verify_installed_configs(config_source_commit=self.old), self.old)
+        self.assertEqual(self.installed.read_bytes(), b"old config\n")
+        with self.assertRaisesRegex(RuntimeError, "Git baseline"):
+            joint.verify_installed_configs()
+
+    def test_explicit_source_rejects_symbolic_short_and_unrelated_revisions(self):
+        for revision in ("HEAD~1", self.old[:12], "--help"):
+            with self.subTest(revision=revision), self.assertRaisesRegex(RuntimeError, "full commit"):
+                joint.verify_installed_configs(config_source_commit=revision)
+        with self.assertRaises(subprocess.CalledProcessError):
+            joint.verify_installed_configs(config_source_commit="4" * 40)
+
+    def test_explicit_source_never_authorizes_customized_config(self):
+        self.installed.write_bytes(b"operator customization\n")
+        with self.assertRaisesRegex(RuntimeError, "Git baseline"):
+            joint.verify_installed_configs(config_source_commit=self.old)
+        self.assertEqual(self.installed.read_bytes(), b"operator customization\n")
+
+    def test_explicit_source_and_backup_cannot_be_combined(self):
+        with self.assertRaisesRegex(RuntimeError, "Choose either"):
+            joint.verify_installed_configs(self.backup, config_source_commit=self.old)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

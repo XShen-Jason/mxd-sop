@@ -85,11 +85,12 @@ class LoginReleaseTest(unittest.TestCase):
                  patch.object(joint.sop, "restore_built_assets") as restore, patch.object(joint, "install_binary") as install, \
                  patch.object(joint.sop, "run") as run:
                 with self.assertRaisesRegex(RuntimeError, "build failed"):
-                    joint.deploy("a" * 40)
+                    joint.deploy("a" * 40, config_source_commit="b" * 40)
             restore.assert_called_once_with(root)
             install.assert_not_called()
             self.assertEqual([call.args for call in run.call_args_list], [("curl", "--version")])
             self.assertEqual(config.read_bytes(), b"current")
+            self.assertEqual((root / "nginx-source-head").read_text(), "b" * 40 + "\n")
 
     def test_failed_switch_restores_both_runtimes_and_config_without_restoring_data(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -32,15 +32,22 @@ def backup_commit(backup, name):
     return value
 
 
-def verify_installed_configs(resume_backup=None):
-    """Accept current Git configs, or the explicitly selected rollback baseline.
+def verify_installed_configs(resume_backup=None, config_source_commit=None):
+    """Read-only validation against current Git or an explicit historical baseline.
 
-    A failed build can advance Git before runtime/config switching. A resume must
-    match that backup's target HEAD, its exact saved configs and their Git source.
-    This is read-only validation: never reset Git, restore data or ignore drift.
+    A resume checks the saved snapshot and its Git source. When that backup is
+    missing, an explicit full ancestor SHA must match every installed snippet;
+    never infer a baseline, reset Git, restore data or accept customized content.
     """
+    if resume_backup is not None and config_source_commit is not None:
+        raise RuntimeError("Choose either a resume backup or an explicit config source commit")
     head = sop.git("rev-parse", "HEAD").decode().strip()
     reference = head
+    if config_source_commit is not None:
+        if not re.fullmatch(r"[a-f0-9]{40}", config_source_commit):
+            raise RuntimeError("Config source requires a full commit SHA")
+        sop.git("merge-base", "--is-ancestor", config_source_commit, head)
+        reference = config_source_commit
     if resume_backup is not None:
         resume_backup = Path(resume_backup)
         if (resume_backup.resolve() != resume_backup or resume_backup.parent != BACKUP_ROOT or
@@ -64,6 +71,8 @@ def verify_installed_configs(resume_backup=None):
                 raise RuntimeError(f"Installed config differs from the selected backup: {name}")
     if resume_backup is not None:
         print(f"RESUME_CONFIG_BASELINE_OK; {reference}; {resume_backup}", flush=True)
+    elif config_source_commit is not None:
+        print(f"EXPLICIT_CONFIG_BASELINE_OK; {reference}; all installed snippets match", flush=True)
     return reference
 
 
@@ -141,14 +150,14 @@ def probe_service(service):
     print(f"{service.upper()}_IP_POLICY_OK;10/300s;5_failures/1200s;durable_count;IPv6_403", flush=True)
 
 
-def deploy(release, resume_backup=None):
+def deploy(release, resume_backup=None, config_source_commit=None):
     # Preflight checks every tracked/untracked entry. Its sole runtime-token
     # exception becomes ignored only after the target .gitignore is installed.
     if sop.preflight(release):
         raise RuntimeError("Joint release requires a clean worktree; no automatic stash")
     auto_domain, go_binary = preflight_auto(sop, release)
     sop.run("curl", "--version", capture=True)
-    config_reference = verify_installed_configs(resume_backup)
+    config_reference = verify_installed_configs(resume_backup, config_source_commit)
     player_pid = sop.service_value("mxd-player", "MainPID")
     backup = sop.make_backup([], release)
     (backup / "nginx-source-head").write_text(config_reference + "\n")
@@ -214,6 +223,8 @@ def deploy(release, resume_backup=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("commit", help="Full pinned origin/main commit")
-    parser.add_argument("--resume-backup", type=Path, help="Verify configs against a specific failed release backup; never restore its database")
+    baseline = parser.add_mutually_exclusive_group()
+    baseline.add_argument("--resume-backup", type=Path, help="Verify configs against a specific failed release backup; never restore its database")
+    baseline.add_argument("--config-source-commit", help="When the prior backup is missing, require every installed snippet to match this full ancestor SHA")
     args = parser.parse_args()
-    deploy(args.commit, args.resume_backup)
+    deploy(args.commit, args.resume_backup, args.config_source_commit)
