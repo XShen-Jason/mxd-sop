@@ -88,6 +88,34 @@ IPv4 及其 IPv6 映射形式归一后共用计数；真实 IPv6 直接拒绝，
 auto 实现同样规则，但使用其独立数据库，两个服务的失败次数不合并。
 人工查看/解封及部署步骤见 `docs/deployment/LOGIN-IP-PROTECTION.md`。
 
+## auth.login-audit
+
+登录尝试的库外操作记录，覆盖两个登录别名，每个到达 SOP 且完成响应的 POST 请求最多写
+一条 JSON 行。记录用户实际提交的账号，而非根据登录成功后身份反查；失败和不存在账号
+同样记录。该值是访客声明，不能当作已验证身份或账号存在的证据。
+
+```json
+{"event":"auth.login.attempt","time":"2026-11-16T12:00:00.000Z","requestId":"req-1","ip":"192.0.2.10","route":"/api/v1/auth/login","username":"Entered.Account","usernameState":"provided","status":401,"result":"invalid-credentials"}
+```
+
+`time` 是响应完成时的 UTC 时间；`ip` 使用与登录保护相同的可信来源并归一。
+`username` 保留大小写、空格及原始拼写，最多 128 个 UTF-16 单元，超过则明确标记
+`usernameState=truncated`。字符串正常为 `provided`；缺字段为 `missing`；非字符串为
+`invalid-type`；正文未解析/无可用对象时为 `body-unavailable`，后三者 `username=null`。
+不把对象序列化成账号，不记录密码、Cookie、Authorization、请求/响应正文或 URL 查询参数。
+JSON 转义换行及 Unicode 行分隔符，输入不能伪造额外日志行。
+
+`result` 按响应状态分为 `success`、`invalid-credentials`、`invalid-request`、`blocked`、
+`limited`、`unavailable`、`failed`。第 5 次错误触发的 429 仍有已解析账号；之后在请求头
+阶段被暂停/封禁/限流的请求不继续读取正文，只记录 IP、结果和 `username=null`。
+Nginx 直接拦截的请求没有到达 SOP，只会出现在 Nginx 安全日志中，无法取得提交账号。
+
+生产默认写在数据库所在目录的 `login-attempts.log`，权限 0600，当前文件与 4 份轮转归档
+各最多 5 MiB（总计最多 25 MiB，单进程使用）。重启继续追加；不会迁移旧请求或回填历史账号。
+这是尽力而为的操作证据，文件写入失败不改变认证结果，每分钟最多输出一次不含敏感数据的
+`auth.login.audit_error` 诊断。认证事务、失败累计和文件日志不组成原子提交。
+查看和边界说明见 `docs/deployment/SOP-LOGIN-AUDIT.md`。
+
 ## auth.logout
 
 `POST /api/v1/auth/logout`。使当前令牌失效，成功返回 204。重复调用幂等。

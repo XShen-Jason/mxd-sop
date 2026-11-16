@@ -103,6 +103,11 @@ not scan or dispatch the existing manual backlog.
 清理扫描最多 10,000 个 IP 且每分钟最多触发一次。达到容量上限拒绝新 IP，
 不驱逐有效限制；持久累计与永久封禁不随内存清理或重启清零，具体语义见 `contracts/auth.md`。
 
+SOP 登录响应完成时追加一条字段白名单日志，提交账号截断至 128 个 UTF-16 单元。
+不为日志读取被提前拒绝的正文，不复制密码或完整请求。单进程同步 append/轮转，没有
+无界异步队列或重试积压；总文件预算 25 MiB。写入失败隔离于认证，诊断每分钟最多一次。
+该文件是库外操作记录，不新增业务表、查询 API 或前端轮询。
+
 For up to 10 internal users, SQLite in WAL mode with `synchronous=NORMAL`,
 memory temporary storage, and a bounded page cache is the selected persistence
 adapter. It provides transactional writes and indexed status/submitter queries

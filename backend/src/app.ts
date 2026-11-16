@@ -5,7 +5,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { appOptions } from './config/options.js';
-import { AuthService, IpAccessPolicy, MemoryIpFailureStore, SqliteIpFailureStore } from './modules/auth/public/index.js';
+import { AuthService, IpAccessPolicy, MemoryIpFailureStore, SqliteIpFailureStore, FileLoginAudit, registerLoginAudit, type LoginAuditSink } from './modules/auth/public/index.js';
 import { JsonUserRepository } from './modules/auth/public/index.js';
 import { SqliteUserRepository } from './modules/auth/infrastructure/sqlite-users.js';
 import { SqliteSessionRepository } from './modules/auth/infrastructure/sqlite-sessions.js';
@@ -36,6 +36,7 @@ import { ServerOptionsProjection, SqliteServerOptionsRepository } from './module
 loadEnvironment();
 
 export interface AppConfig {
+  loginAudit?: LoginAuditSink;
   catalogPath?: string;
   catalogImageMapPath?: string;
   dataPath?: string;
@@ -80,6 +81,10 @@ export async function createApp(config: AppConfig = {}) {
   const projectPath = (relative: string) => path.isAbsolute(relative) ? relative : path.join(projectRoot, relative);
   const testPersistence = Boolean(config.dataPath || config.usersPath);
   const databasePath = projectPath(config.databasePath ?? process.env.DATABASE_PATH ?? 'data/ops.sqlite');
+  // Operational login evidence lives beside the runtime DB, outside its schema.
+  // Contract tests inject a sink explicitly and do not create incidental files.
+  const loginAudit = config.loginAudit ?? (process.env.NODE_ENV === 'test' ? undefined : new FileLoginAudit(path.join(path.dirname(databasePath), 'login-attempts.log')));
+  if (loginAudit) registerLoginAudit(app, loginAudit);
   const bundledCatalogPath = projectPath('data/item-catalog/source/道具表-9-5.csv');
   const environmentCatalogPath = process.env.ITEM_CATALOG_PATH ? projectPath(process.env.ITEM_CATALOG_PATH) : undefined;
   const runtimeCatalogPath = environmentCatalogPath ?? (testPersistence ? bundledCatalogPath : path.join(path.dirname(databasePath), 'item-catalog.csv'));

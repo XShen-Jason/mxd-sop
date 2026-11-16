@@ -5,3 +5,6 @@ export { JsonUserRepository } from '../infrastructure/json-users.js';
 export type { StoredUser, UserRepository } from '../infrastructure/json-users.js';
 export { IpAccessPolicy } from '../domain/ip-access.js';
 export { MemoryIpFailureStore, SqliteIpFailureStore } from '../infrastructure/ip-failures.js';
+export { FileLoginAudit } from '../infrastructure/file-login-audit.js';
+export type { LoginAttemptRecord, LoginAuditSink } from '../domain/login-audit.js';
+export { registerLoginAudit } from '../interface/login-audit.js';

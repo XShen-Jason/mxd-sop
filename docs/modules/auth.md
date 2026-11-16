@@ -9,6 +9,7 @@
 In scope:
 
 - 用户名/密码登录、退出和当前身份查询。
+- 登录请求中提交账号的库外审计日志，含可信 IP、UTC 时间和结果，不记录凭据。
 - 按 IPv4 的登录请求限流、认证失败暂停及持久永久封禁，拒绝 IPv6；规则与恢复语义见 `docs/contracts/auth.md`。
 - `customer`（普通客服）、`manager`（管理）、`super_admin`（超级管理）三层角色。
 - `accounts` 工作区持有者可创建、编辑、停用、启用和删除三类账号，并分别调整其工作区权限和上传权限。
@@ -33,6 +34,7 @@ Out of scope:
 | Contract | 用途 |
 | --- | --- |
 | auth.login | 登录并取得会话令牌 |
+| auth.login-audit | 在服务器私有文件中记录输入账号和登录结果 |
 | auth.logout | 使当前会话失效 |
 | auth.me | 查询当前用户 |
 | auth.list-users | 管理员查看账号目录 |
@@ -55,6 +57,7 @@ Out of scope:
 
 `backend/tests/login-limiter.test.ts` 验证滚动窗口、失败阈值、暂停恢复及内存上限；
 `backend/tests/ip-access.test.ts` 验证持久累计、第 21 次永久封禁、并发、重启、人工解封与 IPv6 拒绝；
+`backend/tests/login-audit.test.ts` 验证成功/失败提交账号、早期拒绝、敏感字段排除、日志注入防护、轮转和写入失败隔离；
 `backend/tests/login-protection.test.ts` 验证两个登录地址共用额度、HTTP 错误、并发请求、
 可信代理 IP 和伪造转发头，使用模拟时间覆盖边界而无需实际等待。
 `deploy/tests/cloudflare-realip.test.py` 在隔离的真实 Nginx 中验证橙云访客 IP 恢复，
