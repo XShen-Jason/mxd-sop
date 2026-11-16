@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 import secrets
 import shutil
 import sqlite3
@@ -17,6 +18,53 @@ from auto_security_release import AUTO_BINARY, AUTO_DATABASE, backup_auto, build
 spec = importlib.util.spec_from_file_location("sop_release", Path(__file__).with_name("update-sop-security.py"))
 sop = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sop)
+BACKUP_ROOT = Path("/var/backups/mxd-sop")
+
+
+def backup_commit(backup, name):
+    """Read only a release SHA from an existing, non-link backup metadata file."""
+    file = backup / name
+    if not file.is_file() or file.is_symlink():
+        raise RuntimeError(f"Missing regular backup metadata: {name}")
+    value = file.read_text().strip()
+    if not re.fullmatch(r"[a-f0-9]{40}", value):
+        raise RuntimeError(f"Invalid backup commit: {name}")
+    return value
+
+
+def verify_installed_configs(resume_backup=None):
+    """Accept current Git configs, or the explicitly selected rollback baseline.
+
+    A failed build can advance Git before runtime/config switching. A resume must
+    match that backup's target HEAD, its exact saved configs and their Git source.
+    This is read-only validation: never reset Git, restore data or ignore drift.
+    """
+    head = sop.git("rev-parse", "HEAD").decode().strip()
+    reference = head
+    if resume_backup is not None:
+        resume_backup = Path(resume_backup)
+        if (resume_backup.resolve() != resume_backup or resume_backup.parent != BACKUP_ROOT or
+                not resume_backup.name.startswith("security-release-") or not resume_backup.is_dir()):
+            raise RuntimeError("Resume requires an exact regular security-release backup directory")
+        if backup_commit(resume_backup, "target-head") != head:
+            raise RuntimeError("Resume backup target does not match current Git HEAD")
+        # Old backups predate the separate config baseline; subsequent retries
+        # preserve it independently of the Git source that has already advanced.
+        name = "nginx-source-head" if (resume_backup / "nginx-source-head").exists() else "before-head"
+        reference = backup_commit(resume_backup, name)
+        sop.git("merge-base", "--is-ancestor", reference, head)
+    for name, destination in sop.CONFIGS.items():
+        installed = destination.read_bytes().replace(b"\r\n", b"\n")
+        expected = sop.git("show", f"{reference}:deploy/security/{name}").replace(b"\r\n", b"\n")
+        if installed != expected:
+            raise RuntimeError(f"Installed config differs from verified Git baseline: {name}")
+        if resume_backup is not None:
+            saved = resume_backup / name
+            if not saved.is_file() or saved.is_symlink() or saved.read_bytes().replace(b"\r\n", b"\n") != installed:
+                raise RuntimeError(f"Installed config differs from the selected backup: {name}")
+    if resume_backup is not None:
+        print(f"RESUME_CONFIG_BASELINE_OK; {reference}; {resume_backup}", flush=True)
+    return reference
 
 
 def check_public_ipv4(url):
@@ -93,17 +141,15 @@ def probe_service(service):
     print(f"{service.upper()}_IP_POLICY_OK;10/300s;5_failures/1200s;durable_count;IPv6_403", flush=True)
 
 
-def deploy(release):
+def deploy(release, resume_backup=None):
     if sop.preflight(release) or sop.git("status", "--porcelain").strip():
         raise RuntimeError("Joint release requires a clean worktree; no automatic stash")
     auto_domain, go_binary = preflight_auto(sop, release)
     sop.run("curl", "--version", capture=True)
-    # Do not overwrite operator customizations in installed snippets.
-    for name, destination in sop.CONFIGS.items():
-        if destination.read_bytes().replace(b"\r\n", b"\n") != sop.git("show", f"HEAD:deploy/security/{name}").replace(b"\r\n", b"\n"):
-            raise RuntimeError(f"Installed config differs from current Git HEAD: {name}")
+    config_reference = verify_installed_configs(resume_backup)
     player_pid = sop.service_value("mxd-player", "MainPID")
     backup = sop.make_backup([], release)
+    (backup / "nginx-source-head").write_text(config_reference + "\n")
     backup_auto(backup)
     switched = config_changed = False
     try:
@@ -166,4 +212,6 @@ def deploy(release):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("commit", help="Full pinned origin/main commit")
-    deploy(parser.parse_args().commit)
+    parser.add_argument("--resume-backup", type=Path, help="Verify configs against a specific failed release backup; never restore its database")
+    args = parser.parse_args()
+    deploy(args.commit, args.resume_backup)

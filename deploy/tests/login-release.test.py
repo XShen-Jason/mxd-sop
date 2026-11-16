@@ -77,7 +77,7 @@ class LoginReleaseTest(unittest.TestCase):
             config = root / "guard.conf"
             config.write_bytes(b"current")
             def git(*args):
-                return b"current" if args[0] == "show" else b""
+                return b"current" if args[0] == "show" else b"a" * 40 if args[0] == "rev-parse" else b""
             with patch.object(joint.sop, "preflight", return_value=[]), patch.object(joint.sop, "git", side_effect=git), \
                  patch.object(joint, "preflight_auto", return_value=("auto.example.com", Path("/configured/go"))), patch.object(joint.sop, "CONFIGS", {"guard.conf": config}), \
                  patch.object(joint.sop, "service_value", return_value="42"), patch.object(joint.sop, "make_backup", return_value=root), \

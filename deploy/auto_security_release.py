@@ -104,10 +104,14 @@ def build_auto(sop, go_binary, release):
           str(go_binary), "-C", str(stage / AUTO_SOURCE)]
     for command in ("test", "vet"):
         sop.run(*go, command, "./...", user=True)
-    artifact = stage / "mxd-auto-process"
+    # The archive creates stage/mxd-auto-process as a SOURCE DIRECTORY. Go treats
+    # '-o <existing directory>' as a container, so use the manual's distinct filename.
+    artifact = stage / "mxd-auto-process.new"
+    if artifact.exists() or artifact.is_symlink():
+        raise RuntimeError(f"Auto output path already exists: {artifact}")
     sop.run(*go, "build", "-trimpath", "-ldflags=-s -w", "-o", str(artifact), "./cmd/mxd-auto-process", user=True)
-    if not artifact.is_file() or artifact.stat().st_size == 0:
-        raise RuntimeError("Auto build produced no executable")
+    if not artifact.is_file() or artifact.is_symlink() or artifact.stat().st_size == 0:
+        raise RuntimeError(f"Auto build produced no regular executable at {artifact}")
     return artifact
 
 

@@ -1,5 +1,8 @@
 """Regression coverage for the Debian installation described in DEPLOYMENT-UPDATE.md."""
 from pathlib import Path
+import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -93,8 +96,10 @@ class AutoEnvironmentTest(unittest.TestCase):
         existing_asset = self.root / auto.AUTO_SOURCE / "internal/operatorapi/assets/index.html"
         existing_asset.parent.mkdir(parents=True)
         existing_asset.write_text("existing worktree asset")
-        artifact = stage / "mxd-auto-process"
+        artifact = stage / "mxd-auto-process.new"
         def run(*args, **kwargs):
+            if args[0] == "tar":
+                (stage / "mxd-auto-process").mkdir()
             if "./cmd/mxd-auto-process" in args:
                 artifact.write_bytes(b"built binary")
         self.sop.run.side_effect = run
@@ -113,6 +118,51 @@ class AutoEnvironmentTest(unittest.TestCase):
         self.assertLess(calls.index(npm_calls[-1]), calls.index(go_calls[0]))
         self.assertTrue(all(call.kwargs.get("user") for call in self.sop.run.call_args_list[1:]))
         self.assertEqual(existing_asset.read_text(), "existing worktree asset")
+        self.assertTrue((stage / "mxd-auto-process").is_dir())
+
+
+class RealGoArtifactTest(unittest.TestCase):
+    @unittest.skipUnless(all(shutil.which(tool) for tool in ("go", "git", "tar")), "requires Go, Git and tar")
+    def test_exported_directory_cannot_be_mistaken_for_the_compiled_binary(self):
+        # Git archive must really create stage/mxd-auto-process. Mocking extraction
+        # previously hid Go's '-o existing-directory' behavior and this regression.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            repository, stage = root / "repo", root / "stage"
+            source = repository / auto.AUTO_SOURCE
+            (source / "cmd/mxd-auto-process").mkdir(parents=True)
+            (source / "go.mod").write_text("module example.invalid/release-probe\n\ngo 1.23\n")
+            (source / "cmd/mxd-auto-process/main.go").write_text('package main\nfunc main() { println("artifact-ok") }\n')
+            stage.mkdir()
+            def git(*args):
+                return subprocess.check_output(["git", *args], cwd=repository, stderr=subprocess.STDOUT)
+            git("init", "--quiet")
+            git("add", ".")
+            git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "--quiet", "-m", "fixture")
+            release = git("rev-parse", "HEAD").decode().strip()
+            compiler = Path(shutil.which("go")).resolve()
+            def run(*args, **kwargs):
+                if args[0] in ("chown", "npm"):
+                    return  # No service users or frontend dependencies in this tiny Go fixture.
+                command, environment = list(args), os.environ.copy()
+                if command[0] == "env":
+                    command.pop(0)
+                    while command and "=" in command[0]:
+                        key, value = command.pop(0).split("=", 1)
+                        environment[key] = value
+                    if "build" in command:
+                        environment.update(GOOS="linux", GOARCH="amd64")
+                subprocess.run(command, cwd=repository, env=environment, check=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            sop = Mock(REPO=repository, run=run)
+            with patch.object(auto.tempfile, "mkdtemp", return_value=str(stage)):
+                artifact = auto.build_auto(sop, compiler, release)
+            self.assertTrue((stage / "mxd-auto-process").is_dir())
+            self.assertEqual(artifact.parent, stage)
+            self.assertNotEqual(artifact, stage / "mxd-auto-process")
+            self.assertEqual(artifact.read_bytes()[:4], b"\x7fELF")
+            metadata = subprocess.check_output([str(compiler), "version", "-m", str(artifact)])
+            self.assertIn(b"GOOS=linux", metadata)
 
 
 if __name__ == "__main__":

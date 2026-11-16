@@ -36,6 +36,8 @@ Debian 初次部署的 env 不含 `AUTO_DOMAIN`，公网检查默认使用手册
 Auto 从目标提交导出到 `/var/tmp/mxd-auto-security-*` 后，依次构建前端和 Go；
 嵌入资源、依赖和 Go 缓存都留在该临时目录，不向服务器仓库回写构建资产。
 `GOTOOLCHAIN=local` 保证检测和构建使用同一编译器，不隐式下载其他版本。
+二进制明确输出为临时根目录的 `mxd-auto-process.new`；`mxd-auto-process/` 是导出的
+源码目录，不能作为 `go build -o` 的文件名，否则 Go 会把二进制放到该目录内部。
 
 脚本在 `/var/backups/mxd-sop/security-release-*` 保存 SOP 源码版本、构建产物、数据库快照、
 Nginx 片段以及 auto 的旧二进制、数据库快照、配置和密钥。目录 root 专有，证据不进入业务表。
@@ -51,6 +53,15 @@ auto 重启会短暂断开游戏连接，后续按现有启用/自动恢复配�
 本机验证失败恢复旧运行产物和 Nginx 片段，不还原数据库或密钥，不覆盖上线期间业务写入。
 新增计数表是兼容的附加表；旧程序不执行永久规则，因此回退后必须处理错误再重新上线。
 Git 可能已前进而产物已回退，不能仅用 Git HEAD 判断运行版本。备份和 stash 不删除。
+
+这种失败状态重试时，显式传入失败输出中的备份目录：
+`python3 <归档目录>/deploy/update-login-security.py <新提交> --resume-backup /var/backups/mxd-sop/security-release-...`。
+脚本要求该目录为固定备份根下的真实目录、`target-head` 等于服务器当前 Git HEAD，
+且当前 Nginx 片段同时等于备份快照和备份记录的 Git 版本。任一不符仍停止，不允许借
+重试覆盖人工配置。旧备份使用 `before-head` 作为配置来源；新备份另外保存
+`nginx-source-head`，使连续失败重试也能保留真正的配置版本。此参数只选择核验基准，
+不会恢复旧数据库/密钥或回退 Git；核验通过后照常新建备份、构建并切换。
+
 公网检查用 `curl --ipv4` 明确验证允许的地址族，保留 TLS 证书校验；失败不回滚已通过本机
 验证的服务，结果以 `joint-deployed.json` 和实际错误为准。
 最终成功标识：`LOGIN_SECURITY_DEPLOYMENT_OK`。它不证明完整游戏流程或承载能力。
